@@ -21,3 +21,14 @@ repos:
         entry: python3 scripts/pre_commit_tests.py
         language: system
         pass_filenames: false
+        types: [file, python]
+      - id: formatting
+        language: system
+        name: format with ruff
+        types: [file, python]
+        entry: ruff format lazyworktree tests
+      - id: lint
+        language: system
+        name: lint with ruff
+        types: [file, python]
+        entry: ruff check --fix --unsafe-fixes lazyworktree tests
