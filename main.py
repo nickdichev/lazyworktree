@@ -2,25 +2,40 @@
 # /// script
 # requires-python = ">=3.12"
 # dependencies = [
+#     "click",
 #     "textual",
 #     "rich",
 #     "PyYAML",
 # ]
 # ///
 
-import sys
+import os
+
+import click
+
+import lazyworktree.app as app_module
+import lazyworktree.models as models
 from lazyworktree.app import GitWtStatus
 
 
-def main():
-    initial_filter = " ".join(sys.argv[1:]).strip()
-    app = GitWtStatus(initial_filter=initial_filter)
+@click.command()
+@click.option(
+    "--worktree-dir",
+    type=click.Path(file_okay=False, dir_okay=True),
+    default=None,
+    help="Override the default worktree root directory.",
+)
+@click.argument("initial_filter", nargs=-1)
+def main(worktree_dir: str | None, initial_filter: tuple[str, ...]) -> None:
+    if worktree_dir:
+        resolved_dir = os.path.expanduser(worktree_dir)
+        models.WORKTREE_DIR = resolved_dir
+        app_module.WORKTREE_DIR = resolved_dir
+    filter_value = " ".join(initial_filter).strip()
+    app = GitWtStatus(initial_filter=filter_value)
     run_result = app.run()
-    if run_result is None:
-        sys.exit(0)
-    result = run_result
-    if result:
-        print(result)
+    if run_result:
+        click.echo(run_result)
 
 
 if __name__ == "__main__":

@@ -42,6 +42,12 @@ cd lazyworktree
 uv run main.py
 ```
 
+You can override the default worktree root:
+
+```bash
+uv run main.py --worktree-dir ~/worktrees
+```
+
 ## Shell Integration (Zsh)
 
 To enable the "jump" functionality (changing your shell's current directory on exit), add the helper functions from `shell/functions.shell` to your `.zshrc`.
