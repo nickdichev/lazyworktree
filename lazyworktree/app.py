@@ -442,7 +442,7 @@ class GitWtStatus(App):
                 current_row_key = table.coordinate_to_cell_key(
                     (table.cursor_row, 0)
                 ).row_key
-            except:
+            except Exception:
                 pass
         table.clear()
         query = self.filter_query.strip().lower()
@@ -491,7 +491,7 @@ class GitWtStatus(App):
             try:
                 index = table.get_row_index(current_row_key)
                 table.move_cursor(row=index)
-            except:
+            except Exception:
                 pass
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
@@ -1063,7 +1063,7 @@ class GitWtStatus(App):
         try:
             row_key = table.coordinate_to_cell_key((table.cursor_row, 0)).row_key
             path = str(row_key.value)
-        except:
+        except Exception:
             return
         wt = next((w for w in self.worktrees if w.path == path), None)
         if not wt:
@@ -1127,7 +1127,7 @@ class GitWtStatus(App):
         try:
             row_key = table.coordinate_to_cell_key((table.cursor_row, 0)).row_key
             path = str(row_key.value)
-        except:
+        except Exception:
             return
         wt = next((w for w in self.worktrees if w.path == path), None)
         if not wt:
