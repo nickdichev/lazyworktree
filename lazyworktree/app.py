@@ -310,6 +310,22 @@ class GitWtStatus(App):
             return out.strip() if strip else out
         except Exception: return ""
 
+    async def _run_command_checked(self, args: List[str], cwd: Optional[str], error_prefix: str) -> bool:
+        try:
+            proc = await asyncio.create_subprocess_exec(*args, cwd=cwd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+            stdout, stderr = await proc.communicate()
+        except Exception as exc:
+            self.notify(f"{error_prefix}: {exc}", severity="error")
+            return False
+        if proc.returncode == 0:
+            return True
+        detail = stderr.decode(errors="replace").strip() or stdout.decode(errors="replace").strip()
+        if detail:
+            self.notify(f"{error_prefix}: {detail}", severity="error")
+        else:
+            self.notify(error_prefix, severity="error")
+        return False
+
     async def get_main_branch(self) -> str:
         if self._main_branch: return self._main_branch
         try:
@@ -773,11 +789,22 @@ class GitWtStatus(App):
                         env["WORKTREE_BRANCH"] = wt.branch; env["MAIN_WORKTREE_PATH"] = main_path; env["WORKTREE_PATH"] = path; env["WORKTREE_NAME"] = os.path.basename(path)
                         await self._run_wt_commands(terminate_commands, main_path, env)
                     except Exception as config_err: self.notify(f"Error loading .wt config: {config_err}", severity="error")
-                process = await asyncio.create_subprocess_exec("git", "worktree", "remove", "--force", path)
-                await process.communicate()
-                process = await asyncio.create_subprocess_exec("git", "branch", "-D", wt.branch)
-                await process.communicate()
-                self.notify("Worktree deleted"); self.refresh_data()
+                removed = await self._run_command_checked(
+                    ["git", "worktree", "remove", "--force", path],
+                    cwd=None,
+                    error_prefix=f"Failed to remove worktree {path}",
+                )
+                if not removed:
+                    return
+                deleted = await self._run_command_checked(
+                    ["git", "branch", "-D", wt.branch],
+                    cwd=None,
+                    error_prefix=f"Failed to delete branch {wt.branch}",
+                )
+                if not deleted:
+                    return
+                self.notify("Worktree deleted")
+                self.refresh_data()
             except Exception as e: self.notify(f"Failed to delete: {e}", severity="error")
         self.push_screen(ConfirmScreen(f"Are you sure you want to delete worktree?\n\nPath: {path}\nBranch: {wt.branch}"), lambda confirm: self.run_worker(do_delete(confirm)))
 
@@ -806,15 +833,36 @@ class GitWtStatus(App):
                         await self._run_wt_commands(terminate_commands, main_path, env)
                     except Exception as config_err: self.notify(f"Error loading .wt config: {config_err}", severity="error")
                 main_branch = await self.get_main_branch()
-                process = await asyncio.create_subprocess_exec("git", "checkout", main_branch, cwd=path)
-                await process.communicate()
-                process = await asyncio.create_subprocess_exec("git", "merge", "--no-edit", wt.branch, cwd=path)
-                await process.communicate()
-                process = await asyncio.create_subprocess_exec("git", "worktree", "remove", "--force", path)
-                await process.communicate()
-                process = await asyncio.create_subprocess_exec("git", "branch", "-D", wt.branch)
-                await process.communicate()
-                self.notify("Worktree absorbed successfully"); self.refresh_data()
+                checked_out = await self._run_command_checked(
+                    ["git", "checkout", main_branch],
+                    cwd=path,
+                    error_prefix=f"Failed to checkout {main_branch}",
+                )
+                if not checked_out:
+                    return
+                merged = await self._run_command_checked(
+                    ["git", "merge", "--no-edit", wt.branch],
+                    cwd=path,
+                    error_prefix=f"Failed to merge {wt.branch} into {main_branch}",
+                )
+                if not merged:
+                    return
+                removed = await self._run_command_checked(
+                    ["git", "worktree", "remove", "--force", path],
+                    cwd=None,
+                    error_prefix=f"Failed to remove worktree {path}",
+                )
+                if not removed:
+                    return
+                deleted = await self._run_command_checked(
+                    ["git", "branch", "-D", wt.branch],
+                    cwd=None,
+                    error_prefix=f"Failed to delete branch {wt.branch}",
+                )
+                if not deleted:
+                    return
+                self.notify("Worktree absorbed successfully")
+                self.refresh_data()
             except Exception as e: self.notify(f"Failed to absorb: {e}", severity="error")
         self.push_screen(ConfirmScreen(f"Absorb worktree to main branch?\n\nPath: {path}\nBranch: {wt.branch}\n\nThis will merge changes to main and delete the worktree."), lambda confirm: self.run_worker(do_absorb(confirm)))
 
