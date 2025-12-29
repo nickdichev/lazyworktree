@@ -21,19 +21,21 @@ async def test_rename_worktree_success(fake_repo, tmp_path, monkeypatch):
     async with app.run_test() as pilot:
         # Wait for startup
         await pilot.pause()
-        
+
         # Wait for table to be populated
         table = app.query_one("#worktree-table")
+
         async def wait_for_rows():
             for _ in range(20):
                 if table.row_count > 0:
                     return
                 await pilot.pause(0.1)
+
         await wait_for_rows()
 
         # Find feature1 path
         feature1_path = fake_repo.worktrees["feature1"]
-        
+
         # Select it directly by finding the row index
         # We need to find which row corresponds to this path
         # The key is the path
@@ -43,30 +45,50 @@ async def test_rename_worktree_success(fake_repo, tmp_path, monkeypatch):
             table.focus()
         except Exception:
             pytest.fail(f"Could not find row for {feature1_path}")
-        
+
         # Trigger rename
         await pilot.press("m")
-        
+
         # Should be input screen
         await pilot.pause(0.5)
         assert isinstance(app.screen, InputScreen)
-        
+
         # Type new name "feature1-renamed"
-        await pilot.press("f", "e", "a", "t", "u", "r", "e", "1", "-", "r", "e", "n", "a", "m", "e", "d", "enter")
-        
+        await pilot.press(
+            "f",
+            "e",
+            "a",
+            "t",
+            "u",
+            "r",
+            "e",
+            "1",
+            "-",
+            "r",
+            "e",
+            "n",
+            "a",
+            "m",
+            "e",
+            "d",
+            "enter",
+        )
+
         # Wait for operation
         await pilot.pause(1.0)
-        
+
         # Verify directory moved
         old_path = fake_repo.worktrees["feature1"]
         new_path = old_path.parent / "feature1-renamed"
-        
+
         assert not old_path.exists()
         assert new_path.exists()
         assert (new_path / "README.md").read_text(encoding="utf-8") == "dirty\n"
 
         # Verify app state updated
-        renamed_wt = next((w for w in app.worktrees if w.branch == "feature1-renamed"), None)
+        renamed_wt = next(
+            (w for w in app.worktrees if w.branch == "feature1-renamed"), None
+        )
         assert renamed_wt is not None
         assert str(renamed_wt.path) == str(new_path)
 
@@ -81,24 +103,26 @@ async def test_rename_worktree_cancel(fake_repo, tmp_path, monkeypatch):
 
     async with app.run_test() as pilot:
         await pilot.pause()
-        
+
         # Wait for table to be populated
         table = app.query_one("#worktree-table")
+
         async def wait_for_rows():
             for _ in range(20):
                 if table.row_count > 0:
                     return
                 await pilot.pause(0.1)
+
         await wait_for_rows()
-        
+
         await pilot.press("down")
         await pilot.press("m")
         await pilot.pause(0.1)
-        
+
         # Escape to cancel
         await pilot.press("escape")
         await pilot.pause(0.1)
-        
+
         # Verify nothing changed
         old_path = fake_repo.worktrees["feature1"]
         assert old_path.exists()
