@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/chmouel/lazyworktree/internal/config"
 	"github.com/chmouel/lazyworktree/internal/models"
 )
 
@@ -30,6 +31,7 @@ type Service struct {
 	gitHost     string
 	notifiedSet map[string]bool
 	mu          sync.RWMutex
+	useDelta    bool
 }
 
 // NewService creates a new GitService instance
@@ -39,12 +41,42 @@ func NewService(notify NotifyFn, notifyOnce NotifyOnceFn) *Service {
 		semaphore <- struct{}{}
 	}
 
-	return &Service{
+	s := &Service{
 		notify:      notify,
 		notifyOnce:  notifyOnce,
 		semaphore:   semaphore,
 		notifiedSet: make(map[string]bool),
 	}
+
+	// Detect delta availability
+	s.detectDelta()
+
+	return s
+}
+
+// detectDelta checks if delta is available
+func (s *Service) detectDelta() {
+	cmd := exec.Command("delta", "--version")
+	if err := cmd.Run(); err == nil {
+		s.useDelta = true
+	}
+}
+
+// ApplyDelta pipes diff output through delta if available
+func (s *Service) ApplyDelta(diff string) string {
+	if !s.useDelta || diff == "" {
+		return diff
+	}
+
+	cmd := exec.Command("delta", "--no-gitconfig", "--paging=never")
+	cmd.Stdin = strings.NewReader(diff)
+	output, err := cmd.Output()
+	if err != nil {
+		// Silently fall back to plain diff
+		return diff
+	}
+
+	return string(output)
 }
 
 // acquireSemaphore acquires a semaphore token
@@ -492,4 +524,78 @@ func (s *Service) ResolveRepoName(ctx context.Context) string {
 	}
 
 	return "unknown"
+}
+
+// BuildThreePartDiff builds a comprehensive diff with staged, unstaged, and untracked changes
+func (s *Service) BuildThreePartDiff(ctx context.Context, path string, cfg *config.AppConfig) string {
+	var parts []string
+	totalChars := 0
+
+	// Part 1: Staged changes
+	stagedDiff := s.RunGit(ctx, []string{"git", "diff", "--cached", "--patch", "--no-color"}, path, []int{0}, false, false)
+	if stagedDiff != "" {
+		header := "=== Staged Changes ===\n"
+		parts = append(parts, header+stagedDiff)
+		totalChars += len(header) + len(stagedDiff)
+	}
+
+	// Part 2: Unstaged changes
+	if totalChars < cfg.MaxDiffChars {
+		unstagedDiff := s.RunGit(ctx, []string{"git", "diff", "--patch", "--no-color"}, path, []int{0}, false, false)
+		if unstagedDiff != "" {
+			header := "=== Unstaged Changes ===\n"
+			parts = append(parts, header+unstagedDiff)
+			totalChars += len(header) + len(unstagedDiff)
+		}
+	}
+
+	// Part 3: Untracked files (limited by config)
+	if totalChars < cfg.MaxDiffChars && cfg.MaxUntrackedDiffs > 0 {
+		untrackedFiles := s.getUntrackedFiles(ctx, path)
+		untrackedCount := len(untrackedFiles)
+		displayCount := untrackedCount
+		if displayCount > cfg.MaxUntrackedDiffs {
+			displayCount = cfg.MaxUntrackedDiffs
+		}
+
+		for i := 0; i < displayCount && totalChars < cfg.MaxDiffChars; i++ {
+			file := untrackedFiles[i]
+			diff := s.RunGit(ctx, []string{"git", "diff", "--no-index", "/dev/null", file}, path, []int{0, 1}, false, false)
+			if diff != "" {
+				header := fmt.Sprintf("=== Untracked: %s ===\n", file)
+				parts = append(parts, header+diff)
+				totalChars += len(header) + len(diff)
+			}
+		}
+
+		// Add truncation notice if we limited untracked files
+		if untrackedCount > displayCount {
+			notice := fmt.Sprintf("\n[...showing %d of %d untracked files]", displayCount, untrackedCount)
+			parts = append(parts, notice)
+			totalChars += len(notice)
+		}
+	}
+
+	result := strings.Join(parts, "\n\n")
+
+	// Truncate if exceeds max chars
+	if len(result) > cfg.MaxDiffChars {
+		result = result[:cfg.MaxDiffChars]
+		result += fmt.Sprintf("\n\n[...truncated at %d chars]", cfg.MaxDiffChars)
+	}
+
+	return result
+}
+
+// getUntrackedFiles returns a list of untracked files in the worktree
+func (s *Service) getUntrackedFiles(ctx context.Context, path string) []string {
+	statusRaw := s.RunGit(ctx, []string{"git", "status", "--porcelain"}, path, []int{0}, false, false)
+	var untracked []string
+	for _, line := range strings.Split(statusRaw, "\n") {
+		if strings.HasPrefix(line, "?? ") {
+			file := strings.TrimPrefix(line, "?? ")
+			untracked = append(untracked, file)
+		}
+	}
+	return untracked
 }

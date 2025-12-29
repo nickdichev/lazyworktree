@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -37,7 +38,10 @@ type (
 		status string
 		log    []commitLogEntry
 	}
-	refreshCompleteMsg struct{}
+	refreshCompleteMsg  struct{}
+	debouncedDetailsMsg struct {
+		selectedIndex int
+	}
 )
 
 type commitLogEntry struct {
@@ -105,6 +109,10 @@ type AppModel struct {
 	// Context
 	ctx    context.Context
 	cancel context.CancelFunc
+
+	// Debouncing
+	detailUpdateCancel  context.CancelFunc
+	pendingDetailsIndex int
 
 	// Exit
 	selectedPath string
@@ -268,7 +276,7 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.focusedPane == 0 {
 				m.worktreeTable, cmd = m.worktreeTable.Update(msg)
 				cmds = append(cmds, cmd)
-				m.updateDetailsView()
+				cmds = append(cmds, m.debouncedUpdateDetailsView())
 			} else if m.focusedPane == 1 {
 				m.statusViewport, cmd = m.statusViewport.Update(msg)
 				cmds = append(cmds, cmd)
@@ -282,7 +290,7 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.focusedPane == 0 {
 				m.worktreeTable, cmd = m.worktreeTable.Update(msg)
 				cmds = append(cmds, cmd)
-				m.updateDetailsView()
+				cmds = append(cmds, m.debouncedUpdateDetailsView())
 			} else if m.focusedPane == 1 {
 				m.statusViewport, cmd = m.statusViewport.Update(msg)
 				cmds = append(cmds, cmd)
@@ -291,6 +299,53 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				cmds = append(cmds, cmd)
 			}
 			return m, tea.Batch(cmds...)
+
+		case "ctrl+d", " ": // Page down
+			if m.focusedPane == 1 {
+				m.statusViewport.HalfViewDown()
+				return m, nil
+			} else if m.focusedPane == 2 {
+				m.logTable, cmd = m.logTable.Update(msg)
+				return m, cmd
+			}
+			return m, nil
+
+		case "ctrl+u": // Page up
+			if m.focusedPane == 1 {
+				m.statusViewport.HalfViewUp()
+				return m, nil
+			} else if m.focusedPane == 2 {
+				m.logTable, cmd = m.logTable.Update(msg)
+				return m, cmd
+			}
+			return m, nil
+
+		case "pgdown":
+			if m.focusedPane == 1 {
+				m.statusViewport.ViewDown()
+				return m, nil
+			} else if m.focusedPane == 2 {
+				m.logTable, cmd = m.logTable.Update(msg)
+				return m, cmd
+			}
+			return m, nil
+
+		case "pgup":
+			if m.focusedPane == 1 {
+				m.statusViewport.ViewUp()
+				return m, nil
+			} else if m.focusedPane == 2 {
+				m.logTable, cmd = m.logTable.Update(msg)
+				return m, cmd
+			}
+			return m, nil
+
+		case "G": // Go to bottom (shift+g)
+			if m.focusedPane == 1 {
+				m.statusViewport.GotoBottom()
+				return m, nil
+			}
+			return m, nil
 
 		case "enter":
 			if m.focusedPane == 0 {
@@ -341,6 +396,11 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		case "g":
+			// If in status pane, go to top, otherwise open lazygit
+			if m.focusedPane == 1 {
+				m.statusViewport.GotoTop()
+				return m, nil
+			}
 			return m, m.openLazyGit()
 
 		case "o":
@@ -380,8 +440,7 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Handle table input
 		if m.focusedPane == 0 {
 			m.worktreeTable, cmd = m.worktreeTable.Update(msg)
-			m.updateDetailsView()
-			return m, cmd
+			return m, tea.Batch(cmd, m.debouncedUpdateDetailsView())
 		}
 
 	case worktreesLoadedMsg:
@@ -420,6 +479,14 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			rows = append(rows, table.Row{entry.sha, entry.message})
 		}
 		m.logTable.SetRows(rows)
+		return m, nil
+
+	case debouncedDetailsMsg:
+		// Only update if the index matches and is still valid
+		if msg.selectedIndex == m.worktreeTable.Cursor() &&
+			msg.selectedIndex >= 0 && msg.selectedIndex < len(m.filteredWts) {
+			return m, m.updateDetailsView()
+		}
 		return m, nil
 
 	case errMsg:
@@ -590,10 +657,40 @@ func (m *AppModel) updateDetailsView() tea.Cmd {
 			}
 		}
 
+		// Build status content with automatic diff if dirty
+		statusContent := m.buildStatusContent(statusRaw)
+		if wt.Dirty {
+			// Automatically show diff when there are changes
+			diff := m.git.BuildThreePartDiff(m.ctx, wt.Path, m.config)
+			diff = m.git.ApplyDelta(diff)
+			if diff != "" {
+				statusContent = statusContent + "\n\n" + diff
+			}
+		}
+
 		return statusUpdatedMsg{
 			info:   m.buildInfoContent(wt),
-			status: m.buildStatusContent(statusRaw),
+			status: statusContent,
 			log:    logEntries,
+		}
+	}
+}
+
+func (m *AppModel) debouncedUpdateDetailsView() tea.Cmd {
+	// Cancel any existing pending detail update
+	if m.detailUpdateCancel != nil {
+		m.detailUpdateCancel()
+	}
+
+	// Get current selected index
+	m.pendingDetailsIndex = m.worktreeTable.Cursor()
+	selectedIndex := m.pendingDetailsIndex
+
+	return func() tea.Msg {
+		// Wait 200ms
+		time.Sleep(200 * time.Millisecond)
+		return debouncedDetailsMsg{
+			selectedIndex: selectedIndex,
 		}
 	}
 }
@@ -649,7 +746,10 @@ func (m *AppModel) showDiff() tea.Cmd {
 	}
 	wt := m.filteredWts[m.selectedIndex]
 	return func() tea.Msg {
-		diff := m.git.RunGit(m.ctx, []string{"git", "diff", "--patch", "--no-color"}, wt.Path, []int{0}, false, false)
+		// Build three-part diff (staged + unstaged + untracked)
+		diff := m.git.BuildThreePartDiff(m.ctx, wt.Path, m.config)
+		// Apply delta if available
+		diff = m.git.ApplyDelta(diff)
 		return statusUpdatedMsg{
 			info:   m.buildInfoContent(wt),
 			status: fmt.Sprintf("Diff for %s:\n\n%s", wt.Branch, diff),
@@ -835,7 +935,7 @@ func (m *AppModel) computeLayout() layoutDims {
 	if m.focusedPane == 0 {
 		leftRatio = 0.60
 	} else if m.focusedPane == 1 || m.focusedPane == 2 {
-		leftRatio = 0.45
+		leftRatio = 0.20
 	}
 
 	leftWidth := int(float64(width-gapX) * leftRatio)
@@ -1087,13 +1187,45 @@ func (m *AppModel) buildStatusContent(statusRaw string) string {
 	if strings.TrimSpace(statusRaw) == "" {
 		return lipgloss.NewStyle().Foreground(colorSuccessFg).Render("Clean working tree")
 	}
-	warnStyle := lipgloss.NewStyle().Foreground(colorWarnFg)
+
+	modifiedStyle := lipgloss.NewStyle().Foreground(colorWarnFg)
+	addedStyle := lipgloss.NewStyle().Foreground(colorSuccessFg)
+	deletedStyle := lipgloss.NewStyle().Foreground(colorErrorFg)
+	untrackedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("243"))
+
 	lines := []string{}
 	for _, line := range strings.Split(statusRaw, "\n") {
 		if line == "" {
 			continue
 		}
-		lines = append(lines, warnStyle.Render(line))
+
+		// Parse git status --short format (XY filename)
+		if len(line) < 3 {
+			lines = append(lines, line)
+			continue
+		}
+
+		status := line[:2]
+		filename := strings.TrimSpace(line[2:])
+
+		// Format based on status
+		var formatted string
+		switch {
+		case strings.HasPrefix(status, "M"):
+			formatted = fmt.Sprintf("%s %s", modifiedStyle.Render("M "), filename)
+		case strings.HasPrefix(status, "A"):
+			formatted = fmt.Sprintf("%s %s", addedStyle.Render("A "), filename)
+		case strings.HasPrefix(status, "D"):
+			formatted = fmt.Sprintf("%s %s", deletedStyle.Render("D "), filename)
+		case strings.HasPrefix(status, "??"):
+			formatted = fmt.Sprintf("%s %s", untrackedStyle.Render("??"), filename)
+		case strings.HasPrefix(status, "R"):
+			formatted = fmt.Sprintf("%s %s", modifiedStyle.Render("R "), filename)
+		default:
+			formatted = line
+		}
+
+		lines = append(lines, formatted)
 	}
 	return strings.Join(lines, "\n")
 }

@@ -213,19 +213,29 @@ func NewHelpScreen() *HelpScreen {
 - 3: Focus Log pane
 - Enter: Jump to selected worktree (exit and cd)
 - Tab: Cycle focus (table → status → log)
-- j / k in Recent Log: Move between commits
-- Enter in Recent Log: Open commit details and diff
+
+**Diff/Status Pane Navigation (when focused)**
+- j/k: Line up/down
+- Ctrl+D / Space: Half page down
+- Ctrl+U: Half page up
+- PageDown / PageUp: Full page up/down
+- g: Go to top
+- G: Go to bottom
+
+**Log Pane**
+- j / k: Move between commits
+- Enter: Open commit details and diff
 
 **Actions**
 - c: Create new worktree
-- d: Refresh diff in the status pane (auto-shown when dirty; uses delta if available)
+- d: Manually refresh diff (diffs auto-show when worktree is dirty)
 - D: Delete selected worktree
 - f: Fetch all remotes
 - p: Fetch PR status from GitHub
 - r: Refresh list
 - s: Sort (toggle Name/Last Active)
 - /: Filter worktrees
-- g: Open LazyGit
+- g: Open LazyGit (or go to top if in diff pane)
 - ?: Show this help
 
 **Status Indicators**
