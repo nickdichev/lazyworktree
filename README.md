@@ -1,8 +1,8 @@
 # lazyworktree - Lazy Git Worktree Manager
 
-A Textual-based TUI for managing Git worktrees efficiently. Visualize status, manage branches, and jump between worktrees with ease.
+A Bubble Tea-based TUI for managing Git worktrees efficiently. Visualize status, manage branches, and jump between worktrees with ease.
 
-![Python](https://img.shields.io/badge/python-3.12%2B-blue)
+![Go](https://img.shields.io/badge/go-1.21%2B-blue)
 
 ## Features
 
@@ -20,45 +20,48 @@ A Textual-based TUI for managing Git worktrees efficiently. Visualize status, ma
 
 ## Prerequisites
 
-- **Python**: 3.12+
+- **Go**: 1.21+ (for building from source)
 - **Git**: 2.31+ (recommended)
 - **Forge CLI**: GitHub CLI (`gh`) or GitLab CLI (`glab`) for repo resolution and PR/MR status.
-- **uv**: Recommended for dependency management and running.
 
 **Optional:**
 
 - **delta**: For syntax-highlighted diffs.
 - **lazygit**: For full TUI git control.
 
-## Run
-
-### Directly with uvx
-
-no drama no worries, just install uv from your favorite method and run:
-
-```shell
-uvx git+https://github.com/chmouel/lazyworktree@main
-```
-
-this will run `lazyworktree` directly without installing anything globally.
-
 ## Installation
 
-### Using uv (Recommended)
+### From Source
 
-Clone the repository and run directly:
+Clone the repository and build:
 
 ```bash
-git clone https://github.com/yourusername/lazyworktree.git
+git clone https://github.com/chmouel/lazyworktree.git
 cd lazyworktree
-uv run main.py
+go build -o lazyworktree ./cmd/lazyworktree
+```
+
+Install to your PATH:
+
+```bash
+go install ./cmd/lazyworktree
+```
+
+Or build and run directly:
+
+```bash
+go run ./cmd/lazyworktree/main.go
 ```
 
 You can override the default worktree root:
 
 ```bash
-uv run main.py --worktree-dir ~/worktrees
+lazyworktree --worktree-dir ~/worktrees
 ```
+
+### Pre-built Binaries
+
+Pre-built binaries for various platforms are available in the [Releases](https://github.com/chmouel/lazyworktree/releases) section.
 
 ## Shell Integration (Zsh)
 
