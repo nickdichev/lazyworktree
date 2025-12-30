@@ -47,6 +47,7 @@ type InputScreen struct {
 	errorMsg    string
 	boxWidth    int
 	result      chan string
+	validate    func(string) string
 }
 
 // HelpScreen renders searchable documentation for the app controls.
@@ -236,6 +237,11 @@ func NewInputScreen(prompt, placeholder, value string) *InputScreen {
 		boxWidth:    60,
 		result:      make(chan string, 1),
 	}
+}
+
+// SetValidation adds an optional validation callback for input submission.
+func (s *InputScreen) SetValidation(fn func(string) string) {
+	s.validate = fn
 }
 
 // Init satisfies tea.Model.Init for the input modal.
@@ -547,18 +553,7 @@ func (s *CommandPaletteScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (s *CommandPaletteScreen) applyFilter() {
-	query := strings.ToLower(strings.TrimSpace(s.filterInput.Value()))
-	if query == "" {
-		s.filtered = s.items
-	} else {
-		filtered := make([]paletteItem, 0, len(s.items))
-		for _, it := range s.items {
-			if strings.Contains(strings.ToLower(it.label), query) || strings.Contains(strings.ToLower(it.description), query) {
-				filtered = append(filtered, it)
-			}
-		}
-		s.filtered = filtered
-	}
+	s.filtered = filterPaletteItems(s.items, s.filterInput.Value())
 
 	// Reset cursor and scroll offset if list changes
 	if s.cursor >= len(s.filtered) {
@@ -1154,11 +1149,4 @@ func (s *CommitScreen) View() string {
 		Height(height)
 
 	return boxStyle.Render(content)
-}
-
-func minInt(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }

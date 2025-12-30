@@ -9,7 +9,7 @@ The Go port has a **solid architectural foundation** with proper separation of c
 **Architecture Status:** ✅ Complete
 **Core TUI:** ✅ Complete
 **Git Operations:** ✅ All mutations implemented with terminate commands (create/delete/rename/prune/absorb)
-**Feature Parity:** ✅ ~98% complete (P1/P2/P3 shipped; all features working; core packages well-tested)
+**Feature Parity:** ✅ ~100% complete (P1/P2/P3 shipped; fuzzy search + absorb conflict handling done; app tests added)
 
 **Recent Updates:**
 - ✅ Rename worktree implemented with modal validation (non-main guard, conflict checks)
@@ -17,14 +17,15 @@ The Go port has a **solid architectural foundation** with proper separation of c
 - ✅ Debounced detail view updates plus vim-style navigation and adaptive layout tuning
 - ✅ Create/Delete/Prune/Absorb implemented with init/terminate command hooks + TOFU prompt for `.wt` (prune still basic delete)
 - ✅ Welcome screen trigger when empty repo; commit detail viewer integrated; help overlay searchable
-- ✅ Command Palette added (ctrl+/) with filterable actions
+- ✅ Command Palette added (ctrl+/) with filterable actions + fuzzy search
 - ✅ Full-screen diff viewer (F) and `link_topsymlinks` built-in command
+- ✅ Absorb now stops on merge failures; app package tests added
 
 ---
 
 ## Current Implementation Session (2025-12-30)
 
-**Status:** Feature parity ~98% complete. Prune terminate commands fixed. Ready for merge.
+**Status:** Feature parity ~100% complete. Fuzzy search, absorb merge handling, and app tests added.
 
 **Latest Updates (PR Info Display Fix):**
 - ✅ Fixed info panel PR display to match Python version:
@@ -55,10 +56,10 @@ The Go port has a **solid architectural foundation** with proper separation of c
 - [x] 3.5 Full-Screen Diff Viewer ✅
 
 **Remaining Work (P4/Polish):**
-- [ ] Add tests for app package (other packages have good coverage)
-- [ ] Fuzzy search in command palette
+- [x] Add tests for app package (other packages have good coverage)
+- [x] Fuzzy search in command palette
 - [x] Terminate commands support for prune batch delete ✅
-- [ ] Improved merge conflict handling in absorb
+- [x] Improved merge conflict handling in absorb
 - [ ] Minor polish and edge case fixes
 
 **Implementation Summary:**

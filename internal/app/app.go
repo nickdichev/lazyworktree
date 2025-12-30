@@ -64,6 +64,11 @@ type (
 		stat string
 		diff string
 	}
+	absorbMergeResultMsg struct {
+		path   string
+		branch string
+		err    error
+	}
 )
 
 type commitLogEntry struct {
@@ -597,6 +602,17 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			summary = fmt.Sprintf("%s (%d failed)", summary, msg.failed)
 		}
 		m.statusContent = summary
+		return m, nil
+
+	case absorbMergeResultMsg:
+		if msg.err != nil {
+			m.statusContent = msg.err.Error()
+			return m, nil
+		}
+		cmd := m.deleteWorktreeCmd(&models.WorktreeInfo{Path: msg.path, Branch: msg.branch})
+		if cmd != nil {
+			return m, cmd()
+		}
 		return m, nil
 
 	case commitLoadingMsg:
@@ -1173,28 +1189,26 @@ func (m *Model) showAbsorbWorktree() tea.Cmd {
 	m.confirmScreen = NewConfirmScreen(fmt.Sprintf("Absorb worktree into %s?\n\nPath: %s\nBranch: %s -> %s", mainBranch, wt.Path, wt.Branch, mainBranch))
 	m.confirmAction = func() tea.Cmd {
 		return func() tea.Msg {
-			ok := m.git.RunCommandChecked(m.ctx, []string{"git", "-C", wt.Path, "checkout", mainBranch}, "", fmt.Sprintf("Failed to checkout %s", mainBranch))
-			if ok {
-				_ = m.git.RunCommandChecked(m.ctx, []string{"git", "-C", wt.Path, "merge", "--no-edit", wt.Branch}, "", fmt.Sprintf("Failed to merge %s into %s", wt.Branch, mainBranch))
-			}
-
-			env := m.buildCommandEnv(wt.Branch, wt.Path)
-			terminateCmds := m.collectTerminateCommands()
-			after := func() tea.Msg {
-				m.git.RunCommandChecked(m.ctx, []string{"git", "worktree", "remove", "--force", wt.Path}, "", fmt.Sprintf("Failed to remove worktree %s", wt.Path))
-				m.git.RunCommandChecked(m.ctx, []string{"git", "branch", "-D", wt.Branch}, "", fmt.Sprintf("Failed to delete branch %s", wt.Branch))
-
-				worktrees, err := m.git.GetWorktrees(m.ctx)
-				return worktreesLoadedMsg{
-					worktrees: worktrees,
-					err:       err,
+			if !m.git.RunCommandChecked(m.ctx, []string{"git", "-C", wt.Path, "checkout", mainBranch}, "", fmt.Sprintf("Failed to checkout %s", mainBranch)) {
+				return absorbMergeResultMsg{
+					path:   wt.Path,
+					branch: wt.Branch,
+					err:    fmt.Errorf("absorb canceled: checkout %s failed", mainBranch),
 				}
 			}
-			cmd := m.runCommandsWithTrust(terminateCmds, wt.Path, env, after)
-			if cmd != nil {
-				return cmd()
+
+			if !m.git.RunCommandChecked(m.ctx, []string{"git", "-C", wt.Path, "merge", "--no-edit", wt.Branch}, "", fmt.Sprintf("Failed to merge %s into %s", wt.Branch, mainBranch)) {
+				return absorbMergeResultMsg{
+					path:   wt.Path,
+					branch: wt.Branch,
+					err:    fmt.Errorf("merge failed; resolve conflicts in %s and retry", wt.Path),
+				}
 			}
-			return nil
+
+			return absorbMergeResultMsg{
+				path:   wt.Path,
+				branch: wt.Branch,
+			}
 		}
 	}
 	m.currentScreen = screenConfirm
@@ -1550,6 +1564,13 @@ func (m *Model) handleScreenKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 		switch msg.String() {
 		case keyEnter:
+			if m.inputScreen.validate != nil {
+				if errMsg := strings.TrimSpace(m.inputScreen.validate(m.inputScreen.input.Value())); errMsg != "" {
+					m.inputScreen.errorMsg = errMsg
+					return m, nil
+				}
+				m.inputScreen.errorMsg = ""
+			}
 			if m.inputSubmit != nil {
 				cmd, closeCmd := m.inputSubmit(m.inputScreen.input.Value())
 				if closeCmd {
@@ -2297,13 +2318,6 @@ func baseInnerBoxStyle() lipgloss.Style {
 		Border(lipgloss.ThickBorder()).
 		BorderForeground(colorBorderDim).
 		Padding(0, 1)
-}
-
-func maxInt(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
 }
 
 // truncateToHeight ensures output doesn't exceed maxLines
