@@ -552,6 +552,8 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.prDataLoaded = true
 			m.updateTable()
+			// Refresh info panel to show PR data (matches Python behavior)
+			return m, m.updateDetailsView()
 		}
 		return m, nil
 
@@ -797,6 +799,7 @@ func (m *AppModel) updateTable() {
 			if stateLetter != "" {
 				stateLetter = stateLetter[:1]
 			}
+			// bubbles table doesn't handle ANSI styling in cells, use plain text
 			prStr = fmt.Sprintf("#%d %s", wt.PR.Number, stateLetter)
 		}
 
@@ -1979,12 +1982,21 @@ func (m *AppModel) renderFooter(layout layoutDims) string {
 		m.renderKeyHint("g", "LazyGit"),
 		m.renderKeyHint("r", "Refresh"),
 		m.renderKeyHint("p", "PR Info"),
+	}
+	// Show "o" key hint only when current worktree has PR info
+	if m.selectedIndex >= 0 && m.selectedIndex < len(m.filteredWts) {
+		wt := m.filteredWts[m.selectedIndex]
+		if wt.PR != nil {
+			hints = append(hints, m.renderKeyHint("o", "Open PR"))
+		}
+	}
+	hints = append(hints,
 		m.renderKeyHint("D", "Delete"),
 		m.renderKeyHint("/", "Filter"),
 		m.renderKeyHint("q", "Quit"),
 		m.renderKeyHint("?", "Help"),
 		m.renderKeyHint("ctrl+p", "Palette"),
-	}
+	)
 	return footerStyle.Width(layout.width).Render(strings.Join(hints, "  "))
 }
 
@@ -2026,26 +2038,39 @@ func (m *AppModel) buildInfoContent(wt *models.WorktreeInfo) string {
 
 	labelStyle := lipgloss.NewStyle().Foreground(colorAccent).Bold(true)
 	valueStyle := lipgloss.NewStyle().Foreground(colorTextFg)
-	mutedStyle := lipgloss.NewStyle().Foreground(colorMutedFg)
 
 	infoLines := []string{
 		fmt.Sprintf("%s %s", labelStyle.Render("Path:"), valueStyle.Render(wt.Path)),
 		fmt.Sprintf("%s %s", labelStyle.Render("Branch:"), valueStyle.Render(wt.Branch)),
 	}
 	if wt.Divergence != "" {
-		infoLines = append(infoLines, fmt.Sprintf("%s %s", labelStyle.Render("Divergence:"), valueStyle.Render(wt.Divergence)))
+		// Colorize arrows to match Python: cyan ↑, red ↓
+		cyanStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("6"))  // cyan
+		redStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("1"))   // red
+		coloredDiv := strings.ReplaceAll(wt.Divergence, "↑", cyanStyle.Render("↑"))
+		coloredDiv = strings.ReplaceAll(coloredDiv, "↓", redStyle.Render("↓"))
+		infoLines = append(infoLines, fmt.Sprintf("%s %s", labelStyle.Render("Divergence:"), coloredDiv))
 	}
 	if wt.PR != nil {
-		stateColor := colorSuccessFg
+		// Match Python: white number, colored state (green=OPEN, magenta=MERGED, red=else)
+		whiteStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("15")) // white
+		stateColor := lipgloss.Color("2")                                  // green for OPEN
 		switch wt.PR.State {
 		case "MERGED":
-			stateColor = lipgloss.Color("171")
+			stateColor = lipgloss.Color("5") // magenta
 		case "CLOSED":
-			stateColor = colorErrorFg
+			stateColor = lipgloss.Color("1") // red
 		}
-		stateStyle := lipgloss.NewStyle().Foreground(stateColor).Bold(true)
-		infoLines = append(infoLines, fmt.Sprintf("%s #%d %s [%s]", labelStyle.Render("PR:"), wt.PR.Number, valueStyle.Render(wt.PR.Title), stateStyle.Render(wt.PR.State)))
-		infoLines = append(infoLines, fmt.Sprintf("%s %s", labelStyle.Render("URL:"), mutedStyle.Render(wt.PR.URL)))
+		stateStyle := lipgloss.NewStyle().Foreground(stateColor)
+		// Format: PR: #123 Title [STATE] (matches Python grid layout)
+		infoLines = append(infoLines, fmt.Sprintf("%s %s %s [%s]",
+			labelStyle.Render("PR:"),
+			whiteStyle.Render(fmt.Sprintf("#%d", wt.PR.Number)),
+			wt.PR.Title,
+			stateStyle.Render(wt.PR.State)))
+		// URL styled with blue underline to match Python version
+		urlStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Underline(true)
+		infoLines = append(infoLines, fmt.Sprintf("     %s", urlStyle.Render(wt.PR.URL)))
 	}
 	return strings.Join(infoLines, "\n")
 }
