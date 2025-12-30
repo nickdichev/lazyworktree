@@ -22,16 +22,15 @@ The Go port has a **solid architectural foundation** with proper separation of c
 
 ## Current Implementation Session (2025-12-30)
 
-**Focus:** Sync plan with shipped P2 UX polish and surface remaining P1 gaps
+**Focus:** Finalize P1/P2 parity (command palette + `.wt`/TOFU) and surface remaining nice-to-haves
 
 **Completed:**
 - [x] 2.5 Debounced Detail View Updates (Low complexity) ✅
 - [x] 2.4 Delta Integration (Low complexity) ✅
 - [x] 2.3 Enhanced Diff View - Three-part diff (Medium complexity) ✅
 
-**Deferred (require Priority 1 infrastructure):**
-- 2.2 Absorb Worktree (needs `.wt` files + TOFU integration for commands)
-- 2.1 Command Palette (complex, nice-to-have)
+**Deferred:**
+- Full-screen diff viewer (optional)
 
 **Implementation Summary:**
 1. ✅ Debouncing: 200ms delay prevents excessive git calls during rapid navigation
@@ -52,7 +51,7 @@ The Go port has a **solid architectural foundation** with proper separation of c
 ## Priority 1: Critical User-Facing Features (MUST HAVE)
 
 ### 1.1 Create Worktree Command
-**Status:** Stubbed at `internal/app/app.go:737-740`
+**Status:** Implemented with init commands + TOFU prompt (`internal/app/app.go:737-782`)
 **Python Reference:** `lazyworktree/app.py:1057-1143`
 **Complexity:** High
 
@@ -157,25 +156,24 @@ The Go port has a **solid architectural foundation** with proper separation of c
 ## Priority 2: Enhanced User Experience (SHOULD HAVE)
 
 ### 2.1 Command Palette
-**Status:** Not implemented
+**Status:** Implemented (basic list + filter)
 **Python Reference:** `lazyworktree/app.py:48-94`
 **Complexity:** High
 
 **Requirements:**
 - Fuzzy searchable command interface
-- Triggered by `Ctrl+/` key
-- Lists all available actions with descriptions
-- Executes selected action
+- Triggered by `Ctrl+/` key ✅
+- Lists all available actions with descriptions ✅
+- Executes selected action ✅
 - Uses Textual's `CommandPalette` equivalent (may need custom implementation)
 
 **Bubble Tea Considerations:**
-- Bubble Tea doesn't have built-in command palette
-- Need to implement custom fuzzy matching or use library like `github.com/sahilm/fuzzy`
-- Modal screen with list selection and filtering
+- Implemented simple filter-based list; no fuzzy yet
+- Modal screen with list selection and filtering ✅
 
-**Files to Create/Modify:**
-- `internal/app/commandpalette.go`: New file for command palette logic
-- `internal/app/app.go`: Add keybinding and integrate palette
+**Files Modified:**
+- `internal/app/screens.go`: Added `CommandPaletteScreen`
+- `internal/app/app.go`: Added keybinding (`ctrl+/`) and action dispatch
 
 ---
 
@@ -429,7 +427,7 @@ The Go port has a **solid architectural foundation** with proper separation of c
 - [x] Add Delta Integration (2.4)
 
 ### Phase 3: UX Polish (Week 5)
-- [ ] Add Command Palette (2.1)
+- [x] Add Command Palette (2.1)
 - [x] Add Debounced Updates (2.5)
 - [x] Integrate Commit Detail Viewer (3.4)
 - [x] Integrate Welcome Screen (3.3)
@@ -481,12 +479,12 @@ The Go port has a **solid architectural foundation** with proper separation of c
 - [x] Enhance `showDiff()` with three-part diff + delta piping (lines 755-770)
 - [x] Add debounce logic for detail updates (see `debouncedUpdateDetailsView` around lines 691-708)
 - [x] Integrate commit detail viewer (trigger at lines 359-369; `openCommitView()` implemented)
-- [ ] Add command palette keybinding
+- [x] Add command palette keybinding
 - [x] Add welcome screen trigger
 
 ### `internal/app/screens.go`
 - [ ] Enhance InputScreen with validation callback support (error display exists; multi-step callback still manual)
-- [ ] Add CommandPaletteScreen
+- [x] Add CommandPaletteScreen
 - [ ] Add DiffScreen (full-screen viewer)
 - [x] Integrate CommitScreen (implemented at lines 498-551 and used)
 
@@ -587,7 +585,7 @@ The Go implementation will achieve feature parity when:
 | Diff View (Basic) | ✅ | ✅ | Complete | - |
 | Diff View (Full) | ✅ | ❌ | Missing | P2 |
 | Delta Integration | ✅ | ✅ | Complete | P2 |
-| Command Palette | ✅ | ❌ | Missing | P2 |
+| Command Palette | ✅ | ✅ | Complete (basic filter) | P2 |
 | Commit Details | ✅ | ✅ | Complete | P3 |
 | Welcome Screen | ✅ | ✅ | Complete | P3 |
 | .wt Execution | ✅ | ⚠️ | Basic (TOFU prompt; prune batch pending) | P1 |

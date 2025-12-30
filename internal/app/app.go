@@ -99,6 +99,8 @@ type AppModel struct {
 	inputSubmit   func(string) (tea.Cmd, bool)
 	commitScreen  *CommitScreen
 	welcomeScreen *WelcomeScreen
+	paletteScreen *CommandPaletteScreen
+	paletteSubmit func(string) tea.Cmd
 	showingFilter bool
 	focusedPane   int // 0=table, 1=status, 2=log
 	windowWidth   int
@@ -423,6 +425,9 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.filterInput.Focus()
 			return m, textinput.Blink
 
+		case "ctrl+/":
+			return m, m.showCommandPalette()
+
 		case "?":
 			m.currentScreen = screenHelp
 			m.helpScreen = NewHelpScreen(m.windowWidth, m.windowHeight)
@@ -452,6 +457,11 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.showingFilter {
 				m.showingFilter = false
 				m.filterInput.Blur()
+				return m, nil
+			}
+			if m.currentScreen == screenPalette {
+				m.currentScreen = screenNone
+				m.paletteScreen = nil
 				return m, nil
 			}
 			return m, nil
@@ -1036,6 +1046,51 @@ func (m *AppModel) showAbsorbWorktree() tea.Cmd {
 	return nil
 }
 
+func (m *AppModel) showCommandPalette() tea.Cmd {
+	items := []paletteItem{
+		{id: "create", label: "Create worktree (c)", description: "Add a new worktree from base branch"},
+		{id: "delete", label: "Delete worktree (D)", description: "Remove worktree and branch"},
+		{id: "rename", label: "Rename worktree (m)", description: "Rename worktree and branch"},
+		{id: "absorb", label: "Absorb worktree (A)", description: "Merge branch into main and remove worktree"},
+		{id: "prune", label: "Prune merged (X)", description: "Remove merged PR worktrees"},
+		{id: "diff", label: "Show diff (d)", description: "Inline diff of selected worktree"},
+		{id: "refresh", label: "Refresh (r)", description: "Reload worktrees"},
+		{id: "fetch", label: "Fetch remotes (f)", description: "git fetch --all"},
+		{id: "pr", label: "Open PR (o)", description: "Open PR in browser"},
+		{id: "help", label: "Help (?)", description: "Show help"},
+	}
+
+	m.paletteScreen = NewCommandPaletteScreen(items)
+	m.paletteSubmit = func(action string) tea.Cmd {
+		switch action {
+		case "create":
+			return m.showCreateWorktree()
+		case "delete":
+			return m.showDeleteWorktree()
+		case "rename":
+			return m.showRenameWorktree()
+		case "absorb":
+			return m.showAbsorbWorktree()
+		case "prune":
+			return m.showPruneMerged()
+		case "diff":
+			return m.showDiff()
+		case "refresh":
+			return m.refreshWorktrees()
+		case "fetch":
+			return m.fetchRemotes()
+		case "pr":
+			return m.openPR()
+		case "help":
+			m.currentScreen = screenHelp
+			return nil
+		}
+		return nil
+	}
+	m.currentScreen = screenPalette
+	return textinput.Blink
+}
+
 func (m *AppModel) deleteWorktreeCmd(wt *models.WorktreeInfo) func() tea.Cmd {
 	env := m.buildCommandEnv(wt.Branch, wt.Path)
 	terminateCmds := m.collectTerminateCommands()
@@ -1135,6 +1190,32 @@ func (m *AppModel) handleScreenKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		hs, cmd := m.helpScreen.Update(msg)
 		if updated, ok := hs.(*HelpScreen); ok {
 			m.helpScreen = updated
+		}
+		return m, cmd
+	case screenPalette:
+		if m.paletteScreen == nil {
+			m.currentScreen = screenNone
+			return m, nil
+		}
+		switch msg.String() {
+		case "esc":
+			m.currentScreen = screenNone
+			m.paletteScreen = nil
+			return m, nil
+		case "enter":
+			if m.paletteSubmit != nil {
+				if action, ok := m.paletteScreen.Selected(); ok {
+					cmd := m.paletteSubmit(action)
+					m.currentScreen = screenNone
+					m.paletteScreen = nil
+					m.paletteSubmit = nil
+					return m, cmd
+				}
+			}
+		}
+		ps, cmd := m.paletteScreen.Update(msg)
+		if updated, ok := ps.(*CommandPaletteScreen); ok {
+			m.paletteScreen = updated
 		}
 		return m, cmd
 	case screenConfirm:
@@ -1282,6 +1363,10 @@ func (m *AppModel) renderScreen() string {
 			m.welcomeScreen = NewWelcomeScreen(cwd, m.getWorktreeDir())
 		}
 		return m.welcomeScreen.View()
+	case screenPalette:
+		if m.paletteScreen != nil {
+			return m.paletteScreen.View()
+		}
 	case screenInput:
 		if m.inputScreen != nil {
 			content := m.inputScreen.View()

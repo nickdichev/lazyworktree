@@ -21,6 +21,8 @@ const (
 	screenTrust
 	screenWelcome
 	screenCommit
+	screenPalette
+	screenDiff
 )
 
 // ConfirmScreen represents a confirmation dialog
@@ -73,6 +75,20 @@ type CommitScreen struct {
 	useDelta    bool
 	viewport    viewport.Model
 	headerShown bool
+}
+
+// CommandPaletteScreen represents a simple command palette with filtering
+type CommandPaletteScreen struct {
+	items       []paletteItem
+	filtered    []paletteItem
+	filterInput textinput.Model
+	cursor      int
+}
+
+type paletteItem struct {
+	id          string
+	label       string
+	description string
 }
 
 func maxInt(a, b int) int {
@@ -332,9 +348,32 @@ Press p to fetch PR information from GitHub.
 	return hs
 }
 
+// NewCommandPaletteScreen creates a new command palette with items
+func NewCommandPaletteScreen(items []paletteItem) *CommandPaletteScreen {
+	ti := textinput.New()
+	ti.Placeholder = "Filter commands..."
+	ti.CharLimit = 100
+	ti.Prompt = "> "
+	ti.Focus()
+	ti.Width = 50
+
+	screen := &CommandPaletteScreen{
+		items:       items,
+		filtered:    items,
+		filterInput: ti,
+		cursor:      0,
+	}
+	return screen
+}
+
 // Init initializes the help screen
 func (s *HelpScreen) Init() tea.Cmd {
 	return nil
+}
+
+// Init initializes the command palette
+func (s *CommandPaletteScreen) Init() tea.Cmd {
+	return textinput.Blink
 }
 
 // Update handles updates for the help screen, including search
@@ -377,6 +416,65 @@ func (s *HelpScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	s.viewport, cmd = s.viewport.Update(msg)
 	return s, cmd
+}
+
+// Update handles updates for the command palette
+func (s *CommandPaletteScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+	switch m := msg.(type) {
+	case tea.KeyMsg:
+		switch m.String() {
+		case "enter":
+			return s, tea.Quit
+		case "esc":
+			s.cursor = -1
+			return s, tea.Quit
+		case "up", "k":
+			if s.cursor > 0 {
+				s.cursor--
+			}
+			return s, nil
+		case "down", "j":
+			if s.cursor < len(s.filtered)-1 {
+				s.cursor++
+			}
+			return s, nil
+		}
+	}
+
+	s.filterInput, cmd = s.filterInput.Update(msg)
+	s.applyFilter()
+	return s, cmd
+}
+
+func (s *CommandPaletteScreen) applyFilter() {
+	query := strings.ToLower(strings.TrimSpace(s.filterInput.Value()))
+	if query == "" {
+		s.filtered = s.items
+		if s.cursor >= len(s.filtered) {
+			s.cursor = maxInt(0, len(s.filtered)-1)
+		}
+		return
+	}
+
+	filtered := make([]paletteItem, 0, len(s.items))
+	for _, it := range s.items {
+		if strings.Contains(strings.ToLower(it.label), query) || strings.Contains(strings.ToLower(it.description), query) {
+			filtered = append(filtered, it)
+		}
+	}
+	s.filtered = filtered
+	if s.cursor >= len(s.filtered) {
+		s.cursor = maxInt(0, len(s.filtered)-1)
+	}
+}
+
+// Selected returns the currently selected item id
+func (s *CommandPaletteScreen) Selected() (string, bool) {
+	if s.cursor < 0 || s.cursor >= len(s.filtered) {
+		return "", false
+	}
+	return s.filtered[s.cursor].id, true
 }
 
 func (s *HelpScreen) refreshContent() {
@@ -439,6 +537,32 @@ func (s *HelpScreen) View() string {
 	lines = append(lines, s.viewport.View())
 
 	return lipgloss.JoinVertical(lipgloss.Left, lines...)
+}
+
+// View renders the command palette
+func (s *CommandPaletteScreen) View() string {
+	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("12"))
+	descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
+	selectedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("0")).Background(lipgloss.Color("12"))
+
+	lines := []string{titleStyle.Render("Command Palette"), "", s.filterInput.View(), ""}
+	for i, it := range s.filtered {
+		line := fmt.Sprintf("%s — %s", it.label, descStyle.Render(it.description))
+		if i == s.cursor {
+			line = selectedStyle.Render(line)
+		}
+		lines = append(lines, line)
+	}
+	if len(s.filtered) == 0 {
+		lines = append(lines, descStyle.Render("No commands match your filter."))
+	}
+
+	return lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("12")).
+		Padding(1, 2).
+		Width(80).
+		Render(strings.Join(lines, "\n"))
 }
 
 // NewTrustScreen creates a new trust screen
