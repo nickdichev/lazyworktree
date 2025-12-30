@@ -664,6 +664,10 @@ func (m *AppModel) View() string {
 		if m.confirmScreen != nil {
 			return m.overlayPopup(baseView, m.confirmScreen.View(), 5)
 		}
+	case screenInput:
+		if m.inputScreen != nil {
+			return m.overlayPopup(baseView, m.inputScreen.View(), 5)
+		}
 	}
 
 	// Handle Full Screen Views (fallback)

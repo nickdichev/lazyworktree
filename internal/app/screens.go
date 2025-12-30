@@ -231,11 +231,8 @@ func NewInputScreen(prompt, placeholder, value string) *InputScreen {
 	ti.Prompt = ""
 	ti.TextStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
 
-	// Compute a comfortable width based on content, bounded to avoid screen overflow
-	promptWidth := lipgloss.Width(prompt)
-	valueWidth := lipgloss.Width(value)
-	boxWidth := maxInt(42, minInt(96, maxInt(promptWidth+8, valueWidth+10)))
-	ti.Width = boxWidth - 8
+	// Fixed width to match modal style (60 - padding/border = 52 for input)
+	ti.Width = 52
 
 	return &InputScreen{
 		prompt:      prompt,
@@ -243,7 +240,7 @@ func NewInputScreen(prompt, placeholder, value string) *InputScreen {
 		value:       value,
 		input:       ti,
 		errorMsg:    "",
-		boxWidth:    boxWidth,
+		boxWidth:    60,
 		result:      make(chan string, 1),
 	}
 }
@@ -276,22 +273,30 @@ func (s *InputScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // View renders the input screen
 func (s *InputScreen) View() string {
+	width := 60
+
 	boxStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("236")).
+		BorderForeground(lipgloss.Color("240")).
 		Padding(1, 2).
-		Width(s.boxWidth).
-		Align(lipgloss.Center, lipgloss.Center)
-
-	inputWrapperStyle := lipgloss.NewStyle().
-		Border(lipgloss.NormalBorder()).
-		BorderForeground(lipgloss.Color("239")).
-		Padding(0, 1).
-		Width(s.boxWidth - 6)
+		Width(width)
 
 	promptStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("252")).
-		MarginBottom(1)
+		Width(width - 6).
+		Align(lipgloss.Center)
+
+	inputWrapperStyle := lipgloss.NewStyle().
+		Border(lipgloss.NormalBorder()).
+		BorderForeground(lipgloss.Color("240")).
+		Padding(0, 1).
+		Width(width - 6)
+
+	footerStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("240")).
+		Width(width - 6).
+		Align(lipgloss.Center).
+		MarginTop(1)
 
 	contentLines := []string{
 		promptStyle.Render(s.prompt),
@@ -301,9 +306,12 @@ func (s *InputScreen) View() string {
 	if s.errorMsg != "" {
 		errorStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("196")).
-			Width(s.boxWidth - 4)
+			Width(width - 6).
+			Align(lipgloss.Center)
 		contentLines = append(contentLines, errorStyle.Render(s.errorMsg))
 	}
+
+	contentLines = append(contentLines, footerStyle.Render("Enter to confirm • Esc to cancel"))
 
 	content := strings.Join(contentLines, "\n\n")
 
