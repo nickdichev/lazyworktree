@@ -445,7 +445,7 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.filterInput.Focus()
 			return m, textinput.Blink
 
-		case "ctrl+/":
+		case "ctrl+p":
 			return m, m.showCommandPalette()
 
 		case "?":
