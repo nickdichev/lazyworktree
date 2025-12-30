@@ -16,9 +16,11 @@ import (
 func main() {
 	var worktreeDir string
 	var debugLog string
+	var outputSelection string
 
 	flag.StringVar(&worktreeDir, "worktree-dir", "", "Override the default worktree root directory")
 	flag.StringVar(&debugLog, "debug-log", "", "Path to debug log file")
+	flag.StringVar(&outputSelection, "output-selection", "", "Write selected worktree path to a file")
 	flag.Parse()
 
 	initialFilter := strings.Join(flag.Args(), " ")
@@ -67,6 +69,26 @@ func main() {
 	}
 
 	selectedPath := model.GetSelectedPath()
+	if outputSelection != "" {
+		expanded, err := expandPath(outputSelection)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error expanding output-selection: %v\n", err)
+			os.Exit(1)
+		}
+		if err := os.MkdirAll(filepath.Dir(expanded), 0o750); err != nil {
+			fmt.Fprintf(os.Stderr, "Error creating output-selection dir: %v\n", err)
+			os.Exit(1)
+		}
+		data := ""
+		if selectedPath != "" {
+			data = selectedPath + "\n"
+		}
+		if err := os.WriteFile(expanded, []byte(data), 0o600); err != nil {
+			fmt.Fprintf(os.Stderr, "Error writing output-selection: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
 	if selectedPath != "" {
 		fmt.Println(selectedPath)
 	}

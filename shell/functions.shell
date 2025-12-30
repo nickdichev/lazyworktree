@@ -21,12 +21,16 @@ _git_repo_slug() {
 # Example function to jump between git worktrees using lazyworktree
 worktree_jump() {
     local dir="$1"; shift
-    local id provider repo slug
+    local id repo slug
+
+    if [[ -z "$dir" || ! -d "$dir" ]]; then
+        print -u2 "worktree_jump: invalid directory: $dir"
+        return 1
+    fi
 
     id=$(_git_repo_slug "$dir" 2>/dev/null)
 
     if [[ -n "$id" ]]; then
-        provider=${id%%:*}
         slug=${id#*:}
         repo="$slug"
     else
@@ -43,10 +47,19 @@ worktree_jump() {
 
     cd "$dir" || return 1
 
-    local tmp=${TMPDIR:-/tmp}/.chosen-worktree.$$
-    lazyworktree "$@" >| "$tmp"
+    local tmp selected
+    tmp=$(mktemp "${TMPDIR:-/tmp}/lazyworktree.selection.XXXXXX") || return 1
+    lazyworktree --output-selection="$tmp" "$@"
+    local rc=$?
+    if [[ $rc -ne 0 ]]; then
+        rm -f "$tmp"
+        return $rc
+    fi
 
-    [[ -s "$tmp" ]] && cd "$(cat "$tmp")"
+    if [[ -s "$tmp" ]]; then
+        selected=$(<"$tmp")
+        [[ -n "$selected" && -d "$selected" ]] && cd "$selected" || true
+    fi
     rm -f "$tmp"
 }
 

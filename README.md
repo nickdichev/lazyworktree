@@ -67,7 +67,7 @@ Pre-built binaries for various platforms are available in the [Releases](https:/
 
 ## Shell Integration (Zsh)
 
-To enable the "jump" functionality (changing your shell's current directory on exit), add the helper functions from `shell/functions.shell` to your `.zshrc`.
+To enable the "jump" functionality (changing your shell's current directory on exit), add the helper functions from `shell/functions.shell` to your `.zshrc`. The helper uses `--output-selection` to write the selected path to a temp file.
 
 Example configuration:
 
