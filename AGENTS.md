@@ -4,4 +4,7 @@ Textual-based TUI for managing Git worktrees. Python 3.12+.
 
 ## Before Finishing
 
-- Run `pre-commit run -a` hooks
+Always Run:
+
+- `golangci-lint run --fix ./cmd/... ./internal/...`
+- `gofumt -w ./cmd/... ./internal/...`
