@@ -635,9 +635,18 @@ func (m *AppModel) View() string {
 	baseView := lipgloss.JoinVertical(lipgloss.Left, sections...)
 
 	// Handle Modal Overlays
-	if m.currentScreen == screenPalette {
+	switch m.currentScreen {
+	case screenPalette:
 		if m.paletteScreen != nil {
 			return m.overlayPopup(baseView, m.paletteScreen.View(), 3)
+		}
+	case screenHelp:
+		if m.helpScreen != nil {
+			// Center the help popup
+			// Help screen has fixed/capped size logic in NewHelpScreen/SetSize
+			// We can pass 0,0 to use its internal defaults or a specific size
+			// In SetSize below we'll ensure it has a good "popup" size
+			return m.overlayPopup(baseView, m.helpScreen.View(), 4)
 		}
 	}
 
@@ -1220,14 +1229,16 @@ func (m *AppModel) openLazyGit() tea.Cmd {
 		return nil
 	}
 	wt := m.filteredWts[m.selectedIndex]
-	return func() tea.Msg {
-		cmd := exec.Command("lazygit")
-		cmd.Dir = wt.Path
-		if err := cmd.Run(); err != nil {
+
+	c := exec.Command("lazygit")
+	c.Dir = wt.Path
+
+	return tea.ExecProcess(c, func(err error) tea.Msg {
+		if err != nil {
 			return errMsg{err: err}
 		}
 		return refreshCompleteMsg{}
-	}
+	})
 }
 
 func (m *AppModel) openPR() tea.Cmd {
@@ -1492,12 +1503,6 @@ func (m *AppModel) handleScreenKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m *AppModel) renderScreen() string {
 	switch m.currentScreen {
-	case screenHelp:
-		if m.helpScreen == nil {
-			m.helpScreen = NewHelpScreen(m.windowWidth, m.windowHeight)
-		}
-		m.helpScreen.SetSize(m.windowWidth, m.windowHeight)
-		return m.helpScreen.View()
 	case screenCommit:
 		if m.commitScreen == nil {
 			m.commitScreen = NewCommitScreen(commitMeta{}, "", "", m.git.UseDelta())

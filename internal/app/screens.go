@@ -553,15 +553,22 @@ func (s *HelpScreen) refreshContent() {
 }
 
 // SetSize updates the help screen dimensions (useful on terminal resize)
-func (s *HelpScreen) SetSize(width, height int) {
-	if width > 0 {
-		s.width = width
+func (s *HelpScreen) SetSize(maxWidth, maxHeight int) {
+	width := 80
+	height := 30
+	if maxWidth > 0 {
+		width = minInt(120, maxInt(60, maxWidth-4)) // -4 for margins
 	}
-	if height > 0 {
-		s.height = height
+	if maxHeight > 0 {
+		height = minInt(60, maxInt(20, maxHeight-6)) // -6 for margins
 	}
-	s.viewport.Width = s.width
-	s.viewport.Height = maxInt(5, s.height-2)
+	s.width = width
+	s.height = height
+
+	// Update viewport size
+	// height - 4 for borders/header/footer
+	s.viewport.Width = s.width - 2
+	s.viewport.Height = maxInt(5, s.height-4)
 }
 
 func (s *HelpScreen) renderContent() string {
@@ -589,23 +596,66 @@ func (s *HelpScreen) View() string {
 	content := s.renderContent()
 
 	// Keep viewport sized to available area (minus header/search lines)
-	vHeight := maxInt(5, s.height-2)
-	s.viewport.Width = s.width
+	vHeight := maxInt(5, s.height-4) // -4 for borders/header/footer
+	s.viewport.Width = s.width - 2   // -2 for borders
 	s.viewport.Height = vHeight
 	s.viewport.SetContent(content)
 
-	titleStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("15")).Background(lipgloss.Color("60")).Bold(true).Padding(0, 1)
-	title := titleStyle.Render(" Help — / search • q/esc close ")
+	// Styles
+	boxStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("62")). // Purple-ish
+		Width(s.width).
+		Padding(0)
 
-	searchLine := s.searchInput.View()
+	titleStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("12")).
+		Bold(true).
+		Border(lipgloss.NormalBorder(), false, false, true, false).
+		BorderForeground(lipgloss.Color("62")).
+		Width(s.width-2).
+		Padding(0, 1).
+		Render("Help")
 
-	lines := []string{title}
-	if searchLine != "" {
-		lines = append(lines, searchLine)
+	// Search bar styling
+	searchView := ""
+	if s.searching || s.searchQuery != "" {
+		searchView = lipgloss.NewStyle().
+			Width(s.width-2).
+			Padding(0, 1).
+			Render(s.searchInput.View())
+
+		// Add separator after search
+		searchView += "\n" + lipgloss.NewStyle().
+			Border(lipgloss.NormalBorder(), false, false, true, false).
+			BorderForeground(lipgloss.Color("238")).
+			Width(s.width-2).
+			Render("")
 	}
-	lines = append(lines, s.viewport.View())
 
-	return lipgloss.JoinVertical(lipgloss.Left, lines...)
+	// Footer
+	footerStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("240")).
+		Align(lipgloss.Right).
+		Width(s.width - 2).
+		PaddingTop(1)
+	footer := footerStyle.Render("esc to close")
+
+	// Viewport styling
+	vpStyle := lipgloss.NewStyle().
+		Padding(0, 1).
+		Width(s.width - 2)
+
+	body := vpStyle.Render(s.viewport.View())
+
+	contentBlock := lipgloss.JoinVertical(lipgloss.Left,
+		titleStyle,
+		searchView,
+		body,
+		footer,
+	)
+
+	return boxStyle.Render(contentBlock)
 }
 
 // View renders the command palette
