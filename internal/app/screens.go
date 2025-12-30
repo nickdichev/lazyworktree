@@ -22,6 +22,13 @@ const (
 	screenCommit
 	screenPalette
 	screenDiff
+
+	// Key constants (keyEnter and keyEsc are defined in app.go)
+	keyCtrlD = "ctrl+d"
+	keyCtrlU = "ctrl+u"
+	keyDown  = "down"
+	keyQ     = "q"
+	keyUp    = "up"
 )
 
 type ConfirmScreen struct {
@@ -104,30 +111,32 @@ func (s *ConfirmScreen) Init() tea.Cmd {
 }
 
 func (s *ConfirmScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.String() {
-		case "tab", "right", "l":
-			s.selectedButton = (s.selectedButton + 1) % 2
-		case "shift+tab", "left", "h":
-			s.selectedButton = (s.selectedButton - 1 + 2) % 2
-		case "y", "Y":
+	keyMsg, ok := msg.(tea.KeyMsg)
+	if !ok {
+		return s, nil
+	}
+	key := keyMsg.String()
+	switch key {
+	case "tab", "right", "l":
+		s.selectedButton = (s.selectedButton + 1) % 2
+	case "shift+tab", "left", "h":
+		s.selectedButton = (s.selectedButton - 1 + 2) % 2
+	case "y", "Y":
+		s.result <- true
+		return s, tea.Quit
+	case "n", "N":
+		s.result <- false
+		return s, tea.Quit
+	case keyEnter:
+		if s.selectedButton == 0 {
 			s.result <- true
-			return s, tea.Quit
-		case "n", "N":
+		} else {
 			s.result <- false
-			return s, tea.Quit
-		case "enter":
-			if s.selectedButton == 0 {
-				s.result <- true
-			} else {
-				s.result <- false
-			}
-			return s, tea.Quit
-		case "esc", "q":
-			s.result <- false
-			return s, tea.Quit
 		}
+		return s, tea.Quit
+	case keyEsc, keyQ:
+		s.result <- false
+		return s, tea.Quit
 	}
 	return s, nil
 }
@@ -224,14 +233,14 @@ func (s *InputScreen) Init() tea.Cmd {
 func (s *InputScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.String() {
-		case "enter":
+	keyMsg, ok := msg.(tea.KeyMsg)
+	if ok {
+		switch keyMsg.String() {
+		case keyEnter:
 			value := s.input.Value()
 			s.result <- value
 			return s, tea.Quit
-		case "esc":
+		case keyEsc:
 			s.result <- ""
 			return s, tea.Quit
 		}
@@ -416,16 +425,17 @@ func (s *CommandPaletteScreen) Init() tea.Cmd {
 func (s *HelpScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.String() {
+	keyMsg, ok := msg.(tea.KeyMsg)
+	if ok {
+		key := keyMsg.String()
+		switch key {
 		case "/":
 			if !s.searching {
 				s.searching = true
 				s.searchInput.Focus()
 				return s, textinput.Blink
 			}
-		case "enter":
+		case keyEnter:
 			if s.searching {
 				s.searchQuery = strings.TrimSpace(s.searchInput.Value())
 				s.searching = false
@@ -433,7 +443,7 @@ func (s *HelpScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				s.refreshContent()
 				return s, nil
 			}
-		case "esc":
+		case keyEsc:
 			if s.searching || s.searchQuery != "" {
 				s.searching = false
 				s.searchInput.SetValue("")
@@ -455,19 +465,19 @@ func (s *HelpScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return s, cmd
 	}
 
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.String() {
-		case "ctrl+d", " ":
+	if ok {
+		key := keyMsg.String()
+		switch key {
+		case keyCtrlD, " ":
 			s.viewport.HalfPageDown()
 			return s, nil
-		case "ctrl+u":
+		case keyCtrlU:
 			s.viewport.HalfPageUp()
 			return s, nil
-		case "j", "down":
+		case "j", keyDown:
 			s.viewport.ScrollDown(1)
 			return s, nil
-		case "k", "up":
+		case "k", keyUp:
 			s.viewport.ScrollUp(1)
 			return s, nil
 		}
@@ -482,15 +492,15 @@ func (s *CommandPaletteScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	maxVisible := 12
 
-	switch m := msg.(type) {
-	case tea.KeyMsg:
-		switch m.String() {
-		case "enter":
+	keyMsg, ok := msg.(tea.KeyMsg)
+	if ok {
+		switch keyMsg.String() {
+		case keyEnter:
 			return s, tea.Quit
-		case "esc":
+		case keyEsc:
 			s.cursor = -1
 			return s, tea.Quit
-		case "up", "k":
+		case keyUp, "k":
 			if s.cursor > 0 {
 				s.cursor--
 				if s.cursor < s.scrollOffset {
@@ -498,7 +508,7 @@ func (s *CommandPaletteScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 			return s, nil
-		case "down", "j":
+		case keyDown, "j":
 			if s.cursor < len(s.filtered)-1 {
 				s.cursor++
 				if s.cursor >= s.scrollOffset+maxVisible {
@@ -548,21 +558,21 @@ func (s *DiffScreen) Init() tea.Cmd {
 
 func (s *DiffScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
-	switch m := msg.(type) {
-	case tea.KeyMsg:
-		switch m.String() {
-		case "q", "esc":
+	keyMsg, ok := msg.(tea.KeyMsg)
+	if ok {
+		switch keyMsg.String() {
+		case keyQ, keyEsc:
 			return s, tea.Quit
-		case "j", "down":
+		case "j", keyDown:
 			s.viewport.ScrollDown(1)
 			return s, nil
-		case "k", "up":
+		case "k", keyUp:
 			s.viewport.ScrollUp(1)
 			return s, nil
-		case "ctrl+d", " ":
+		case keyCtrlD, " ":
 			s.viewport.HalfPageDown()
 			return s, nil
-		case "ctrl+u":
+		case keyCtrlU:
 			s.viewport.HalfPageUp()
 			return s, nil
 		case "g":
@@ -857,16 +867,16 @@ func (s *TrustScreen) Init() tea.Cmd {
 
 func (s *TrustScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.String() {
+	keyMsg, ok := msg.(tea.KeyMsg)
+	if ok {
+		switch keyMsg.String() {
 		case "t", "T":
 			s.result <- "trust"
 			return s, tea.Quit
 		case "b", "B":
 			s.result <- "block"
 			return s, tea.Quit
-		case "esc", "c", "C":
+		case keyEsc, "c", "C":
 			s.result <- "cancel"
 			return s, tea.Quit
 		}
@@ -927,13 +937,13 @@ func (s *WelcomeScreen) Init() tea.Cmd {
 }
 
 func (s *WelcomeScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.String() {
+	keyMsg, ok := msg.(tea.KeyMsg)
+	if ok {
+		switch keyMsg.String() {
 		case "r", "R":
 			s.result <- true
 			return s, tea.Quit
-		case "q", "Q", "esc":
+		case "q", "Q", keyEsc:
 			s.result <- false
 			return s, tea.Quit
 		}
@@ -1012,21 +1022,21 @@ func (s *CommitScreen) Init() tea.Cmd {
 
 func (s *CommitScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.String() {
-		case "q", "esc":
+	keyMsg, ok := msg.(tea.KeyMsg)
+	if ok {
+		switch keyMsg.String() {
+		case keyQ, keyEsc:
 			return s, tea.Quit
-		case "j", "down":
+		case "j", keyDown:
 			s.viewport.ScrollDown(1)
 			return s, nil
-		case "k", "up":
+		case "k", keyUp:
 			s.viewport.ScrollUp(1)
 			return s, nil
-		case "ctrl+d", " ":
+		case keyCtrlD, " ":
 			s.viewport.HalfPageDown()
 			return s, nil
-		case "ctrl+u":
+		case keyCtrlU:
 			s.viewport.HalfPageUp()
 			return s, nil
 		case "g":

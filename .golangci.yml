@@ -1,0 +1,40 @@
+version: 2
+
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - revive
+    - gocritic
+    - gosec
+    - misspell
+    - unconvert
+    - goconst
+    - prealloc
+    - testifylint
+    - usestdlibvars
+
+linters-settings:
+  revive:
+    rules:
+      - name: exported
+        severity: warning
+  goimports:
+    local-prefixes: github.com/chmouel/lazyworktree
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - experimental
+      - opinionated
+      - performance
+      - style
+    disabled-checks:
+      - whyNoLint
+      - wrapperFunc

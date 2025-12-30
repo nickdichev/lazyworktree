@@ -10,6 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const testContent = "test content"
+
 func TestNewTrustManager(t *testing.T) {
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "trusted.json")
@@ -29,8 +31,7 @@ func TestCalculateHash(t *testing.T) {
 	t.Run("calculate hash for existing file", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		testFile := filepath.Join(tmpDir, "test.txt")
-		content := "test content"
-		err := os.WriteFile(testFile, []byte(content), 0o644)
+		err := os.WriteFile(testFile, []byte(testContent), 0o644)
 		require.NoError(t, err)
 
 		tm := &TrustManager{

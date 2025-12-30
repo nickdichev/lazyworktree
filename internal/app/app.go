@@ -23,6 +23,11 @@ import (
 	"github.com/muesli/reflow/wrap"
 )
 
+const (
+	keyEnter = "enter"
+	keyEsc   = "esc"
+)
+
 type (
 	errMsg             struct{ err error }
 	worktreesLoadedMsg struct {
@@ -278,7 +283,7 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Handle filter input first - when filtering, only escape/enter should exit
 		if m.showingFilter {
 			switch msg.String() {
-			case "enter", "esc":
+			case keyEnter, keyEsc:
 				m.showingFilter = false
 				m.filterInput.Blur()
 				m.worktreeTable.Focus()
@@ -414,7 +419,7 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 
-		case "enter":
+		case keyEnter:
 			switch m.focusedPane {
 			case 0:
 				// Jump to worktree
@@ -495,7 +500,7 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "X":
 			return m, m.showPruneMerged()
 
-		case "esc":
+		case keyEsc:
 			if m.currentScreen == screenPalette {
 				m.currentScreen = screenNone
 				m.paletteScreen = nil
@@ -1350,7 +1355,7 @@ func (m *AppModel) handleScreenKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.helpScreen == nil {
 			m.helpScreen = NewHelpScreen(m.windowWidth, m.windowHeight)
 		}
-		if msg.String() == "q" || msg.String() == "esc" {
+		if msg.String() == "q" || msg.String() == keyEsc {
 			// If currently searching, esc clears search; otherwise close help
 			if m.helpScreen.searching || m.helpScreen.searchQuery != "" {
 				m.helpScreen.searching = false
@@ -1375,11 +1380,11 @@ func (m *AppModel) handleScreenKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		switch msg.String() {
-		case "esc":
+		case keyEsc:
 			m.currentScreen = screenNone
 			m.paletteScreen = nil
 			return m, nil
-		case "enter":
+		case keyEnter:
 			if m.paletteSubmit != nil {
 				if action, ok := m.paletteScreen.Selected(); ok {
 					cmd := m.paletteSubmit(action)
@@ -1433,7 +1438,7 @@ func (m *AppModel) handleScreenKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.currentScreen = screenNone
 			m.welcomeScreen = nil
 			return m, m.refreshWorktrees()
-		case "q", "Q", "esc":
+		case "q", "Q", keyEsc:
 			m.quitting = true
 			return m, tea.Quit
 		}
@@ -1459,7 +1464,7 @@ func (m *AppModel) handleScreenKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m, after
 			}
 			return m, nil
-		case "c", "C", "esc":
+		case "c", "C", keyEsc:
 			m.clearPendingTrust()
 			m.currentScreen = screenNone
 			return m, nil
@@ -1475,7 +1480,7 @@ func (m *AppModel) handleScreenKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		switch msg.String() {
-		case "q", "esc":
+		case "q", keyEsc:
 			m.commitScreen = nil
 			m.currentScreen = screenNone
 			return m, nil
@@ -1491,7 +1496,7 @@ func (m *AppModel) handleScreenKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		switch msg.String() {
-		case "q", "esc":
+		case "q", keyEsc:
 			m.diffScreen = nil
 			m.currentScreen = screenNone
 			return m, nil
@@ -1508,7 +1513,7 @@ func (m *AppModel) handleScreenKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 		switch msg.String() {
-		case "enter":
+		case keyEnter:
 			if m.inputSubmit != nil {
 				cmd, close := m.inputSubmit(m.inputScreen.input.Value())
 				if close {
@@ -1520,7 +1525,7 @@ func (m *AppModel) handleScreenKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				}
 				return m, cmd
 			}
-		case "esc":
+		case keyEsc:
 			m.inputScreen = nil
 			m.inputSubmit = nil
 			m.currentScreen = screenNone

@@ -18,6 +18,12 @@ import (
 	"github.com/chmouel/lazyworktree/internal/models"
 )
 
+const (
+	gitHostGitLab  = "gitlab"
+	gitHostGithub  = "github"
+	gitHostUnknown = "unknown"
+)
+
 type NotifyFn func(message string, severity string)
 
 type NotifyOnceFn func(key string, message string, severity string)
@@ -327,7 +333,8 @@ func (s *Service) GetWorktrees(ctx context.Context) ([]*models.WorktreeInfo, err
 			staged := 0
 
 			for _, line := range strings.Split(statusRaw, "\n") {
-				if strings.HasPrefix(line, "# branch.ab ") {
+				switch {
+				case strings.HasPrefix(line, "# branch.ab "):
 					parts := strings.Fields(line)
 					if len(parts) >= 4 {
 						aheadStr := strings.TrimPrefix(parts[2], "+")
@@ -335,9 +342,9 @@ func (s *Service) GetWorktrees(ctx context.Context) ([]*models.WorktreeInfo, err
 						ahead, _ = strconv.Atoi(aheadStr)
 						behind, _ = strconv.Atoi(behindStr)
 					}
-				} else if strings.HasPrefix(line, "?") {
+				case strings.HasPrefix(line, "?"):
 					untracked++
-				} else if strings.HasPrefix(line, "1 ") || strings.HasPrefix(line, "2 ") {
+				case strings.HasPrefix(line, "1 "), strings.HasPrefix(line, "2 "):
 					parts := strings.Fields(line)
 					if len(parts) > 1 {
 						xy := parts[1]
@@ -404,19 +411,19 @@ func (s *Service) detectHost(ctx context.Context) string {
 		matches := re.FindStringSubmatch(remoteURL)
 		if len(matches) > 1 {
 			hostname := strings.ToLower(matches[1])
-			if strings.Contains(hostname, "gitlab") {
-				s.gitHost = "gitlab"
-				return "gitlab"
+			if strings.Contains(hostname, gitHostGitLab) {
+				s.gitHost = gitHostGitLab
+				return gitHostGitLab
 			}
-			if strings.Contains(hostname, "github") {
-				s.gitHost = "github"
-				return "github"
+			if strings.Contains(hostname, gitHostGithub) {
+				s.gitHost = gitHostGithub
+				return gitHostGithub
 			}
 		}
 	}
 
-	s.gitHost = "unknown"
-	return "unknown"
+	s.gitHost = gitHostUnknown
+	return gitHostUnknown
 }
 
 func (s *Service) fetchGitLabPRs(ctx context.Context) (map[string]*models.PRInfo, error) {
@@ -461,7 +468,7 @@ func (s *Service) fetchGitLabPRs(ctx context.Context) (map[string]*models.PRInfo
 // FetchPRMap fetches PR/MR information from GitHub or GitLab
 func (s *Service) FetchPRMap(ctx context.Context) (map[string]*models.PRInfo, error) {
 	host := s.detectHost(ctx)
-	if host == "gitlab" {
+	if host == gitHostGitLab {
 		return s.fetchGitLabPRs(ctx)
 	}
 
@@ -471,7 +478,7 @@ func (s *Service) FetchPRMap(ctx context.Context) (map[string]*models.PRInfo, er
 		"--state", "all",
 		"--json", "headRefName,state,number,title,url",
 		"--limit", "100",
-	}, "", []int{0}, false, host == "unknown")
+	}, "", []int{0}, false, host == gitHostUnknown)
 
 	if prRaw == "" {
 		return nil, nil

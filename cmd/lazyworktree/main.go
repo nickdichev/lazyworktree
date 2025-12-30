@@ -28,19 +28,20 @@ func main() {
 		cfg = config.DefaultConfig()
 	}
 
-	if worktreeDir != "" {
+	switch {
+	case worktreeDir != "":
 		expanded, err := expandPath(worktreeDir)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error expanding worktree-dir: %v\n", err)
 			os.Exit(1)
 		}
 		cfg.WorktreeDir = expanded
-	} else if cfg.WorktreeDir != "" {
+	case cfg.WorktreeDir != "":
 		expanded, err := expandPath(cfg.WorktreeDir)
 		if err == nil {
 			cfg.WorktreeDir = expanded
 		}
-	} else {
+	default:
 		home, _ := os.UserHomeDir()
 		cfg.WorktreeDir = filepath.Join(home, ".local", "share", "worktrees")
 	}
@@ -55,10 +56,11 @@ func main() {
 	}
 
 	model := app.NewAppModel(cfg, initialFilter)
-	defer model.Close()
 	p := tea.NewProgram(model, tea.WithAltScreen())
 
-	if _, err := p.Run(); err != nil {
+	_, err = p.Run()
+	model.Close()
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error running app: %v\n", err)
 		os.Exit(1)
 	}
