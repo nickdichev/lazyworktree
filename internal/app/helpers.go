@@ -92,7 +92,7 @@ func fuzzyScoreLower(query, target string) (int, bool) {
 					gap := i - lastIdx - 1
 					score += gap * 2
 					if gap == 0 {
-						score -= 1
+						score--
 					}
 				} else {
 					score += i * 2
