@@ -191,9 +191,9 @@ func (s *Service) GetWorktrees(ctx context.Context) ([]*models.WorktreeInfo, err
 	}
 
 	type wtData struct {
-		path    string
-		branch  string
-		isMain  bool
+		path   string
+		branch string
+		isMain bool
 	}
 
 	var wts []wtData

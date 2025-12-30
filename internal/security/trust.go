@@ -63,7 +63,7 @@ func (tm *TrustManager) load() {
 // save saves the trust database to disk
 func (tm *TrustManager) save() error {
 	dir := filepath.Dir(tm.dbPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
 
@@ -72,7 +72,7 @@ func (tm *TrustManager) save() error {
 		return err
 	}
 
-	return os.WriteFile(tm.dbPath, data, 0644)
+	return os.WriteFile(tm.dbPath, data, 0o644)
 }
 
 // calculateHash calculates SHA256 of the file content

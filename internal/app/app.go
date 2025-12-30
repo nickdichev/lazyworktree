@@ -944,13 +944,13 @@ func (m *AppModel) loadCache() tea.Cmd {
 func (m *AppModel) saveCache() {
 	repoKey := m.getRepoKey()
 	cachePath := filepath.Join(m.getWorktreeDir(), repoKey, models.CacheFilename)
-	os.MkdirAll(filepath.Dir(cachePath), 0755)
+	os.MkdirAll(filepath.Dir(cachePath), 0o755)
 
 	cacheData := map[string]interface{}{
 		"worktrees": m.worktrees,
 	}
 	data, _ := json.Marshal(cacheData)
-	os.WriteFile(cachePath, data, 0644)
+	os.WriteFile(cachePath, data, 0o644)
 }
 
 func (m *AppModel) getRepoKey() string {
@@ -1055,7 +1055,15 @@ func (m *AppModel) computeLayout() layoutDims {
 		rightWidth = 0
 	}
 
-	rightTopHeight := int(float64(bodyHeight-gapY) * 0.70)
+	topRatio := 0.70
+	switch m.focusedPane {
+	case 1: // Info/Diff focused → give more height to top pane
+		topRatio = 0.82
+	case 2: // Log focused → give more height to bottom pane
+		topRatio = 0.30
+	}
+
+	rightTopHeight := int(float64(bodyHeight-gapY) * topRatio)
 	if rightTopHeight < 6 {
 		rightTopHeight = 6
 	}
