@@ -8,7 +8,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
@@ -20,12 +19,8 @@ jobs:
           golangci-lint: latest
       - name: Set up Gofumpt
         uses: luisnquin/setup-gofumpt@v2
-      - name: Install dependencies
-        run: |
-          pip install -U uv
-          uv sync
-          export PATH="$PATH:$(pwd)/.venv/bin"
-          uv add pre-commit
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
       - name: Run Pre-commit
         run: |
-          .venv/bin/pre-commit run -a
+          uvx pre-commit run -a
