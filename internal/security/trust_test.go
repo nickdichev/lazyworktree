@@ -159,11 +159,11 @@ func TestSave(t *testing.T) {
 		tm.trustedHashes["/path/to/file2.txt"] = "hash2"
 
 		err := tm.save()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Verify file was created
 		_, err = os.Stat(dbPath)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Verify content
 		data, err := os.ReadFile(dbPath)
@@ -171,7 +171,7 @@ func TestSave(t *testing.T) {
 
 		var loaded map[string]string
 		err = json.Unmarshal(data, &loaded)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Len(t, loaded, 2)
 		assert.Equal(t, "hash1", loaded["/path/to/file1.txt"])
 		assert.Equal(t, "hash2", loaded["/path/to/file2.txt"])
@@ -189,11 +189,11 @@ func TestSave(t *testing.T) {
 		tm.trustedHashes["/path/to/file.txt"] = "hash"
 
 		err := tm.save()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Verify file and directory were created
 		_, err = os.Stat(dbPath)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	})
 }
 
@@ -313,7 +313,7 @@ func TestTrustFile(t *testing.T) {
 		}
 
 		err = tm.TrustFile(testFile)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Verify hash was stored
 		absPath, _ := filepath.Abs(testFile)
@@ -323,7 +323,7 @@ func TestTrustFile(t *testing.T) {
 
 		// Verify database was saved
 		_, err = os.Stat(tm.dbPath)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	})
 
 	t.Run("trust non-existent file", func(t *testing.T) {
@@ -334,7 +334,7 @@ func TestTrustFile(t *testing.T) {
 		}
 
 		err := tm.TrustFile("/nonexistent/file.txt")
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "does not exist")
 	})
 

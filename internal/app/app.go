@@ -1,3 +1,4 @@
+// Package app provides the main application UI and logic using Bubble Tea.
 package app
 
 import (

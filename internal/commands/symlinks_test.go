@@ -16,7 +16,7 @@ func TestSymlinkPath(t *testing.T) {
 		worktreeDir := t.TempDir()
 
 		err := symlinkPath(mainDir, worktreeDir, "nonexistent.txt")
-		assert.NoError(t, err) // Should return nil without error
+		require.NoError(t, err) // Should return nil without error
 	})
 
 	t.Run("create symlink for file", func(t *testing.T) {
@@ -30,12 +30,12 @@ func TestSymlinkPath(t *testing.T) {
 
 		// Create symlink
 		err = symlinkPath(mainDir, worktreeDir, "test.txt")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Verify symlink exists and points to correct target
 		dstFile := filepath.Join(worktreeDir, "test.txt")
 		linkTarget, err := os.Readlink(dstFile)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, srcFile, linkTarget)
 	})
 
@@ -50,12 +50,12 @@ func TestSymlinkPath(t *testing.T) {
 
 		// Create symlink
 		err = symlinkPath(mainDir, worktreeDir, "testdir")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Verify symlink exists
 		dstDir := filepath.Join(worktreeDir, "testdir")
 		linkTarget, err := os.Readlink(dstDir)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, srcDir, linkTarget)
 	})
 
@@ -70,11 +70,11 @@ func TestSymlinkPath(t *testing.T) {
 
 		// Create symlink first time
 		err = symlinkPath(mainDir, worktreeDir, "test.txt")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Try creating symlink again - should return nil without error
 		err = symlinkPath(mainDir, worktreeDir, "test.txt")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	})
 
 	t.Run("create symlink with nested path", func(t *testing.T) {
@@ -90,18 +90,18 @@ func TestSymlinkPath(t *testing.T) {
 
 		// Create symlink
 		err = symlinkPath(mainDir, worktreeDir, "nested/dir/test.txt")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Verify symlink exists
 		dstFile := filepath.Join(worktreeDir, "nested/dir/test.txt")
 		linkTarget, err := os.Readlink(dstFile)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, srcFile, linkTarget)
 
 		// Verify parent directory was created
 		dstDir := filepath.Join(worktreeDir, "nested/dir")
 		info, err := os.Stat(dstDir)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.True(t, info.IsDir())
 	})
 }
@@ -114,7 +114,7 @@ func TestLinkTopSymlinks(t *testing.T) {
 		}
 
 		err := LinkTopSymlinks(context.Background(), "", worktreeDir, statusFunc)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "missing paths")
 	})
 
@@ -125,7 +125,7 @@ func TestLinkTopSymlinks(t *testing.T) {
 		}
 
 		err := LinkTopSymlinks(context.Background(), mainDir, "", statusFunc)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "missing paths")
 	})
 
@@ -147,17 +147,17 @@ func TestLinkTopSymlinks(t *testing.T) {
 		}
 
 		err = LinkTopSymlinks(context.Background(), mainDir, worktreeDir, statusFunc)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Verify symlinks were created
 		link1 := filepath.Join(worktreeDir, "untracked1.txt")
 		target1, err := os.Readlink(link1)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, file1, target1)
 
 		link2 := filepath.Join(worktreeDir, "untracked2.txt")
 		target2, err := os.Readlink(link2)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, file2, target2)
 	})
 
@@ -175,12 +175,12 @@ func TestLinkTopSymlinks(t *testing.T) {
 		}
 
 		err = LinkTopSymlinks(context.Background(), mainDir, worktreeDir, statusFunc)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Verify symlink was created
 		link := filepath.Join(worktreeDir, "ignored.log")
 		target, err := os.Readlink(link)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, ignoredFile, target)
 	})
 
@@ -206,13 +206,13 @@ func TestLinkTopSymlinks(t *testing.T) {
 		}
 
 		err := LinkTopSymlinks(context.Background(), mainDir, worktreeDir, statusFunc)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Verify symlinks were created for all editor dirs
 		for _, dir := range editorDirs {
 			link := filepath.Join(worktreeDir, dir)
 			target, err := os.Readlink(link)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, filepath.Join(mainDir, dir), target)
 		}
 	})
@@ -226,12 +226,12 @@ func TestLinkTopSymlinks(t *testing.T) {
 		}
 
 		err := LinkTopSymlinks(context.Background(), mainDir, worktreeDir, statusFunc)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Verify tmp directory was created
 		tmpDir := filepath.Join(worktreeDir, "tmp")
 		info, err := os.Stat(tmpDir)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.True(t, info.IsDir())
 	})
 
@@ -251,7 +251,7 @@ func TestLinkTopSymlinks(t *testing.T) {
 		// This will attempt to run direnv allow, which may not exist
 		// The function doesn't return error if direnv fails (best-effort)
 		err = LinkTopSymlinks(context.Background(), mainDir, worktreeDir, statusFunc)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	})
 
 	t.Run("handle empty status lines", func(t *testing.T) {
@@ -268,12 +268,12 @@ func TestLinkTopSymlinks(t *testing.T) {
 		require.NoError(t, err)
 
 		err = LinkTopSymlinks(context.Background(), mainDir, worktreeDir, statusFunc)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Only valid file should have symlink
 		link := filepath.Join(worktreeDir, "file.txt")
 		_, err = os.Readlink(link)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	})
 
 	t.Run("handle status with short lines", func(t *testing.T) {
@@ -289,11 +289,11 @@ func TestLinkTopSymlinks(t *testing.T) {
 		require.NoError(t, err)
 
 		err = LinkTopSymlinks(context.Background(), mainDir, worktreeDir, statusFunc)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		link := filepath.Join(worktreeDir, "file.txt")
 		_, err = os.Readlink(link)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	})
 
 	t.Run("skip non-untracked files", func(t *testing.T) {
@@ -314,13 +314,13 @@ func TestLinkTopSymlinks(t *testing.T) {
 		}
 
 		err = LinkTopSymlinks(context.Background(), mainDir, worktreeDir, statusFunc)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Verify no symlinks created for tracked/modified files
 		_, err = os.Readlink(filepath.Join(worktreeDir, "tracked.txt"))
-		assert.Error(t, err) // Should not exist
+		require.Error(t, err) // Should not exist
 
 		_, err = os.Readlink(filepath.Join(worktreeDir, "modified.txt"))
-		assert.Error(t, err) // Should not exist
+		require.Error(t, err) // Should not exist
 	})
 }

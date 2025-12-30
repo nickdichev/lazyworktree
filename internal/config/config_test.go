@@ -479,7 +479,7 @@ func TestLoadRepoConfig(t *testing.T) {
 	t.Run("non-existent .wt file", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		cfg, path, err := LoadRepoConfig(tmpDir)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Nil(t, cfg)
 		assert.Equal(t, filepath.Join(tmpDir, ".wt"), path)
 	})
@@ -498,7 +498,7 @@ terminate_commands:
 		require.NoError(t, err)
 
 		cfg, path, err := LoadRepoConfig(tmpDir)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, cfg)
 		assert.Equal(t, wtPath, path)
 		assert.Equal(t, wtPath, cfg.Path)
@@ -526,7 +526,7 @@ func TestLoadConfig(t *testing.T) {
 		configPath := filepath.Join(tmpDir, "nonexistent.yaml")
 
 		cfg, err := LoadConfig(configPath)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, cfg)
 		assert.Equal(t, DefaultConfig().SortByActive, cfg.SortByActive)
 		assert.Equal(t, DefaultConfig().MaxUntrackedDiffs, cfg.MaxUntrackedDiffs)
@@ -551,7 +551,7 @@ terminate_commands:
 		require.NoError(t, err)
 
 		cfg, err := LoadConfig(configPath)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, cfg)
 		assert.Equal(t, "/custom/worktrees", cfg.WorktreeDir)
 		assert.False(t, cfg.SortByActive)
@@ -571,7 +571,7 @@ terminate_commands:
 		require.NoError(t, err)
 
 		cfg, err := LoadConfig(configPath)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, cfg)
 		assert.Equal(t, DefaultConfig().SortByActive, cfg.SortByActive)
 	})
@@ -635,7 +635,7 @@ func TestExpandPath(t *testing.T) {
 			defer tt.cleanup()
 
 			result, err := expandPath(tt.input)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			tt.validate(t, result)
 		})
 	}

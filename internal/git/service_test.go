@@ -287,7 +287,7 @@ func TestWorktreeOperations(t *testing.T) {
 
 		// Should handle error gracefully
 		if err != nil {
-			assert.Error(t, err)
+			require.Error(t, err)
 			assert.Nil(t, worktrees)
 		} else {
 			assert.IsType(t, []*models.WorktreeInfo{}, worktrees)
