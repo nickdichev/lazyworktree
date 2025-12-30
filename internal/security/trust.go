@@ -1,3 +1,4 @@
+// Package security manages trust decisions and persistence for repository config files.
 package security
 
 import (
@@ -9,11 +10,15 @@ import (
 	"path/filepath"
 )
 
+// TrustStatus represents the outcome of a trust check on a file.
 type TrustStatus int
 
 const (
+	// TrustStatusTrusted indicates the file matches a known hash.
 	TrustStatusTrusted TrustStatus = iota
+	// TrustStatusUntrusted means the file either changed or has not been trusted yet.
 	TrustStatusUntrusted
+	// TrustStatusNotFound is returned when the file does not exist.
 	TrustStatusNotFound
 )
 
@@ -25,12 +30,13 @@ func getTrustDBPath() string {
 	return filepath.Join(home, ".local", "share", "lazyworktree", "trusted.json")
 }
 
-// TOFU (Trust On First Use)
+// TrustManager stores trusted hashes and enforces TOFU (Trust On First Use).
 type TrustManager struct {
 	dbPath        string
 	trustedHashes map[string]string // Map absolute path -> sha256 hash
 }
 
+// NewTrustManager creates and loads the persisted trust database.
 func NewTrustManager() *TrustManager {
 	tm := &TrustManager{
 		dbPath:        getTrustDBPath(),
@@ -58,7 +64,7 @@ func (tm *TrustManager) load() {
 
 func (tm *TrustManager) save() error {
 	dir := filepath.Dir(tm.dbPath)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return err
 	}
 
@@ -67,12 +73,18 @@ func (tm *TrustManager) save() error {
 		return err
 	}
 
-	return os.WriteFile(tm.dbPath, data, 0o644)
+	return os.WriteFile(tm.dbPath, data, 0o600)
 }
 
 // calculateHash calculates SHA256 of the file content
 func (tm *TrustManager) calculateHash(filePath string) string {
-	file, err := os.Open(filePath)
+	resolvedPath, err := filepath.Abs(filePath)
+	if err != nil {
+		return ""
+	}
+
+	// #nosec G304 -- resolvedPath is an absolute path derived from trusted input
+	file, err := os.Open(resolvedPath)
 	if err != nil {
 		return ""
 	}
@@ -98,6 +110,7 @@ func (tm *TrustManager) calculateHash(filePath string) string {
 	return fmt.Sprintf("%x", hash.Sum(nil))
 }
 
+// CheckTrust validates the given path against the trust database.
 func (tm *TrustManager) CheckTrust(filePath string) TrustStatus {
 	resolvedPath, err := filepath.Abs(filePath)
 	if err != nil {
@@ -125,6 +138,7 @@ func (tm *TrustManager) CheckTrust(filePath string) TrustStatus {
 	return TrustStatusUntrusted
 }
 
+// TrustFile records the current hash of a file as trusted.
 func (tm *TrustManager) TrustFile(filePath string) error {
 	resolvedPath, err := filepath.Abs(filePath)
 	if err != nil {

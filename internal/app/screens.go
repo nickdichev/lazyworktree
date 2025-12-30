@@ -31,12 +31,14 @@ const (
 	keyUp    = "up"
 )
 
+// ConfirmScreen displays a modal confirmation prompt with Accept/Cancel buttons.
 type ConfirmScreen struct {
 	message        string
 	result         chan bool
 	selectedButton int // 0 = Confirm, 1 = Cancel
 }
 
+// InputScreen provides a prompt along with a text input and inline validation.
 type InputScreen struct {
 	prompt      string
 	placeholder string
@@ -47,6 +49,7 @@ type InputScreen struct {
 	result      chan string
 }
 
+// HelpScreen renders searchable documentation for the app controls.
 type HelpScreen struct {
 	viewport    viewport.Model
 	width       int
@@ -57,6 +60,7 @@ type HelpScreen struct {
 	searchQuery string
 }
 
+// TrustScreen surfaces trust warnings and records commands for a path.
 type TrustScreen struct {
 	filePath string
 	commands []string
@@ -64,12 +68,14 @@ type TrustScreen struct {
 	result   chan string
 }
 
+// WelcomeScreen shows the initial instructions when no worktrees are open.
 type WelcomeScreen struct {
 	currentDir  string
 	worktreeDir string
 	result      chan bool
 }
 
+// CommitScreen displays metadata, stats, and diff details for a single commit.
 type CommitScreen struct {
 	meta     commitMeta
 	stat     string
@@ -78,6 +84,7 @@ type CommitScreen struct {
 	viewport viewport.Model
 }
 
+// CommandPaletteScreen lets the user pick a command from a filtered list.
 type CommandPaletteScreen struct {
 	items        []paletteItem
 	filtered     []paletteItem
@@ -92,12 +99,14 @@ type paletteItem struct {
 	description string
 }
 
+// DiffScreen renders a full commit diff inside a viewport.
 type DiffScreen struct {
 	title    string
 	content  string
 	viewport viewport.Model
 }
 
+// NewConfirmScreen creates a confirm screen preloaded with a message.
 func NewConfirmScreen(message string) *ConfirmScreen {
 	return &ConfirmScreen{
 		message:        message,
@@ -106,10 +115,12 @@ func NewConfirmScreen(message string) *ConfirmScreen {
 	}
 }
 
+// Init implements the tea.Model Init stage for ConfirmScreen.
 func (s *ConfirmScreen) Init() tea.Cmd {
 	return nil
 }
 
+// Update processes keyboard events for the confirmation dialog.
 func (s *ConfirmScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	keyMsg, ok := msg.(tea.KeyMsg)
 	if !ok {
@@ -141,6 +152,7 @@ func (s *ConfirmScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return s, nil
 }
 
+// View renders the confirmation UI box with focused button highlighting.
 func (s *ConfirmScreen) View() string {
 	width := 60
 	height := 11
@@ -203,6 +215,7 @@ func (s *ConfirmScreen) View() string {
 	return box
 }
 
+// NewInputScreen builds an input modal with prompt, placeholder, and initial value.
 func NewInputScreen(prompt, placeholder, value string) *InputScreen {
 	ti := textinput.New()
 	ti.Placeholder = placeholder
@@ -226,10 +239,12 @@ func NewInputScreen(prompt, placeholder, value string) *InputScreen {
 	}
 }
 
+// Init satisfies tea.Model.Init for the input modal.
 func (s *InputScreen) Init() tea.Cmd {
 	return textinput.Blink
 }
 
+// Update handles keystrokes for the input modal and returns commands on submit.
 func (s *InputScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
@@ -250,6 +265,7 @@ func (s *InputScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return s, cmd
 }
 
+// View renders the prompt, input field, and error message inside a styled box.
 func (s *InputScreen) View() string {
 	width := 60
 
@@ -296,6 +312,7 @@ func (s *InputScreen) View() string {
 	return boxStyle.Render(content)
 }
 
+// NewHelpScreen initializes help content with the available screen size.
 func NewHelpScreen(maxWidth, maxHeight int) *HelpScreen {
 	helpText := `# Git Worktree Status Help
 
@@ -353,13 +370,13 @@ Press p to fetch PR information from GitHub.
 	width := 80
 	height := 30
 	if maxWidth > 0 {
-		width = min(120, max(60, maxWidth))
+		width = minInt(120, maxInt(60, maxWidth))
 	}
 	if maxHeight > 0 {
-		height = min(60, max(25, maxHeight))
+		height = minInt(60, maxInt(25, maxHeight))
 	}
 
-	vp := viewport.New(width, max(5, height-3))
+	vp := viewport.New(width, maxInt(5, height-3))
 	fullLines := strings.Split(helpText, "\n")
 
 	ti := textinput.New()
@@ -368,7 +385,7 @@ Press p to fetch PR information from GitHub.
 	ti.Prompt = "/ "
 	ti.SetValue("")
 	ti.Blur()
-	ti.Width = max(20, width-6)
+	ti.Width = maxInt(20, width-6)
 
 	hs := &HelpScreen{
 		viewport:    vp,
@@ -382,6 +399,7 @@ Press p to fetch PR information from GitHub.
 	return hs
 }
 
+// NewCommandPaletteScreen builds a palette populated with candidate commands.
 func NewCommandPaletteScreen(items []paletteItem) *CommandPaletteScreen {
 	ti := textinput.New()
 	ti.Placeholder = "Type a command..."
@@ -400,7 +418,8 @@ func NewCommandPaletteScreen(items []paletteItem) *CommandPaletteScreen {
 	return screen
 }
 
-func NewDiffScreen(title, diff string, useDelta bool) *DiffScreen {
+// NewDiffScreen displays a commit diff title and body inside a viewport.
+func NewDiffScreen(title, diff string) *DiffScreen {
 	vp := viewport.New(100, 40)
 	content := title
 	if diff != "" {
@@ -414,14 +433,17 @@ func NewDiffScreen(title, diff string, useDelta bool) *DiffScreen {
 	}
 }
 
+// Init prepares the help screen before it starts handling updates.
 func (s *HelpScreen) Init() tea.Cmd {
 	return nil
 }
 
+// Init configures the palette input before Bubble Tea updates begin.
 func (s *CommandPaletteScreen) Init() tea.Cmd {
 	return textinput.Blink
 }
 
+// Update handles scrolling and search input for the help screen.
 func (s *HelpScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
@@ -540,11 +562,12 @@ func (s *CommandPaletteScreen) applyFilter() {
 
 	// Reset cursor and scroll offset if list changes
 	if s.cursor >= len(s.filtered) {
-		s.cursor = max(0, len(s.filtered)-1)
+		s.cursor = maxInt(0, len(s.filtered)-1)
 	}
 	s.scrollOffset = 0
 }
 
+// Selected reports the current palette selection if one exists.
 func (s *CommandPaletteScreen) Selected() (string, bool) {
 	if s.cursor < 0 || s.cursor >= len(s.filtered) {
 		return "", false
@@ -552,10 +575,12 @@ func (s *CommandPaletteScreen) Selected() (string, bool) {
 	return s.filtered[s.cursor].id, true
 }
 
+// Init sets up the diff viewport state before rendering.
 func (s *DiffScreen) Init() tea.Cmd {
 	return nil
 }
 
+// Update processes navigation keys while the diff is visible.
 func (s *DiffScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	keyMsg, ok := msg.(tea.KeyMsg)
@@ -598,10 +623,10 @@ func (s *HelpScreen) SetSize(maxWidth, maxHeight int) {
 	width := 80
 	height := 30
 	if maxWidth > 0 {
-		width = min(120, max(60, maxWidth-4)) // -4 for margins
+		width = minInt(120, maxInt(60, maxWidth-4)) // -4 for margins
 	}
 	if maxHeight > 0 {
-		height = min(60, max(20, maxHeight-6)) // -6 for margins
+		height = minInt(60, maxInt(20, maxHeight-6)) // -6 for margins
 	}
 	s.width = width
 	s.height = height
@@ -609,7 +634,7 @@ func (s *HelpScreen) SetSize(maxWidth, maxHeight int) {
 	// Update viewport size
 	// height - 4 for borders/header/footer
 	s.viewport.Width = s.width - 2
-	s.viewport.Height = max(5, s.height-4)
+	s.viewport.Height = maxInt(5, s.height-4)
 }
 
 func (s *HelpScreen) renderContent() string {
@@ -658,12 +683,13 @@ func highlightMatches(line, lowerLine, lowerQuery string, style lipgloss.Style) 
 	return b.String()
 }
 
+// View renders the help content and search input inside the viewport.
 func (s *HelpScreen) View() string {
 	content := s.renderContent()
 
 	// Keep viewport sized to available area (minus header/search lines)
-	vHeight := max(5, s.height-4)  // -4 for borders/header/footer
-	s.viewport.Width = s.width - 2 // -2 for borders
+	vHeight := maxInt(5, s.height-4) // -4 for borders/header/footer
+	s.viewport.Width = s.width - 2   // -2 for borders
 	s.viewport.Height = vHeight
 	s.viewport.SetContent(content)
 
@@ -724,6 +750,7 @@ func (s *HelpScreen) View() string {
 	return boxStyle.Render(contentBlock)
 }
 
+// View displays the palette items and current filter text.
 func (s *CommandPaletteScreen) View() string {
 	width := 80
 	maxVisible := 12
@@ -831,6 +858,7 @@ func (s *CommandPaletteScreen) View() string {
 	return boxStyle.Render(content)
 }
 
+// View renders the diff text inside a scrollable viewport.
 func (s *DiffScreen) View() string {
 	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("12"))
 	title := titleStyle.Render(s.title)
@@ -840,10 +868,11 @@ func (s *DiffScreen) View() string {
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("12")).
 		Padding(1, 2).
-		Width(max(80, s.viewport.Width)).
+		Width(maxInt(80, s.viewport.Width)).
 		Render(content)
 }
 
+// NewTrustScreen warns the user when a repo config has changed or is untrusted.
 func NewTrustScreen(filePath string, commands []string) *TrustScreen {
 	commandsText := strings.Join(commands, "\n")
 	question := fmt.Sprintf("The repository config '%s' defines the following commands.\nThis file has changed or hasn't been trusted yet.\nDo you trust these commands to run?", filePath)
@@ -861,10 +890,12 @@ func NewTrustScreen(filePath string, commands []string) *TrustScreen {
 	}
 }
 
+// Init satisfies tea.Model.Init for the trust confirmation screen.
 func (s *TrustScreen) Init() tea.Cmd {
 	return nil
 }
 
+// Update handles trust decisions and delegates viewport input updates.
 func (s *TrustScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	keyMsg, ok := msg.(tea.KeyMsg)
@@ -885,6 +916,7 @@ func (s *TrustScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return s, cmd
 }
 
+// View renders the trust warning content inside a styled box.
 func (s *TrustScreen) View() string {
 	width := 70
 	height := 25
@@ -924,6 +956,7 @@ func (s *TrustScreen) View() string {
 	return boxStyle.Render(content)
 }
 
+// NewWelcomeScreen builds the greeting screen shown when no worktrees exist.
 func NewWelcomeScreen(currentDir, worktreeDir string) *WelcomeScreen {
 	return &WelcomeScreen{
 		currentDir:  currentDir,
@@ -932,10 +965,12 @@ func NewWelcomeScreen(currentDir, worktreeDir string) *WelcomeScreen {
 	}
 }
 
+// Init is part of the tea.Model interface for the welcome screen.
 func (s *WelcomeScreen) Init() tea.Cmd {
 	return nil
 }
 
+// Update listens for retry or quit keys on the welcome screen.
 func (s *WelcomeScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	keyMsg, ok := msg.(tea.KeyMsg)
 	if ok {
@@ -951,6 +986,7 @@ func (s *WelcomeScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return s, nil
 }
 
+// View renders the welcome dialog with guidance and action buttons.
 func (s *WelcomeScreen) View() string {
 	width := 70
 	height := 20
@@ -1001,6 +1037,7 @@ func (s *WelcomeScreen) View() string {
 	return boxStyle.Render(content)
 }
 
+// NewCommitScreen configures the commit detail viewer for the selected SHA.
 func NewCommitScreen(meta commitMeta, stat, diff string, useDelta bool) *CommitScreen {
 	vp := viewport.New(110, 60)
 
@@ -1016,10 +1053,12 @@ func NewCommitScreen(meta commitMeta, stat, diff string, useDelta bool) *CommitS
 	return screen
 }
 
+// Init satisfies tea.Model.Init for the commit detail view.
 func (s *CommitScreen) Init() tea.Cmd {
 	return nil
 }
 
+// Update handles scrolling and closing events for the commit screen.
 func (s *CommitScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	keyMsg, ok := msg.(tea.KeyMsg)
@@ -1101,8 +1140,8 @@ func (s *CommitScreen) renderHeader() string {
 
 // View renders the commit screen
 func (s *CommitScreen) View() string {
-	width := max(100, s.viewport.Width)
-	height := max(30, s.viewport.Height)
+	width := maxInt(100, s.viewport.Width)
+	height := maxInt(30, s.viewport.Height)
 
 	header := s.renderHeader()
 	content := lipgloss.JoinVertical(lipgloss.Left, header, s.viewport.View())
@@ -1115,4 +1154,11 @@ func (s *CommitScreen) View() string {
 		Height(height)
 
 	return boxStyle.Render(content)
+}
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }

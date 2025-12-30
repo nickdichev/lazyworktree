@@ -25,7 +25,7 @@ func TestSymlinkPath(t *testing.T) {
 
 		// Create source file in main
 		srcFile := filepath.Join(mainDir, "test.txt")
-		err := os.WriteFile(srcFile, []byte("test content"), 0o644)
+		err := os.WriteFile(srcFile, []byte("test content"), 0o600)
 		require.NoError(t, err)
 
 		// Create symlink
@@ -45,7 +45,7 @@ func TestSymlinkPath(t *testing.T) {
 
 		// Create source directory in main
 		srcDir := filepath.Join(mainDir, "testdir")
-		err := os.MkdirAll(srcDir, 0o755)
+		err := os.MkdirAll(srcDir, 0o750)
 		require.NoError(t, err)
 
 		// Create symlink
@@ -65,7 +65,7 @@ func TestSymlinkPath(t *testing.T) {
 
 		// Create source file
 		srcFile := filepath.Join(mainDir, "test.txt")
-		err := os.WriteFile(srcFile, []byte("test"), 0o644)
+		err := os.WriteFile(srcFile, []byte("test"), 0o600)
 		require.NoError(t, err)
 
 		// Create symlink first time
@@ -83,9 +83,9 @@ func TestSymlinkPath(t *testing.T) {
 
 		// Create source file in nested directory
 		srcFile := filepath.Join(mainDir, "nested", "dir", "test.txt")
-		err := os.MkdirAll(filepath.Dir(srcFile), 0o755)
+		err := os.MkdirAll(filepath.Dir(srcFile), 0o750)
 		require.NoError(t, err)
-		err = os.WriteFile(srcFile, []byte("nested content"), 0o644)
+		err = os.WriteFile(srcFile, []byte("nested content"), 0o600)
 		require.NoError(t, err)
 
 		// Create symlink
@@ -109,7 +109,7 @@ func TestSymlinkPath(t *testing.T) {
 func TestLinkTopSymlinks(t *testing.T) {
 	t.Run("missing main path", func(t *testing.T) {
 		worktreeDir := t.TempDir()
-		statusFunc := func(ctx context.Context, path string) string {
+		statusFunc := func(_ context.Context, _ string) string {
 			return ""
 		}
 
@@ -120,7 +120,7 @@ func TestLinkTopSymlinks(t *testing.T) {
 
 	t.Run("missing worktree path", func(t *testing.T) {
 		mainDir := t.TempDir()
-		statusFunc := func(ctx context.Context, path string) string {
+		statusFunc := func(_ context.Context, _ string) string {
 			return ""
 		}
 
@@ -135,14 +135,14 @@ func TestLinkTopSymlinks(t *testing.T) {
 
 		// Create untracked files in main
 		file1 := filepath.Join(mainDir, "untracked1.txt")
-		err := os.WriteFile(file1, []byte("content1"), 0o644)
+		err := os.WriteFile(file1, []byte("content1"), 0o600)
 		require.NoError(t, err)
 
 		file2 := filepath.Join(mainDir, "untracked2.txt")
-		err = os.WriteFile(file2, []byte("content2"), 0o644)
+		err = os.WriteFile(file2, []byte("content2"), 0o600)
 		require.NoError(t, err)
 
-		statusFunc := func(ctx context.Context, path string) string {
+		statusFunc := func(_ context.Context, _ string) string {
 			return "?? untracked1.txt\n?? untracked2.txt\n M tracked.txt"
 		}
 
@@ -167,10 +167,10 @@ func TestLinkTopSymlinks(t *testing.T) {
 
 		// Create ignored file in main
 		ignoredFile := filepath.Join(mainDir, "ignored.log")
-		err := os.WriteFile(ignoredFile, []byte("log content"), 0o644)
+		err := os.WriteFile(ignoredFile, []byte("log content"), 0o600)
 		require.NoError(t, err)
 
-		statusFunc := func(ctx context.Context, path string) string {
+		statusFunc := func(_ context.Context, _ string) string {
 			return "!! ignored.log"
 		}
 
@@ -192,16 +192,16 @@ func TestLinkTopSymlinks(t *testing.T) {
 		editorDirs := []string{".vscode", ".idea", ".cursor", ".claude"}
 		for _, dir := range editorDirs {
 			dirPath := filepath.Join(mainDir, dir)
-			err := os.MkdirAll(dirPath, 0o755)
+			err := os.MkdirAll(dirPath, 0o750)
 			require.NoError(t, err)
 
 			// Add a file in each directory
 			configFile := filepath.Join(dirPath, "settings.json")
-			err = os.WriteFile(configFile, []byte("{}"), 0o644)
+			err = os.WriteFile(configFile, []byte("{}"), 0o600)
 			require.NoError(t, err)
 		}
 
-		statusFunc := func(ctx context.Context, path string) string {
+		statusFunc := func(_ context.Context, _ string) string {
 			return ""
 		}
 
@@ -221,7 +221,7 @@ func TestLinkTopSymlinks(t *testing.T) {
 		mainDir := t.TempDir()
 		worktreeDir := t.TempDir()
 
-		statusFunc := func(ctx context.Context, path string) string {
+		statusFunc := func(_ context.Context, _ string) string {
 			return ""
 		}
 
@@ -241,10 +241,10 @@ func TestLinkTopSymlinks(t *testing.T) {
 
 		// Create .envrc file
 		envrcPath := filepath.Join(worktreeDir, ".envrc")
-		err := os.WriteFile(envrcPath, []byte("export TEST=1"), 0o644)
+		err := os.WriteFile(envrcPath, []byte("export TEST=1"), 0o600)
 		require.NoError(t, err)
 
-		statusFunc := func(ctx context.Context, path string) string {
+		statusFunc := func(_ context.Context, _ string) string {
 			return ""
 		}
 
@@ -258,13 +258,13 @@ func TestLinkTopSymlinks(t *testing.T) {
 		mainDir := t.TempDir()
 		worktreeDir := t.TempDir()
 
-		statusFunc := func(ctx context.Context, path string) string {
+		statusFunc := func(_ context.Context, _ string) string {
 			return "?? file.txt\n\n?? \n   \n"
 		}
 
 		// Create only the valid file
 		file := filepath.Join(mainDir, "file.txt")
-		err := os.WriteFile(file, []byte("content"), 0o644)
+		err := os.WriteFile(file, []byte("content"), 0o600)
 		require.NoError(t, err)
 
 		err = LinkTopSymlinks(context.Background(), mainDir, worktreeDir, statusFunc)
@@ -280,12 +280,12 @@ func TestLinkTopSymlinks(t *testing.T) {
 		mainDir := t.TempDir()
 		worktreeDir := t.TempDir()
 
-		statusFunc := func(ctx context.Context, path string) string {
+		statusFunc := func(_ context.Context, _ string) string {
 			return "?? file.txt\n??\nM\n   "
 		}
 
 		file := filepath.Join(mainDir, "file.txt")
-		err := os.WriteFile(file, []byte("content"), 0o644)
+		err := os.WriteFile(file, []byte("content"), 0o600)
 		require.NoError(t, err)
 
 		err = LinkTopSymlinks(context.Background(), mainDir, worktreeDir, statusFunc)
@@ -302,14 +302,14 @@ func TestLinkTopSymlinks(t *testing.T) {
 
 		// Create files
 		tracked := filepath.Join(mainDir, "tracked.txt")
-		err := os.WriteFile(tracked, []byte("tracked"), 0o644)
+		err := os.WriteFile(tracked, []byte("tracked"), 0o600)
 		require.NoError(t, err)
 
 		modified := filepath.Join(mainDir, "modified.txt")
-		err = os.WriteFile(modified, []byte("modified"), 0o644)
+		err = os.WriteFile(modified, []byte("modified"), 0o600)
 		require.NoError(t, err)
 
-		statusFunc := func(ctx context.Context, path string) string {
+		statusFunc := func(_ context.Context, _ string) string {
 			return " M tracked.txt\n M modified.txt\nA  added.txt"
 		}
 

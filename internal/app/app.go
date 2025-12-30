@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -96,8 +97,8 @@ var (
 	colorErrorFg   = lipgloss.Color("196") // vibrant red
 )
 
-// AppModel represents the main application model
-type AppModel struct {
+// Model represents the main application model
+type Model struct {
 	// Configuration
 	config *config.AppConfig
 	git    *git.Service
@@ -170,12 +171,12 @@ type AppModel struct {
 	quitting     bool
 }
 
-// NewAppModel creates a new application model
-func NewAppModel(cfg *config.AppConfig, initialFilter string) *AppModel {
+// NewModel creates a new application model
+func NewModel(cfg *config.AppConfig, initialFilter string) *Model {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	notify := func(msg string, severity string) {}
-	notifyOnce := func(key string, msg string, severity string) {}
+	notify := func(_ string, _ string) {}
+	notifyOnce := func(_ string, _ string, _ string) {}
 
 	gitService := git.NewService(notify, notifyOnce)
 	trustManager := security.NewTrustManager()
@@ -230,7 +231,7 @@ func NewAppModel(cfg *config.AppConfig, initialFilter string) *AppModel {
 	filterInput.Placeholder = "Filter worktrees..."
 	filterInput.Width = 50
 
-	m := &AppModel{
+	m := &Model{
 		config:          cfg,
 		git:             gitService,
 		worktreeTable:   t,
@@ -260,14 +261,16 @@ func NewAppModel(cfg *config.AppConfig, initialFilter string) *AppModel {
 	return m
 }
 
-func (m *AppModel) Init() tea.Cmd {
+// Init satisfies the tea.Model interface and starts with no command.
+func (m *Model) Init() tea.Cmd {
 	return tea.Batch(
 		m.loadCache(),
 		m.refreshWorktrees(),
 	)
 }
 
-func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+// Update processes Bubble Tea messages and routes them through the app model.
+func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	var cmds []tea.Cmd
 
@@ -612,7 +615,8 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-func (m *AppModel) View() string {
+// View renders the active screen for the Bubble Tea program.
+func (m *Model) View() string {
 	if m.quitting {
 		return ""
 	}
@@ -677,7 +681,7 @@ func (m *AppModel) View() string {
 	return baseView
 }
 
-func (m *AppModel) overlayPopup(base string, popup string, marginTop int) string {
+func (m *Model) overlayPopup(base string, popup string, marginTop int) string {
 	if base == "" || popup == "" {
 		return base
 	}
@@ -728,7 +732,7 @@ func (m *AppModel) overlayPopup(base string, popup string, marginTop int) string
 
 // Helper methods
 
-func (m *AppModel) updateTable() {
+func (m *Model) updateTable() {
 	// Filter worktrees
 	query := strings.ToLower(strings.TrimSpace(m.filterQuery))
 	m.filteredWts = []*models.WorktreeInfo{}
@@ -826,7 +830,7 @@ func (m *AppModel) updateTable() {
 	}
 }
 
-func (m *AppModel) updateDetailsView() tea.Cmd {
+func (m *Model) updateDetailsView() tea.Cmd {
 	m.selectedIndex = m.worktreeTable.Cursor()
 	if m.selectedIndex < 0 || m.selectedIndex >= len(m.filteredWts) {
 		return nil
@@ -870,7 +874,7 @@ func (m *AppModel) updateDetailsView() tea.Cmd {
 	}
 }
 
-func (m *AppModel) debouncedUpdateDetailsView() tea.Cmd {
+func (m *Model) debouncedUpdateDetailsView() tea.Cmd {
 	// Cancel any existing pending detail update
 	if m.detailUpdateCancel != nil {
 		m.detailUpdateCancel()
@@ -899,7 +903,7 @@ func (m *AppModel) debouncedUpdateDetailsView() tea.Cmd {
 	}
 }
 
-func (m *AppModel) refreshWorktrees() tea.Cmd {
+func (m *Model) refreshWorktrees() tea.Cmd {
 	return func() tea.Msg {
 		worktrees, err := m.git.GetWorktrees(m.ctx)
 		return worktreesLoadedMsg{
@@ -909,7 +913,7 @@ func (m *AppModel) refreshWorktrees() tea.Cmd {
 	}
 }
 
-func (m *AppModel) fetchPRData() tea.Cmd {
+func (m *Model) fetchPRData() tea.Cmd {
 	return func() tea.Msg {
 		prMap, err := m.git.FetchPRMap(m.ctx)
 		return prDataLoadedMsg{
@@ -919,14 +923,14 @@ func (m *AppModel) fetchPRData() tea.Cmd {
 	}
 }
 
-func (m *AppModel) fetchRemotes() tea.Cmd {
+func (m *Model) fetchRemotes() tea.Cmd {
 	return func() tea.Msg {
 		m.git.RunGit(m.ctx, []string{"git", "fetch", "--all", "--quiet"}, "", []int{0}, false, false)
 		return fetchRemotesCompleteMsg{}
 	}
 }
 
-func (m *AppModel) showCreateWorktree() tea.Cmd {
+func (m *Model) showCreateWorktree() tea.Cmd {
 	defaultBase := m.git.GetMainBranch(m.ctx)
 
 	// Stage 1: branch name
@@ -962,7 +966,7 @@ func (m *AppModel) showCreateWorktree() tea.Cmd {
 			}
 
 			m.inputScreen.errorMsg = ""
-			if err := os.MkdirAll(m.getWorktreeDir(), 0o755); err != nil {
+			if err := os.MkdirAll(m.getWorktreeDir(), 0o750); err != nil {
 				return func() tea.Msg { return errMsg{err: fmt.Errorf("failed to create worktree directory: %w", err)} }, true
 			}
 
@@ -994,7 +998,7 @@ func (m *AppModel) showCreateWorktree() tea.Cmd {
 	return textinput.Blink
 }
 
-func (m *AppModel) showDeleteWorktree() tea.Cmd {
+func (m *Model) showDeleteWorktree() tea.Cmd {
 	if m.selectedIndex < 0 || m.selectedIndex >= len(m.filteredWts) {
 		return nil
 	}
@@ -1008,7 +1012,7 @@ func (m *AppModel) showDeleteWorktree() tea.Cmd {
 	return nil
 }
 
-func (m *AppModel) showDiff() tea.Cmd {
+func (m *Model) showDiff() tea.Cmd {
 	if m.selectedIndex < 0 || m.selectedIndex >= len(m.filteredWts) {
 		return nil
 	}
@@ -1026,7 +1030,7 @@ func (m *AppModel) showDiff() tea.Cmd {
 	}
 }
 
-func (m *AppModel) showFullDiff() tea.Cmd {
+func (m *Model) showFullDiff() tea.Cmd {
 	if m.selectedIndex < 0 || m.selectedIndex >= len(m.filteredWts) {
 		return nil
 	}
@@ -1034,13 +1038,13 @@ func (m *AppModel) showFullDiff() tea.Cmd {
 	return func() tea.Msg {
 		diff := m.git.BuildThreePartDiff(m.ctx, wt.Path, m.config)
 		diff = m.git.ApplyDelta(m.ctx, diff)
-		m.diffScreen = NewDiffScreen(fmt.Sprintf("Diff for %s", wt.Branch), diff, m.git.UseDelta())
+		m.diffScreen = NewDiffScreen(fmt.Sprintf("Diff for %s", wt.Branch), diff)
 		m.currentScreen = screenDiff
 		return nil
 	}
 }
 
-func (m *AppModel) showRenameWorktree() tea.Cmd {
+func (m *Model) showRenameWorktree() tea.Cmd {
 	if m.selectedIndex < 0 || m.selectedIndex >= len(m.filteredWts) {
 		return nil
 	}
@@ -1091,7 +1095,7 @@ func (m *AppModel) showRenameWorktree() tea.Cmd {
 	return textinput.Blink
 }
 
-func (m *AppModel) showPruneMerged() tea.Cmd {
+func (m *Model) showPruneMerged() tea.Cmd {
 	merged := []*models.WorktreeInfo{}
 	for _, wt := range m.worktrees {
 		if wt.IsMain {
@@ -1148,7 +1152,7 @@ func (m *AppModel) showPruneMerged() tea.Cmd {
 }
 
 // showAbsorbWorktree merges selected branch into main and removes the worktree
-func (m *AppModel) showAbsorbWorktree() tea.Cmd {
+func (m *Model) showAbsorbWorktree() tea.Cmd {
 	if m.selectedIndex < 0 || m.selectedIndex >= len(m.filteredWts) {
 		return nil
 	}
@@ -1190,7 +1194,7 @@ func (m *AppModel) showAbsorbWorktree() tea.Cmd {
 	return nil
 }
 
-func (m *AppModel) showCommandPalette() tea.Cmd {
+func (m *Model) showCommandPalette() tea.Cmd {
 	items := []paletteItem{
 		{id: "create", label: "Create worktree (c)", description: "Add a new worktree from base branch"},
 		{id: "delete", label: "Delete worktree (D)", description: "Remove worktree and branch"},
@@ -1234,7 +1238,7 @@ func (m *AppModel) showCommandPalette() tea.Cmd {
 	return textinput.Blink
 }
 
-func (m *AppModel) deleteWorktreeCmd(wt *models.WorktreeInfo) func() tea.Cmd {
+func (m *Model) deleteWorktreeCmd(wt *models.WorktreeInfo) func() tea.Cmd {
 	env := m.buildCommandEnv(wt.Branch, wt.Path)
 	terminateCmds := m.collectTerminateCommands()
 	afterCmd := func() tea.Msg {
@@ -1253,7 +1257,7 @@ func (m *AppModel) deleteWorktreeCmd(wt *models.WorktreeInfo) func() tea.Cmd {
 	}
 }
 
-func (m *AppModel) openLazyGit() tea.Cmd {
+func (m *Model) openLazyGit() tea.Cmd {
 	if m.selectedIndex < 0 || m.selectedIndex >= len(m.filteredWts) {
 		return nil
 	}
@@ -1270,7 +1274,7 @@ func (m *AppModel) openLazyGit() tea.Cmd {
 	})
 }
 
-func (m *AppModel) openPR() tea.Cmd {
+func (m *Model) openPR() tea.Cmd {
 	if m.selectedIndex < 0 || m.selectedIndex >= len(m.filteredWts) {
 		return nil
 	}
@@ -1279,14 +1283,20 @@ func (m *AppModel) openPR() tea.Cmd {
 		return nil
 	}
 	return func() tea.Msg {
-		if err := exec.Command("xdg-open", wt.PR.URL).Start(); err != nil {
+		prURL, err := sanitizePRURL(wt.PR.URL)
+		if err != nil {
+			return errMsg{err: err}
+		}
+
+		// #nosec G204 -- the URL is sanitized and only executed directly as a single argument
+		if err := exec.Command("xdg-open", prURL).Start(); err != nil {
 			return errMsg{err: err}
 		}
 		return nil
 	}
 }
 
-func (m *AppModel) openCommitView() tea.Cmd {
+func (m *Model) openCommitView() tea.Cmd {
 	if m.selectedIndex < 0 || m.selectedIndex >= len(m.filteredWts) {
 		return nil
 	}
@@ -1350,7 +1360,25 @@ func parseCommitMeta(raw string) commitMeta {
 	return meta
 }
 
-func (m *AppModel) handleScreenKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+func sanitizePRURL(raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", fmt.Errorf("PR URL is empty")
+	}
+
+	u, err := url.Parse(raw)
+	if err != nil {
+		return "", fmt.Errorf("invalid PR URL %q: %w", raw, err)
+	}
+
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return "", fmt.Errorf("unsupported URL scheme %q", u.Scheme)
+	}
+
+	return u.String(), nil
+}
+
+func (m *Model) handleScreenKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch m.currentScreen {
 	case screenHelp:
 		if m.helpScreen == nil {
@@ -1516,8 +1544,8 @@ func (m *AppModel) handleScreenKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case keyEnter:
 			if m.inputSubmit != nil {
-				cmd, close := m.inputSubmit(m.inputScreen.input.Value())
-				if close {
+				cmd, closeCmd := m.inputSubmit(m.inputScreen.input.Value())
+				if closeCmd {
 					m.inputScreen = nil
 					m.inputSubmit = nil
 					if m.currentScreen == screenInput {
@@ -1540,7 +1568,7 @@ func (m *AppModel) handleScreenKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *AppModel) renderScreen() string {
+func (m *Model) renderScreen() string {
 	switch m.currentScreen {
 	case screenCommit:
 		if m.commitScreen == nil {
@@ -1593,10 +1621,11 @@ func (m *AppModel) renderScreen() string {
 	return ""
 }
 
-func (m *AppModel) loadCache() tea.Cmd {
+func (m *Model) loadCache() tea.Cmd {
 	return func() tea.Msg {
 		repoKey := m.getRepoKey()
 		cachePath := filepath.Join(m.getWorktreeDir(), repoKey, models.CacheFilename)
+		// #nosec G304 -- cachePath is constructed from vetted worktree directory and constant filename
 		data, err := os.ReadFile(cachePath)
 		if err != nil {
 			return nil
@@ -1608,10 +1637,10 @@ func (m *AppModel) loadCache() tea.Cmd {
 	}
 }
 
-func (m *AppModel) saveCache() {
+func (m *Model) saveCache() {
 	repoKey := m.getRepoKey()
 	cachePath := filepath.Join(m.getWorktreeDir(), repoKey, models.CacheFilename)
-	if err := os.MkdirAll(filepath.Dir(cachePath), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(cachePath), 0o750); err != nil {
 		m.statusContent = fmt.Sprintf("Failed to create cache dir: %v", err)
 		return
 	}
@@ -1620,12 +1649,12 @@ func (m *AppModel) saveCache() {
 		"worktrees": m.worktrees,
 	}
 	data, _ := json.Marshal(cacheData)
-	if err := os.WriteFile(cachePath, data, 0o644); err != nil {
+	if err := os.WriteFile(cachePath, data, 0o600); err != nil {
 		m.statusContent = fmt.Sprintf("Failed to write cache: %v", err)
 	}
 }
 
-func (m *AppModel) getRepoKey() string {
+func (m *Model) getRepoKey() string {
 	if m.repoKey != "" {
 		return m.repoKey
 	}
@@ -1633,7 +1662,7 @@ func (m *AppModel) getRepoKey() string {
 	return m.repoKey
 }
 
-func (m *AppModel) getWorktreeDir() string {
+func (m *Model) getWorktreeDir() string {
 	if m.config.WorktreeDir != "" {
 		return m.config.WorktreeDir
 	}
@@ -1642,12 +1671,12 @@ func (m *AppModel) getWorktreeDir() string {
 }
 
 // GetSelectedPath returns the selected worktree path (for shell integration)
-func (m *AppModel) GetSelectedPath() string {
+func (m *Model) GetSelectedPath() string {
 	return m.selectedPath
 }
 
 // Close releases background resources (cancel contexts, timers)
-func (m *AppModel) Close() {
+func (m *Model) Close() {
 	if m.detailUpdateCancel != nil {
 		m.detailUpdateCancel()
 	}
@@ -1656,7 +1685,7 @@ func (m *AppModel) Close() {
 	}
 }
 
-func (m *AppModel) buildCommandEnv(branch, wtPath string) map[string]string {
+func (m *Model) buildCommandEnv(branch, wtPath string) map[string]string {
 	return map[string]string{
 		"WORKTREE_BRANCH":    branch,
 		"MAIN_WORKTREE_PATH": m.git.GetMainWorktreePath(m.ctx),
@@ -1665,7 +1694,7 @@ func (m *AppModel) buildCommandEnv(branch, wtPath string) map[string]string {
 	}
 }
 
-func (m *AppModel) collectInitCommands() []string {
+func (m *Model) collectInitCommands() []string {
 	cmds := []string{}
 	cmds = append(cmds, m.config.InitCommands...)
 	if m.repoConfig != nil {
@@ -1674,7 +1703,7 @@ func (m *AppModel) collectInitCommands() []string {
 	return cmds
 }
 
-func (m *AppModel) collectTerminateCommands() []string {
+func (m *Model) collectTerminateCommands() []string {
 	cmds := []string{}
 	cmds = append(cmds, m.config.TerminateCommands...)
 	if m.repoConfig != nil {
@@ -1683,7 +1712,7 @@ func (m *AppModel) collectTerminateCommands() []string {
 	return cmds
 }
 
-func (m *AppModel) runCommandsWithTrust(cmds []string, cwd string, env map[string]string, after func() tea.Msg) tea.Cmd {
+func (m *Model) runCommandsWithTrust(cmds []string, cwd string, env map[string]string, after func() tea.Msg) tea.Cmd {
 	if len(cmds) == 0 {
 		if after == nil {
 			return nil
@@ -1724,7 +1753,7 @@ func (m *AppModel) runCommandsWithTrust(cmds []string, cwd string, env map[strin
 	return nil
 }
 
-func (m *AppModel) runCommands(cmds []string, cwd string, env map[string]string, after func() tea.Msg) tea.Cmd {
+func (m *Model) runCommands(cmds []string, cwd string, env map[string]string, after func() tea.Msg) tea.Cmd {
 	return func() tea.Msg {
 		if err := m.git.ExecuteCommands(m.ctx, cmds, cwd, env); err != nil {
 			// Still refresh UI even if commands failed, so user sees current state
@@ -1740,7 +1769,7 @@ func (m *AppModel) runCommands(cmds []string, cwd string, env map[string]string,
 	}
 }
 
-func (m *AppModel) clearPendingTrust() {
+func (m *Model) clearPendingTrust() {
 	m.pendingCommands = nil
 	m.pendingCmdEnv = nil
 	m.pendingCmdCwd = ""
@@ -1749,7 +1778,7 @@ func (m *AppModel) clearPendingTrust() {
 	m.trustScreen = nil
 }
 
-func (m *AppModel) ensureRepoConfig() {
+func (m *Model) ensureRepoConfig() {
 	if m.repoConfig != nil || m.repoConfigPath != "" {
 		return
 	}
@@ -1783,13 +1812,13 @@ type layoutDims struct {
 	rightBottomInnerHeight int
 }
 
-func (m *AppModel) setWindowSize(width, height int) {
+func (m *Model) setWindowSize(width, height int) {
 	m.windowWidth = width
 	m.windowHeight = height
 	m.applyLayout(m.computeLayout())
 }
 
-func (m *AppModel) computeLayout() layoutDims {
+func (m *Model) computeLayout() layoutDims {
 	width := m.windowWidth
 	height := m.windowHeight
 	if width <= 0 {
@@ -1865,11 +1894,11 @@ func (m *AppModel) computeLayout() layoutDims {
 	paneFrameX := basePaneStyle().GetHorizontalFrameSize()
 	paneFrameY := basePaneStyle().GetVerticalFrameSize()
 
-	leftInnerWidth := max(1, leftWidth-paneFrameX)
-	rightInnerWidth := max(1, rightWidth-paneFrameX)
-	leftInnerHeight := max(1, bodyHeight-paneFrameY)
-	rightTopInnerHeight := max(1, rightTopHeight-paneFrameY)
-	rightBottomInnerHeight := max(1, rightBottomHeight-paneFrameY)
+	leftInnerWidth := maxInt(1, leftWidth-paneFrameX)
+	rightInnerWidth := maxInt(1, rightWidth-paneFrameX)
+	leftInnerHeight := maxInt(1, bodyHeight-paneFrameY)
+	rightTopInnerHeight := maxInt(1, rightTopHeight-paneFrameY)
+	rightBottomInnerHeight := maxInt(1, rightBottomHeight-paneFrameY)
 
 	return layoutDims{
 		width:                  width,
@@ -1892,25 +1921,25 @@ func (m *AppModel) computeLayout() layoutDims {
 	}
 }
 
-func (m *AppModel) applyLayout(layout layoutDims) {
+func (m *Model) applyLayout(layout layoutDims) {
 	titleHeight := 1
 	tableHeaderHeight := 1 // bubbles table has its own header
 
 	// Subtract 2 extra lines for safety margin
-	tableHeight := max(1, layout.leftInnerHeight-titleHeight-tableHeaderHeight-2)
+	tableHeight := maxInt(1, layout.leftInnerHeight-titleHeight-tableHeaderHeight-2)
 	m.worktreeTable.SetWidth(layout.leftInnerWidth)
 	m.worktreeTable.SetHeight(tableHeight)
 	m.updateTableColumns(layout.leftInnerWidth)
 
-	logHeight := max(1, layout.rightBottomInnerHeight-titleHeight-tableHeaderHeight-2)
+	logHeight := maxInt(1, layout.rightBottomInnerHeight-titleHeight-tableHeaderHeight-2)
 	m.logTable.SetWidth(layout.rightInnerWidth)
 	m.logTable.SetHeight(logHeight)
 	m.updateLogColumns(layout.rightInnerWidth)
 
-	m.filterInput.Width = max(20, layout.width-18)
+	m.filterInput.Width = maxInt(20, layout.width-18)
 }
 
-func (m *AppModel) renderHeader(layout layoutDims) string {
+func (m *Model) renderHeader(layout layoutDims) string {
 	headerStyle := lipgloss.NewStyle().
 		Foreground(colorAccent).
 		Bold(true).
@@ -1919,7 +1948,7 @@ func (m *AppModel) renderHeader(layout layoutDims) string {
 	return headerStyle.Render("─── Git Worktree Status ───")
 }
 
-func (m *AppModel) renderFilter(layout layoutDims) string {
+func (m *Model) renderFilter(layout layoutDims) string {
 	labelStyle := lipgloss.NewStyle().Foreground(colorAccent).Bold(true)
 	filterStyle := lipgloss.NewStyle().
 		Foreground(colorTextFg).
@@ -1928,7 +1957,7 @@ func (m *AppModel) renderFilter(layout layoutDims) string {
 	return filterStyle.Width(layout.width).Render(line)
 }
 
-func (m *AppModel) renderBody(layout layoutDims) string {
+func (m *Model) renderBody(layout layoutDims) string {
 	left := m.renderLeftPane(layout)
 	right := m.renderRightPane(layout)
 	gap := lipgloss.NewStyle().
@@ -1937,7 +1966,7 @@ func (m *AppModel) renderBody(layout layoutDims) string {
 	return lipgloss.JoinHorizontal(lipgloss.Top, left, gap, right)
 }
 
-func (m *AppModel) renderLeftPane(layout layoutDims) string {
+func (m *Model) renderLeftPane(layout layoutDims) string {
 	title := m.renderPaneTitle(1, "Worktrees", m.focusedPane == 0, layout.leftInnerWidth)
 	tableView := m.worktreeTable.View()
 	content := lipgloss.JoinVertical(lipgloss.Left, title, tableView)
@@ -1947,14 +1976,14 @@ func (m *AppModel) renderLeftPane(layout layoutDims) string {
 		Render(content)
 }
 
-func (m *AppModel) renderRightPane(layout layoutDims) string {
+func (m *Model) renderRightPane(layout layoutDims) string {
 	top := m.renderRightTopPane(layout)
 	bottom := m.renderRightBottomPane(layout)
 	gap := strings.Repeat("\n", layout.gapY)
 	return lipgloss.JoinVertical(lipgloss.Left, top, gap, bottom)
 }
 
-func (m *AppModel) renderRightTopPane(layout layoutDims) string {
+func (m *Model) renderRightTopPane(layout layoutDims) string {
 	title := m.renderPaneTitle(2, "Info/Diff", m.focusedPane == 1, layout.rightInnerWidth)
 	infoBox := m.renderInnerBox("Info", m.infoContent, layout.rightInnerWidth, 0)
 
@@ -1963,8 +1992,8 @@ func (m *AppModel) renderRightTopPane(layout layoutDims) string {
 	if statusBoxHeight < 3 {
 		statusBoxHeight = 3
 	}
-	statusViewportWidth := max(1, layout.rightInnerWidth-innerBoxStyle.GetHorizontalFrameSize())
-	statusViewportHeight := max(1, statusBoxHeight-innerBoxStyle.GetVerticalFrameSize())
+	statusViewportWidth := maxInt(1, layout.rightInnerWidth-innerBoxStyle.GetHorizontalFrameSize())
+	statusViewportHeight := maxInt(1, statusBoxHeight-innerBoxStyle.GetVerticalFrameSize())
 	m.statusViewport.Width = statusViewportWidth
 	m.statusViewport.Height = statusViewportHeight
 	m.statusViewport.SetContent(m.statusContent)
@@ -1985,7 +2014,7 @@ func (m *AppModel) renderRightTopPane(layout layoutDims) string {
 		Render(content)
 }
 
-func (m *AppModel) renderRightBottomPane(layout layoutDims) string {
+func (m *Model) renderRightBottomPane(layout layoutDims) string {
 	title := m.renderPaneTitle(3, "Log", m.focusedPane == 2, layout.rightInnerWidth)
 	content := lipgloss.JoinVertical(lipgloss.Left, title, m.logTable.View())
 	return paneStyle(m.focusedPane == 2).
@@ -1994,7 +2023,7 @@ func (m *AppModel) renderRightBottomPane(layout layoutDims) string {
 		Render(content)
 }
 
-func (m *AppModel) renderFooter(layout layoutDims) string {
+func (m *Model) renderFooter(layout layoutDims) string {
 	footerStyle := lipgloss.NewStyle().
 		Foreground(colorMutedFg).
 		Padding(0, 1)
@@ -2021,13 +2050,13 @@ func (m *AppModel) renderFooter(layout layoutDims) string {
 	return footerStyle.Width(layout.width).Render(strings.Join(hints, "  "))
 }
 
-func (m *AppModel) renderKeyHint(key, label string) string {
+func (m *Model) renderKeyHint(key, label string) string {
 	keyStyle := lipgloss.NewStyle().Foreground(colorAccent).Bold(true)
 	labelStyle := lipgloss.NewStyle().Foreground(colorMutedFg)
 	return fmt.Sprintf("%s %s", keyStyle.Render(key), labelStyle.Render(label))
 }
 
-func (m *AppModel) renderPaneTitle(index int, title string, focused bool, width int) string {
+func (m *Model) renderPaneTitle(index int, title string, focused bool, width int) string {
 	numStyle := lipgloss.NewStyle().Foreground(colorAccentDim)
 	titleStyle := lipgloss.NewStyle().Foreground(colorMutedFg)
 	if focused {
@@ -2039,7 +2068,7 @@ func (m *AppModel) renderPaneTitle(index int, title string, focused bool, width 
 	return lipgloss.NewStyle().Width(width).Render(fmt.Sprintf("%s %s", num, name))
 }
 
-func (m *AppModel) renderInnerBox(title, content string, width, height int) string {
+func (m *Model) renderInnerBox(title, content string, width, height int) string {
 	if content == "" {
 		content = "No data available."
 	}
@@ -2051,14 +2080,14 @@ func (m *AppModel) renderInnerBox(title, content string, width, height int) stri
 		style = style.Height(height)
 	}
 
-	innerWidth := max(1, width-style.GetHorizontalFrameSize())
+	innerWidth := maxInt(1, width-style.GetHorizontalFrameSize())
 	wrappedContent := wrap.String(content, innerWidth)
 	boxContent := lipgloss.JoinVertical(lipgloss.Left, titleStyle.Render(title), wrappedContent)
 
 	return style.Render(boxContent)
 }
 
-func (m *AppModel) buildInfoContent(wt *models.WorktreeInfo) string {
+func (m *Model) buildInfoContent(wt *models.WorktreeInfo) string {
 	if wt == nil {
 		return "No worktree selected."
 	}
@@ -2102,7 +2131,7 @@ func (m *AppModel) buildInfoContent(wt *models.WorktreeInfo) string {
 	return strings.Join(infoLines, "\n")
 }
 
-func (m *AppModel) buildStatusContent(statusRaw string) string {
+func (m *Model) buildStatusContent(statusRaw string) string {
 	statusRaw = strings.TrimRight(statusRaw, "\n")
 	if strings.TrimSpace(statusRaw) == "" {
 		return lipgloss.NewStyle().Foreground(colorSuccessFg).Render("Clean working tree")
@@ -2186,8 +2215,8 @@ func (m *AppModel) buildStatusContent(statusRaw string) string {
 	return strings.Join(lines, "\n")
 }
 
-func (m *AppModel) updateTableColumns(totalWidth int) {
-	worktree := max(12, totalWidth-44)
+func (m *Model) updateTableColumns(totalWidth int) {
+	worktree := maxInt(12, totalWidth-44)
 	status := 6
 	ab := 7
 	pr := 12
@@ -2214,7 +2243,7 @@ func (m *AppModel) updateTableColumns(totalWidth int) {
 		excess--
 	}
 	if excess > 0 {
-		worktree = max(6, worktree-excess)
+		worktree = maxInt(6, worktree-excess)
 	}
 
 	m.worktreeTable.SetColumns([]table.Column{
@@ -2226,9 +2255,9 @@ func (m *AppModel) updateTableColumns(totalWidth int) {
 	})
 }
 
-func (m *AppModel) updateLogColumns(totalWidth int) {
+func (m *Model) updateLogColumns(totalWidth int) {
 	sha := 8
-	message := max(10, totalWidth-sha)
+	message := maxInt(10, totalWidth-sha)
 	m.logTable.SetColumns([]table.Column{
 		{Title: "SHA", Width: sha},
 		{Title: "Message", Width: message},
@@ -2260,7 +2289,7 @@ func baseInnerBoxStyle() lipgloss.Style {
 		Padding(0, 1)
 }
 
-func max(a, b int) int {
+func maxInt(a, b int) int {
 	if a > b {
 		return a
 	}

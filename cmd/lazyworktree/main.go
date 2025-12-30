@@ -56,7 +56,7 @@ func main() {
 		}
 	}
 
-	model := app.NewAppModel(cfg, initialFilter)
+	model := app.NewModel(cfg, initialFilter)
 	p := tea.NewProgram(model, tea.WithAltScreen())
 
 	_, err = p.Run()

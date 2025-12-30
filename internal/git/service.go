@@ -1,3 +1,4 @@
+// Package git wraps git commands and helpers used by lazyworktree.
 package git
 
 import (
@@ -24,10 +25,13 @@ const (
 	gitHostUnknown = "unknown"
 )
 
+// NotifyFn receives ongoing notifications.
 type NotifyFn func(message string, severity string)
 
+// NotifyOnceFn reports deduplicated notification messages.
 type NotifyOnceFn func(key string, message string, severity string)
 
+// Service orchestrates git and helper commands for the UI.
 type Service struct {
 	notify      NotifyFn
 	notifyOnce  NotifyOnceFn
@@ -38,6 +42,7 @@ type Service struct {
 	useDelta    bool
 }
 
+// NewService constructs a Service and sets up concurrency limits.
 func NewService(notify NotifyFn, notifyOnce NotifyOnceFn) *Service {
 	limit := runtime.NumCPU() * 2
 	if limit < 4 {
@@ -65,6 +70,26 @@ func NewService(notify NotifyFn, notifyOnce NotifyOnceFn) *Service {
 	return s
 }
 
+func prepareAllowedCommand(ctx context.Context, args []string) (*exec.Cmd, error) {
+	if len(args) == 0 {
+		return nil, fmt.Errorf("no command provided")
+	}
+
+	switch args[0] {
+	case "git":
+		// #nosec G204 -- arguments for git command come from internal logic and are not shell interpolated
+		return exec.CommandContext(ctx, "git", args[1:]...), nil
+	case "glab":
+		// #nosec G204 -- arguments for glab command are controlled by the application workflow
+		return exec.CommandContext(ctx, "glab", args[1:]...), nil
+	case "gh":
+		// #nosec G204 -- arguments for gh command are supplied by vetted code paths
+		return exec.CommandContext(ctx, "gh", args[1:]...), nil
+	default:
+		return nil, fmt.Errorf("unsupported command %q", args[0])
+	}
+}
+
 func (s *Service) detectDelta() {
 	cmd := exec.Command("delta", "--version")
 	if err := cmd.Run(); err == nil {
@@ -73,6 +98,7 @@ func (s *Service) detectDelta() {
 }
 
 // ApplyDelta pipes diff output through delta if available
+// ApplyDelta pipes diff output through delta when available.
 func (s *Service) ApplyDelta(ctx context.Context, diff string) string {
 	if !s.useDelta || diff == "" {
 		return diff
@@ -88,10 +114,12 @@ func (s *Service) ApplyDelta(ctx context.Context, diff string) string {
 	return string(output)
 }
 
+// UseDelta reports whether delta integration is enabled.
 func (s *Service) UseDelta() bool {
 	return s.useDelta
 }
 
+// ExecuteCommands runs provided shell commands sequentially inside the given working directory.
 func (s *Service) ExecuteCommands(ctx context.Context, cmdList []string, cwd string, env map[string]string) error {
 	for _, cmdStr := range cmdList {
 		if strings.TrimSpace(cmdStr) == "" {
@@ -109,6 +137,7 @@ func (s *Service) ExecuteCommands(ctx context.Context, cmdList []string, cwd str
 			}
 			continue
 		}
+		// #nosec G204 -- commands are defined in the local config and executed through bash intentionally
 		command := exec.CommandContext(ctx, "bash", "-lc", cmdStr)
 		if cwd != "" {
 			command.Dir = cwd
@@ -145,8 +174,18 @@ func (s *Service) releaseSemaphore() {
 	s.semaphore <- struct{}{}
 }
 
+// RunGit executes a git command and optionally trims its output.
 func (s *Service) RunGit(ctx context.Context, args []string, cwd string, okReturncodes []int, strip bool, silent bool) string {
-	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
+	cmd, err := prepareAllowedCommand(ctx, args)
+	if err != nil {
+		command := ""
+		if len(args) > 0 {
+			command = strings.Join(args, " ")
+		}
+		key := fmt.Sprintf("unsupported_cmd:%s", command)
+		s.notifyOnce(key, fmt.Sprintf("Unsupported command: %s", command), "error")
+		return ""
+	}
 	if cwd != "" {
 		cmd.Dir = cwd
 	}
@@ -198,8 +237,17 @@ func (s *Service) RunGit(ctx context.Context, args []string, cwd string, okRetur
 	return out
 }
 
+// RunCommandChecked runs the provided git command and reports failures via notify callbacks.
 func (s *Service) RunCommandChecked(ctx context.Context, args []string, cwd string, errorPrefix string) bool {
-	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
+	cmd, err := prepareAllowedCommand(ctx, args)
+	if err != nil {
+		message := fmt.Sprintf("%s: %v", errorPrefix, err)
+		if errorPrefix == "" {
+			message = fmt.Sprintf("command error: %v", err)
+		}
+		s.notify(message, "error")
+		return false
+	}
 	if cwd != "" {
 		cmd.Dir = cwd
 	}
@@ -218,6 +266,7 @@ func (s *Service) RunCommandChecked(ctx context.Context, args []string, cwd stri
 	return true
 }
 
+// GetMainBranch returns the main branch name for the current repository.
 func (s *Service) GetMainBranch(ctx context.Context) string {
 	if s.mainBranch != "" {
 		return s.mainBranch
@@ -236,6 +285,7 @@ func (s *Service) GetMainBranch(ctx context.Context) string {
 	return s.mainBranch
 }
 
+// GetWorktrees parses git worktree metadata and returns the list of worktrees.
 func (s *Service) GetWorktrees(ctx context.Context) ([]*models.WorktreeInfo, error) {
 	rawWts := s.RunGit(ctx, []string{"git", "worktree", "list", "--porcelain"}, "", []int{0}, true, false)
 	if rawWts == "" {
@@ -466,6 +516,7 @@ func (s *Service) fetchGitLabPRs(ctx context.Context) (map[string]*models.PRInfo
 }
 
 // FetchPRMap fetches PR/MR information from GitHub or GitLab
+// FetchPRMap gathers PR information via supported host APIs.
 func (s *Service) FetchPRMap(ctx context.Context) (map[string]*models.PRInfo, error) {
 	host := s.detectHost(ctx)
 	if host == gitHostGitLab {
@@ -512,6 +563,7 @@ func (s *Service) FetchPRMap(ctx context.Context) (map[string]*models.PRInfo, er
 	return prMap, nil
 }
 
+// GetMainWorktreePath returns the path of the main worktree.
 func (s *Service) GetMainWorktreePath(ctx context.Context) string {
 	rawWts := s.RunGit(ctx, []string{"git", "worktree", "list", "--porcelain"}, "", []int{0}, true, false)
 	for _, line := range strings.Split(rawWts, "\n") {
@@ -523,6 +575,7 @@ func (s *Service) GetMainWorktreePath(ctx context.Context) string {
 	return cwd
 }
 
+// RenameWorktree attempts to move and rename branches for a worktree migration.
 func (s *Service) RenameWorktree(ctx context.Context, oldPath, newPath, oldBranch, newBranch string) bool {
 	// 1. Move the worktree directory
 	if !s.RunCommandChecked(ctx, []string{"git", "worktree", "move", oldPath, newPath}, "", fmt.Sprintf("Failed to move worktree from %s to %s", oldPath, newPath)) {
@@ -538,6 +591,7 @@ func (s *Service) RenameWorktree(ctx context.Context, oldPath, newPath, oldBranc
 }
 
 // ResolveRepoName resolves the repository name using various methods
+// ResolveRepoName returns the repository identifier for caching purposes.
 func (s *Service) ResolveRepoName(ctx context.Context) string {
 	// Try gh repo view
 	out := s.RunGit(ctx, []string{"gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"}, "", []int{0}, true, true)
@@ -576,6 +630,7 @@ func (s *Service) ResolveRepoName(ctx context.Context) string {
 }
 
 // BuildThreePartDiff builds a comprehensive diff with staged, unstaged, and untracked changes
+// BuildThreePartDiff assembles a diff showing staged, modified, and untracked sections.
 func (s *Service) BuildThreePartDiff(ctx context.Context, path string, cfg *config.AppConfig) string {
 	var parts []string
 	totalChars := 0

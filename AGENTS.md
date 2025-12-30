@@ -10,5 +10,6 @@ Textual-based TUI for managing Git worktrees. Python 3.12+.
 
 Always Run:
 
-- `golangci-lint run --fix ./cmd/... ./internal/...`
-- `gofumpt -w ./cmd/... ./internal/...`
+- `golangci-lint run --fix ./cmd/... ./internal/... ./tests/...`
+- `gofumpt -w ***/*.go`
+-`go test ./cmd/... ./internal/... ./tests/... -coverprofile cover.out -covermode=atomic`

@@ -289,7 +289,7 @@ The Go port has a **solid architectural foundation** with proper separation of c
 **Files Modified:**
 - `internal/app/app.go`:
   - Added `debouncedDetailsMsg` message type
-  - Added `detailUpdateCancel` and `pendingDetailsIndex` fields to AppModel
+  - Added `detailUpdateCancel` and `pendingDetailsIndex` fields to Model
   - Added `debouncedUpdateDetailsView()` method
   - Updated cursor movement handlers (j/k keys, table input)
   - Added message handler for `debouncedDetailsMsg`

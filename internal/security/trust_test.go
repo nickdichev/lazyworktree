@@ -31,7 +31,7 @@ func TestCalculateHash(t *testing.T) {
 	t.Run("calculate hash for existing file", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		testFile := filepath.Join(tmpDir, "test.txt")
-		err := os.WriteFile(testFile, []byte(testContent), 0o644)
+		err := os.WriteFile(testFile, []byte(testContent), 0o600)
 		require.NoError(t, err)
 
 		tm := &TrustManager{
@@ -62,11 +62,11 @@ func TestCalculateHash(t *testing.T) {
 		tmpDir := t.TempDir()
 
 		file1 := filepath.Join(tmpDir, "file1.txt")
-		err := os.WriteFile(file1, []byte("content1"), 0o644)
+		err := os.WriteFile(file1, []byte("content1"), 0o600)
 		require.NoError(t, err)
 
 		file2 := filepath.Join(tmpDir, "file2.txt")
-		err = os.WriteFile(file2, []byte("content2"), 0o644)
+		err = os.WriteFile(file2, []byte("content2"), 0o600)
 		require.NoError(t, err)
 
 		tm := &TrustManager{
@@ -108,9 +108,9 @@ func TestLoad(t *testing.T) {
 		}
 		data, err := json.MarshalIndent(trustedData, "", "  ")
 		require.NoError(t, err)
-		err = os.MkdirAll(filepath.Dir(dbPath), 0o755)
+		err = os.MkdirAll(filepath.Dir(dbPath), 0o750)
 		require.NoError(t, err)
-		err = os.WriteFile(dbPath, data, 0o644)
+		err = os.WriteFile(dbPath, data, 0o600)
 		require.NoError(t, err)
 
 		tm := &TrustManager{
@@ -129,9 +129,9 @@ func TestLoad(t *testing.T) {
 		dbPath := filepath.Join(tmpDir, "trusted.json")
 
 		// Write invalid JSON
-		err := os.MkdirAll(filepath.Dir(dbPath), 0o755)
+		err := os.MkdirAll(filepath.Dir(dbPath), 0o750)
 		require.NoError(t, err)
-		err = os.WriteFile(dbPath, []byte("invalid json {{{"), 0o644)
+		err = os.WriteFile(dbPath, []byte("invalid json {{{"), 0o600)
 		require.NoError(t, err)
 
 		tm := &TrustManager{
@@ -166,6 +166,7 @@ func TestSave(t *testing.T) {
 		require.NoError(t, err)
 
 		// Verify content
+		// #nosec G304 -- reading back from the temporary trust database created by the test
 		data, err := os.ReadFile(dbPath)
 		require.NoError(t, err)
 
@@ -212,7 +213,7 @@ func TestCheckTrust(t *testing.T) {
 	t.Run("check trust for untrusted file", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		testFile := filepath.Join(tmpDir, "test.txt")
-		err := os.WriteFile(testFile, []byte("content"), 0o644)
+		err := os.WriteFile(testFile, []byte("content"), 0o600)
 		require.NoError(t, err)
 
 		tm := &TrustManager{
@@ -228,7 +229,7 @@ func TestCheckTrust(t *testing.T) {
 		tmpDir := t.TempDir()
 		testFile := filepath.Join(tmpDir, "test.txt")
 		content := "test content"
-		err := os.WriteFile(testFile, []byte(content), 0o644)
+		err := os.WriteFile(testFile, []byte(content), 0o600)
 		require.NoError(t, err)
 
 		tm := &TrustManager{
@@ -248,7 +249,7 @@ func TestCheckTrust(t *testing.T) {
 	t.Run("check trust for modified file", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		testFile := filepath.Join(tmpDir, "test.txt")
-		err := os.WriteFile(testFile, []byte("original content"), 0o644)
+		err := os.WriteFile(testFile, []byte("original content"), 0o600)
 		require.NoError(t, err)
 
 		tm := &TrustManager{
@@ -261,7 +262,7 @@ func TestCheckTrust(t *testing.T) {
 		require.NoError(t, err)
 
 		// Modify the file
-		err = os.WriteFile(testFile, []byte("modified content"), 0o644)
+		err = os.WriteFile(testFile, []byte("modified content"), 0o600)
 		require.NoError(t, err)
 
 		// Check trust - should be untrusted due to content change
@@ -272,7 +273,7 @@ func TestCheckTrust(t *testing.T) {
 	t.Run("check trust with relative path", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		testFile := filepath.Join(tmpDir, "test.txt")
-		err := os.WriteFile(testFile, []byte("content"), 0o644)
+		err := os.WriteFile(testFile, []byte("content"), 0o600)
 		require.NoError(t, err)
 
 		// Save current directory and change to tmpDir
@@ -304,7 +305,7 @@ func TestTrustFile(t *testing.T) {
 		tmpDir := t.TempDir()
 		testFile := filepath.Join(tmpDir, "test.txt")
 		content := "test content"
-		err := os.WriteFile(testFile, []byte(content), 0o644)
+		err := os.WriteFile(testFile, []byte(content), 0o600)
 		require.NoError(t, err)
 
 		tm := &TrustManager{
@@ -341,7 +342,7 @@ func TestTrustFile(t *testing.T) {
 	t.Run("trust file updates hash on content change", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		testFile := filepath.Join(tmpDir, "test.txt")
-		err := os.WriteFile(testFile, []byte("original"), 0o644)
+		err := os.WriteFile(testFile, []byte("original"), 0o600)
 		require.NoError(t, err)
 
 		tm := &TrustManager{
@@ -357,7 +358,7 @@ func TestTrustFile(t *testing.T) {
 		hash1 := tm.trustedHashes[absPath]
 
 		// Modify and trust again
-		err = os.WriteFile(testFile, []byte("modified"), 0o644)
+		err = os.WriteFile(testFile, []byte("modified"), 0o600)
 		require.NoError(t, err)
 
 		err = tm.TrustFile(testFile)

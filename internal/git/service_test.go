@@ -14,8 +14,8 @@ import (
 )
 
 func TestNewService(t *testing.T) {
-	notify := func(message string, severity string) {}
-	notifyOnce := func(key string, message string, severity string) {}
+	notify := func(_ string, _ string) {}
+	notifyOnce := func(_ string, _ string, _ string) {}
 
 	service := NewService(notify, notifyOnce)
 
@@ -47,8 +47,8 @@ func TestNewService(t *testing.T) {
 }
 
 func TestUseDelta(t *testing.T) {
-	notify := func(message string, severity string) {}
-	notifyOnce := func(key string, message string, severity string) {}
+	notify := func(_ string, _ string) {}
+	notifyOnce := func(_ string, _ string, _ string) {}
 
 	service := NewService(notify, notifyOnce)
 
@@ -58,8 +58,8 @@ func TestUseDelta(t *testing.T) {
 }
 
 func TestApplyDelta(t *testing.T) {
-	notify := func(message string, severity string) {}
-	notifyOnce := func(key string, message string, severity string) {}
+	notify := func(_ string, _ string) {}
+	notifyOnce := func(_ string, _ string, _ string) {}
 
 	service := NewService(notify, notifyOnce)
 
@@ -90,8 +90,8 @@ func TestApplyDelta(t *testing.T) {
 }
 
 func TestGetMainBranch(t *testing.T) {
-	notify := func(message string, severity string) {}
-	notifyOnce := func(key string, message string, severity string) {}
+	notify := func(_ string, _ string) {}
+	notifyOnce := func(_ string, _ string, _ string) {}
 
 	service := NewService(notify, notifyOnce)
 
@@ -107,8 +107,8 @@ func TestGetMainBranch(t *testing.T) {
 }
 
 func TestRenameWorktree(t *testing.T) {
-	notify := func(message string, severity string) {}
-	notifyOnce := func(key string, message string, severity string) {}
+	notify := func(_ string, _ string) {}
+	notifyOnce := func(_ string, _ string, _ string) {}
 
 	service := NewService(notify, notifyOnce)
 	ctx := context.Background()
@@ -120,12 +120,12 @@ func TestRenameWorktree(t *testing.T) {
 		newPath := filepath.Join(tmpDir, "new")
 
 		// Create old directory
-		err := os.MkdirAll(oldPath, 0o755)
+		err := os.MkdirAll(oldPath, 0o750)
 		require.NoError(t, err)
 
 		// Create a test file in old directory
 		testFile := filepath.Join(oldPath, "test.txt")
-		err = os.WriteFile(testFile, []byte("test"), 0o644)
+		err = os.WriteFile(testFile, []byte("test"), 0o600)
 		require.NoError(t, err)
 
 		// Rename (this is essentially just a directory move, not a git worktree operation)
@@ -138,8 +138,8 @@ func TestRenameWorktree(t *testing.T) {
 }
 
 func TestExecuteCommands(t *testing.T) {
-	notify := func(message string, severity string) {}
-	notifyOnce := func(key string, message string, severity string) {}
+	notify := func(_ string, _ string) {}
+	notifyOnce := func(_ string, _ string, _ string) {}
 
 	service := NewService(notify, notifyOnce)
 	ctx := context.Background()
@@ -173,8 +173,8 @@ func TestExecuteCommands(t *testing.T) {
 }
 
 func TestBuildThreePartDiff(t *testing.T) {
-	notify := func(message string, severity string) {}
-	notifyOnce := func(key string, message string, severity string) {}
+	notify := func(_ string, _ string) {}
+	notifyOnce := func(_ string, _ string, _ string) {}
 
 	service := NewService(notify, notifyOnce)
 	ctx := context.Background()
@@ -194,8 +194,8 @@ func TestBuildThreePartDiff(t *testing.T) {
 }
 
 func TestRunGit(t *testing.T) {
-	notify := func(message string, severity string) {}
-	notifyOnce := func(key string, message string, severity string) {}
+	notify := func(_ string, _ string) {}
+	notifyOnce := func(_ string, _ string, _ string) {}
 
 	service := NewService(notify, notifyOnce)
 	ctx := context.Background()
@@ -239,7 +239,7 @@ func TestNotifications(t *testing.T) {
 			receivedMessage = message
 			receivedSeverity = severity
 		}
-		notifyOnce := func(key string, message string, severity string) {}
+		notifyOnce := func(_ string, _ string, _ string) {}
 
 		service := NewService(notify, notifyOnce)
 
@@ -255,7 +255,7 @@ func TestNotifications(t *testing.T) {
 		called := false
 		var receivedKey, receivedMessage, receivedSeverity string
 
-		notify := func(message string, severity string) {}
+		notify := func(_ string, _ string) {}
 		notifyOnce := func(key string, message string, severity string) {
 			called = true
 			receivedKey = key
@@ -276,8 +276,8 @@ func TestNotifications(t *testing.T) {
 }
 
 func TestWorktreeOperations(t *testing.T) {
-	notify := func(message string, severity string) {}
-	notifyOnce := func(key string, message string, severity string) {}
+	notify := func(_ string, _ string) {}
+	notifyOnce := func(_ string, _ string, _ string) {}
 
 	service := NewService(notify, notifyOnce)
 	ctx := context.Background()
@@ -296,8 +296,8 @@ func TestWorktreeOperations(t *testing.T) {
 }
 
 func TestFetchPRMap(t *testing.T) {
-	notify := func(message string, severity string) {}
-	notifyOnce := func(key string, message string, severity string) {}
+	notify := func(_ string, _ string) {}
+	notifyOnce := func(_ string, _ string, _ string) {}
 
 	service := NewService(notify, notifyOnce)
 	ctx := context.Background()

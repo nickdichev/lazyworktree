@@ -1,3 +1,4 @@
+// Package commands provides utility helpers for workspace-related shell commands.
 package commands
 
 import (
@@ -38,7 +39,7 @@ func LinkTopSymlinks(ctx context.Context, mainPath, worktreePath string, statusF
 		}
 	}
 
-	if err := os.MkdirAll(filepath.Join(worktreePath, "tmp"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(worktreePath, "tmp"), 0o750); err != nil {
 		return err
 	}
 
@@ -63,7 +64,7 @@ func symlinkPath(mainPath, worktreePath, rel string) error {
 		return nil
 	}
 
-	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(dst), 0o750); err != nil {
 		return err
 	}
 

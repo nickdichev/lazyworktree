@@ -1,5 +1,7 @@
+// Package models defines the data objects shared across lazyworktree packages.
 package models
 
+// PRInfo captures the relevant metadata for a pull request.
 type PRInfo struct {
 	Number int
 	State  string
@@ -7,6 +9,7 @@ type PRInfo struct {
 	URL    string
 }
 
+// WorktreeInfo summarizes the information for a git worktree.
 type WorktreeInfo struct {
 	Path         string
 	Branch       string
@@ -24,6 +27,8 @@ type WorktreeInfo struct {
 }
 
 const (
+	// LastSelectedFilename stores the last worktree selection for a repo.
 	LastSelectedFilename = ".last-selected"
-	CacheFilename        = ".worktree-cache.json"
+	// CacheFilename stores cached worktree metadata for faster loads.
+	CacheFilename = ".worktree-cache.json"
 )

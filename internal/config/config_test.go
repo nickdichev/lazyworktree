@@ -471,7 +471,7 @@ func TestParseConfig(t *testing.T) {
 func TestLoadRepoConfig(t *testing.T) {
 	t.Run("empty repo path", func(t *testing.T) {
 		cfg, path, err := LoadRepoConfig("")
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Nil(t, cfg)
 		assert.Empty(t, path)
 	})
@@ -494,7 +494,7 @@ func TestLoadRepoConfig(t *testing.T) {
 terminate_commands:
   - echo "terminate"
 `
-		err := os.WriteFile(wtPath, []byte(yamlContent), 0o644)
+		err := os.WriteFile(wtPath, []byte(yamlContent), 0o600)
 		require.NoError(t, err)
 
 		cfg, path, err := LoadRepoConfig(tmpDir)
@@ -510,11 +510,11 @@ terminate_commands:
 		tmpDir := t.TempDir()
 		wtPath := filepath.Join(tmpDir, ".wt")
 
-		err := os.WriteFile(wtPath, []byte("invalid: yaml: content: [[["), 0o644)
+		err := os.WriteFile(wtPath, []byte("invalid: yaml: content: [[["), 0o600)
 		require.NoError(t, err)
 
 		cfg, path, err := LoadRepoConfig(tmpDir)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Nil(t, cfg)
 		assert.Equal(t, wtPath, path)
 	})
@@ -523,7 +523,11 @@ terminate_commands:
 func TestLoadConfig(t *testing.T) {
 	t.Run("no config file returns defaults", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		configPath := filepath.Join(tmpDir, "nonexistent.yaml")
+		t.Setenv("XDG_CONFIG_HOME", tmpDir)
+		configDir := filepath.Join(tmpDir, "lazyworktree")
+		configPath := filepath.Join(configDir, "nonexistent.yaml")
+
+		require.NoError(t, os.MkdirAll(filepath.Dir(configPath), 0o750))
 
 		cfg, err := LoadConfig(configPath)
 		require.NoError(t, err)
@@ -534,7 +538,9 @@ func TestLoadConfig(t *testing.T) {
 
 	t.Run("valid config file", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		configPath := filepath.Join(tmpDir, "config.yaml")
+		t.Setenv("XDG_CONFIG_HOME", tmpDir)
+		configDir := filepath.Join(tmpDir, "lazyworktree")
+		configPath := filepath.Join(configDir, "config.yaml")
 
 		yamlContent := `worktree_dir: /custom/worktrees
 sort_by_active: false
@@ -547,7 +553,8 @@ init_commands:
 terminate_commands:
   - echo "cleanup"
 `
-		err := os.WriteFile(configPath, []byte(yamlContent), 0o644)
+		require.NoError(t, os.MkdirAll(filepath.Dir(configPath), 0o750))
+		err := os.WriteFile(configPath, []byte(yamlContent), 0o600)
 		require.NoError(t, err)
 
 		cfg, err := LoadConfig(configPath)
@@ -565,9 +572,12 @@ terminate_commands:
 
 	t.Run("invalid YAML returns defaults", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		configPath := filepath.Join(tmpDir, "config.yaml")
+		t.Setenv("XDG_CONFIG_HOME", tmpDir)
+		configDir := filepath.Join(tmpDir, "lazyworktree")
+		configPath := filepath.Join(configDir, "config.yaml")
 
-		err := os.WriteFile(configPath, []byte("invalid: [[["), 0o644)
+		require.NoError(t, os.MkdirAll(filepath.Dir(configPath), 0o750))
+		err := os.WriteFile(configPath, []byte("invalid: [[["), 0o600)
 		require.NoError(t, err)
 
 		cfg, err := LoadConfig(configPath)

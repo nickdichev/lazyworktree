@@ -1,7 +1,9 @@
+// Package config loads application and repository configuration from YAML.
 package config
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -10,6 +12,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// AppConfig defines the global lazyworktree configuration options.
 type AppConfig struct {
 	WorktreeDir       string
 	InitCommands      []string
@@ -29,6 +32,7 @@ type RepoConfig struct {
 	Path              string
 }
 
+// DefaultConfig returns the default configuration values.
 func DefaultConfig() *AppConfig {
 	return &AppConfig{
 		SortByActive:      true,
@@ -158,12 +162,17 @@ func LoadRepoConfig(repoPath string) (*RepoConfig, string, error) {
 	if repoPath == "" {
 		return nil, "", fmt.Errorf("empty repo path")
 	}
-	wtPath := filepath.Join(repoPath, ".wt")
+	cleanRepoPath := filepath.Clean(repoPath)
+	wtPath := filepath.Join(cleanRepoPath, ".wt")
 	if _, err := os.Stat(wtPath); os.IsNotExist(err) {
 		return nil, wtPath, nil
 	}
 
-	dataBytes, err := os.ReadFile(wtPath)
+	if !isPathWithin(cleanRepoPath, wtPath) {
+		return nil, "", fmt.Errorf("invalid repo path %q", repoPath)
+	}
+
+	dataBytes, err := fs.ReadFile(os.DirFS(cleanRepoPath), ".wt")
 	if err != nil {
 		return nil, wtPath, err
 	}
@@ -189,7 +198,11 @@ func getConfigDir() string {
 	return filepath.Join(home, ".config")
 }
 
+// LoadConfig reads the application configuration from a YAML file.
 func LoadConfig(configPath string) (*AppConfig, error) {
+	configBase := filepath.Join(getConfigDir(), "lazyworktree")
+	configBase = filepath.Clean(configBase)
+
 	var paths []string
 
 	if configPath != "" {
@@ -197,12 +210,18 @@ func LoadConfig(configPath string) (*AppConfig, error) {
 		if err != nil {
 			return DefaultConfig(), err
 		}
-		paths = []string{expanded}
+		absPath, err := filepath.Abs(expanded)
+		if err != nil {
+			return DefaultConfig(), err
+		}
+		if !isPathWithin(configBase, absPath) {
+			return DefaultConfig(), fmt.Errorf("config path must reside inside %s", configBase)
+		}
+		paths = []string{absPath}
 	} else {
-		configDir := getConfigDir()
 		paths = []string{
-			filepath.Join(configDir, "lazyworktree", "config.yaml"),
-			filepath.Join(configDir, "lazyworktree", "config.yml"),
+			filepath.Join(configBase, "config.yaml"),
+			filepath.Join(configBase, "config.yml"),
 		}
 	}
 
@@ -211,6 +230,7 @@ func LoadConfig(configPath string) (*AppConfig, error) {
 			continue
 		}
 
+		// #nosec G304 -- path is constrained to the config directory after validation
 		data, err := os.ReadFile(path)
 		if err != nil {
 			continue
@@ -236,4 +256,21 @@ func expandPath(path string) (string, error) {
 		path = filepath.Join(home, path[1:])
 	}
 	return os.ExpandEnv(path), nil
+}
+
+func isPathWithin(base, target string) bool {
+	base = filepath.Clean(base)
+	target = filepath.Clean(target)
+
+	rel, err := filepath.Rel(base, target)
+	if err != nil {
+		return false
+	}
+	if rel == "." {
+		return true
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+		return false
+	}
+	return true
 }
