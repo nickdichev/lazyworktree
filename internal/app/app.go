@@ -91,6 +91,8 @@ type AppModel struct {
 	repoName      string
 	repoKey       string
 	currentScreen screenType
+	inputScreen   *InputScreen
+	inputSubmit   func(string) (tea.Cmd, bool)
 	showingFilter bool
 	focusedPane   int // 0=table, 1=status, 2=log
 	windowWidth   int
@@ -265,76 +267,83 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "tab":
 			m.focusedPane = (m.focusedPane + 1) % 3
-			if m.focusedPane == 0 {
+			switch m.focusedPane {
+			case 0:
 				m.worktreeTable.Focus()
-			} else if m.focusedPane == 2 {
+			case 2:
 				m.logTable.Focus()
 			}
 			return m, nil
 
 		case "j", "down":
-			if m.focusedPane == 0 {
+			switch m.focusedPane {
+			case 0:
 				m.worktreeTable, cmd = m.worktreeTable.Update(msg)
 				cmds = append(cmds, cmd)
 				cmds = append(cmds, m.debouncedUpdateDetailsView())
-			} else if m.focusedPane == 1 {
+			case 1:
 				m.statusViewport, cmd = m.statusViewport.Update(msg)
 				cmds = append(cmds, cmd)
-			} else {
+			default:
 				m.logTable, cmd = m.logTable.Update(msg)
 				cmds = append(cmds, cmd)
 			}
 			return m, tea.Batch(cmds...)
 
 		case "k", "up":
-			if m.focusedPane == 0 {
+			switch m.focusedPane {
+			case 0:
 				m.worktreeTable, cmd = m.worktreeTable.Update(msg)
 				cmds = append(cmds, cmd)
 				cmds = append(cmds, m.debouncedUpdateDetailsView())
-			} else if m.focusedPane == 1 {
+			case 1:
 				m.statusViewport, cmd = m.statusViewport.Update(msg)
 				cmds = append(cmds, cmd)
-			} else {
+			default:
 				m.logTable, cmd = m.logTable.Update(msg)
 				cmds = append(cmds, cmd)
 			}
 			return m, tea.Batch(cmds...)
 
 		case "ctrl+d", " ": // Page down
-			if m.focusedPane == 1 {
+			switch m.focusedPane {
+			case 1:
 				m.statusViewport.HalfViewDown()
 				return m, nil
-			} else if m.focusedPane == 2 {
+			case 2:
 				m.logTable, cmd = m.logTable.Update(msg)
 				return m, cmd
 			}
 			return m, nil
 
 		case "ctrl+u": // Page up
-			if m.focusedPane == 1 {
+			switch m.focusedPane {
+			case 1:
 				m.statusViewport.HalfViewUp()
 				return m, nil
-			} else if m.focusedPane == 2 {
+			case 2:
 				m.logTable, cmd = m.logTable.Update(msg)
 				return m, cmd
 			}
 			return m, nil
 
 		case "pgdown":
-			if m.focusedPane == 1 {
+			switch m.focusedPane {
+			case 1:
 				m.statusViewport.ViewDown()
 				return m, nil
-			} else if m.focusedPane == 2 {
+			case 2:
 				m.logTable, cmd = m.logTable.Update(msg)
 				return m, cmd
 			}
 			return m, nil
 
 		case "pgup":
-			if m.focusedPane == 1 {
+			switch m.focusedPane {
+			case 1:
 				m.statusViewport.ViewUp()
 				return m, nil
-			} else if m.focusedPane == 2 {
+			case 2:
 				m.logTable, cmd = m.logTable.Update(msg)
 				return m, cmd
 			}
@@ -348,13 +357,14 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		case "enter":
-			if m.focusedPane == 0 {
+			switch m.focusedPane {
+			case 0:
 				// Jump to worktree
 				if m.selectedIndex >= 0 && m.selectedIndex < len(m.filteredWts) {
 					m.selectedPath = m.filteredWts[m.selectedIndex].Path
 					return m, tea.Quit
 				}
-			} else if m.focusedPane == 2 {
+			case 2:
 				// Open commit view
 				return m, m.openCommitView()
 			}
@@ -490,7 +500,9 @@ func (m *AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case errMsg:
-		// Handle error
+		if msg.err != nil {
+			m.statusContent = fmt.Sprintf("Error: %v", msg.err)
+		}
 		return m, nil
 	}
 
@@ -759,8 +771,54 @@ func (m *AppModel) showDiff() tea.Cmd {
 }
 
 func (m *AppModel) showRenameWorktree() tea.Cmd {
-	// Show input screen for rename
-	return nil
+	if m.selectedIndex < 0 || m.selectedIndex >= len(m.filteredWts) {
+		return nil
+	}
+
+	wt := m.filteredWts[m.selectedIndex]
+	if wt.IsMain {
+		m.statusContent = "Cannot rename the main worktree."
+		return nil
+	}
+
+	prompt := fmt.Sprintf("Enter new name for '%s'", wt.Branch)
+	m.inputScreen = NewInputScreen(prompt, "New branch name", wt.Branch)
+	m.inputSubmit = func(value string) (tea.Cmd, bool) {
+		newBranch := strings.TrimSpace(value)
+		if newBranch == "" {
+			m.inputScreen.errorMsg = "Name cannot be empty."
+			return nil, false
+		}
+		if newBranch == wt.Branch {
+			m.inputScreen.errorMsg = "Name must be different from the current branch."
+			return nil, false
+		}
+
+		parentDir := filepath.Dir(wt.Path)
+		newPath := filepath.Join(parentDir, newBranch)
+		if _, err := os.Stat(newPath); err == nil {
+			m.inputScreen.errorMsg = fmt.Sprintf("Destination already exists: %s", newPath)
+			return nil, false
+		}
+
+		m.inputScreen.errorMsg = ""
+		oldPath := wt.Path
+		oldBranch := wt.Branch
+
+		return func() tea.Msg {
+			ok := m.git.RenameWorktree(m.ctx, oldPath, newPath, oldBranch, newBranch)
+			if !ok {
+				return errMsg{err: fmt.Errorf("failed to rename %s to %s", oldBranch, newBranch)}
+			}
+			worktrees, err := m.git.GetWorktrees(m.ctx)
+			return worktreesLoadedMsg{
+				worktrees: worktrees,
+				err:       err,
+			}
+		}, true
+	}
+	m.currentScreen = screenInput
+	return textinput.Blink
 }
 
 func (m *AppModel) showPruneMerged() tea.Cmd {
@@ -816,6 +874,33 @@ func (m *AppModel) handleScreenKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.currentScreen = screenNone
 			return m, nil
 		}
+	case screenInput:
+		if m.inputScreen == nil {
+			m.currentScreen = screenNone
+			return m, nil
+		}
+
+		switch msg.String() {
+		case "enter":
+			if m.inputSubmit != nil {
+				cmd, close := m.inputSubmit(m.inputScreen.input.Value())
+				if close {
+					m.inputScreen = nil
+					m.inputSubmit = nil
+					m.currentScreen = screenNone
+				}
+				return m, cmd
+			}
+		case "esc":
+			m.inputScreen = nil
+			m.inputSubmit = nil
+			m.currentScreen = screenNone
+			return m, nil
+		}
+
+		var cmd tea.Cmd
+		m.inputScreen.input, cmd = m.inputScreen.input.Update(msg)
+		return m, cmd
 	}
 	return m, nil
 }
@@ -830,6 +915,14 @@ func (m *AppModel) renderScreen() string {
 			wt := m.filteredWts[m.selectedIndex]
 			confirmScreen := NewConfirmScreen(fmt.Sprintf("Delete worktree?\n\nPath: %s\nBranch: %s", wt.Path, wt.Branch))
 			return confirmScreen.View()
+		}
+	case screenInput:
+		if m.inputScreen != nil {
+			content := m.inputScreen.View()
+			if m.windowWidth > 0 && m.windowHeight > 0 {
+				return lipgloss.Place(m.windowWidth, m.windowHeight, lipgloss.Center, lipgloss.Center, content)
+			}
+			return content
 		}
 	}
 	return ""
@@ -932,9 +1025,10 @@ func (m *AppModel) computeLayout() layoutDims {
 	}
 
 	leftRatio := 0.55
-	if m.focusedPane == 0 {
+	switch m.focusedPane {
+	case 0:
 		leftRatio = 0.60
-	} else if m.focusedPane == 1 || m.focusedPane == 2 {
+	case 1, 2:
 		leftRatio = 0.20
 	}
 
@@ -1170,9 +1264,10 @@ func (m *AppModel) buildInfoContent(wt *models.WorktreeInfo) string {
 	}
 	if wt.PR != nil {
 		stateColor := colorSuccessFg
-		if wt.PR.State == "MERGED" {
+		switch wt.PR.State {
+		case "MERGED":
 			stateColor = lipgloss.Color("171")
-		} else if wt.PR.State == "CLOSED" {
+		case "CLOSED":
 			stateColor = colorErrorFg
 		}
 		stateStyle := lipgloss.NewStyle().Foreground(stateColor).Bold(true)

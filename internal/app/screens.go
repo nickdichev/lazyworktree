@@ -36,6 +36,8 @@ type InputScreen struct {
 	placeholder string
 	value       string
 	input       textinput.Model
+	errorMsg    string
+	boxWidth    int
 	result      chan string
 }
 
@@ -46,10 +48,10 @@ type HelpScreen struct {
 
 // TrustScreen represents a trust confirmation screen
 type TrustScreen struct {
-	filePath    string
-	commands    []string
-	viewport    viewport.Model
-	result      chan string
+	filePath string
+	commands []string
+	viewport viewport.Model
+	result   chan string
 }
 
 // WelcomeScreen represents a welcome screen
@@ -66,6 +68,20 @@ type CommitScreen struct {
 	useDelta    bool
 	viewport    viewport.Model
 	headerShown bool
+}
+
+func maxInt(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // NewConfirmScreen creates a new confirmation screen
@@ -110,12 +126,12 @@ func (s *ConfirmScreen) View() string {
 		Height(height)
 
 	messageStyle := lipgloss.NewStyle().
-		Width(width - 4).
-		Height(height - 6).
+		Width(width-4).
+		Height(height-6).
 		Align(lipgloss.Center, lipgloss.Center)
 
 	buttonStyle := lipgloss.NewStyle().
-		Width((width - 6) / 2).
+		Width((width-6)/2).
 		Align(lipgloss.Center).
 		Padding(0, 1)
 
@@ -143,13 +159,22 @@ func NewInputScreen(prompt, placeholder, value string) *InputScreen {
 	ti.SetValue(value)
 	ti.Focus()
 	ti.CharLimit = 200
-	ti.Width = 50
+	ti.Prompt = ""
+	ti.TextStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
+
+	// Compute a comfortable width based on content, bounded to avoid screen overflow
+	promptWidth := lipgloss.Width(prompt)
+	valueWidth := lipgloss.Width(value)
+	boxWidth := maxInt(42, minInt(96, maxInt(promptWidth+8, valueWidth+10)))
+	ti.Width = boxWidth - 8
 
 	return &InputScreen{
 		prompt:      prompt,
 		placeholder: placeholder,
 		value:       value,
 		input:       ti,
+		errorMsg:    "",
+		boxWidth:    boxWidth,
 		result:      make(chan string, 1),
 	}
 }
@@ -182,21 +207,36 @@ func (s *InputScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // View renders the input screen
 func (s *InputScreen) View() string {
-	width := 60
-
 	boxStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("240")).
+		BorderForeground(lipgloss.Color("236")).
 		Padding(1, 2).
-		Width(width)
+		Width(s.boxWidth).
+		Align(lipgloss.Center, lipgloss.Center)
+
+	inputWrapperStyle := lipgloss.NewStyle().
+		Border(lipgloss.NormalBorder()).
+		BorderForeground(lipgloss.Color("239")).
+		Padding(0, 1).
+		Width(s.boxWidth - 6)
 
 	promptStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("252")).
 		MarginBottom(1)
 
-	content := fmt.Sprintf("%s\n\n%s",
+	contentLines := []string{
 		promptStyle.Render(s.prompt),
-		s.input.View(),
-	)
+		inputWrapperStyle.Render(s.input.View()),
+	}
+
+	if s.errorMsg != "" {
+		errorStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("196")).
+			Width(s.boxWidth - 4)
+		contentLines = append(contentLines, errorStyle.Render(s.errorMsg))
+	}
+
+	content := strings.Join(contentLines, "\n\n")
 
 	return boxStyle.Render(content)
 }
@@ -379,7 +419,7 @@ func NewWelcomeScreen(currentDir, worktreeDir string) *WelcomeScreen {
 	return &WelcomeScreen{
 		currentDir:  currentDir,
 		worktreeDir: worktreeDir,
-		result:       make(chan bool, 1),
+		result:      make(chan bool, 1),
 	}
 }
 
