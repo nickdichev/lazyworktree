@@ -2,25 +2,27 @@
 
 A Bubble Tea-based TUI for managing Git worktrees efficiently. Visualize status, manage branches, and jump between worktrees with ease.
 
-![Go](https://img.shields.io/badge/go-1.21%2B-blue)
+![Go](https://img.shields.io/badge/go-1.25%2B-blue)
 
 ## Features
 
-- **Worktree Management**: Create, rename, delete, and absorb worktrees seamlessly.
-- **Smart Cleanup**: Automatically identify and prune worktrees with merged PRs.
+- **Worktree Management**: Create, rename, delete, absorb, and prune merged worktrees.
+- **Command Palette**: Fuzzy search and run actions quickly.
 - **Status at a Glance**: View dirty state, ahead/behind counts, and divergence from main.
 - **Forge Integration**: Fetch and display associated Pull Request (GitHub) or Merge Request (GitLab) status (via `gh` or `glab` CLI).
-- **Diff Viewer**: Integrated diff viewer with optional `delta` support.
+- **Diff Viewer**: Three-part diff with optional `delta` support and a full-screen viewer.
+- **Commit Details**: Open commit metadata and diffs directly from the log pane.
+- **Repo Automation**: `.wt` init/terminate commands with TOFU security.
 - **LazyGit Integration**: Launch `lazygit` directly for the selected worktree.
 - **Shell Integration**: Jump (cd) directly to selected worktrees upon exit.
 
-# Screenshots
+## Screenshots
 
 <img width="3835" height="2107" alt="image" src="https://github.com/user-attachments/assets/17ac93bf-6247-496c-981d-7156b8186b33" />
 
 ## Prerequisites
 
-- **Go**: 1.21+ (for building from source)
+- **Go**: 1.25+ (for building from source)
 - **Git**: 2.31+ (recommended)
 - **Forge CLI**: GitHub CLI (`gh`) or GitLab CLI (`glab`) for repo resolution and PR/MR status.
 
@@ -132,12 +134,20 @@ You can configure this behavior in `config.yaml` via the `trust_mode` setting:
 | --- | --- |
 | `Enter` | Jump to worktree (exit and cd) |
 | `c` | Create new worktree |
+| `m` | Rename selected worktree |
 | `D` | Delete selected worktree |
 | `d` | View diff (auto-refreshes) |
+| `F` | Full-screen diff viewer |
+| `A` | Absorb worktree into main |
+| `X` | Prune merged worktrees |
 | `p` | Fetch PR/MR status |
+| `o` | Open PR/MR in browser |
+| `ctrl+p` | Command palette |
 | `g` | Open LazyGit |
 | `r` | Refresh list |
-| `/` | Filter worktrees |
+| `R` | Fetch all remotes |
+| `f`, `/` | Filter worktrees |
+| `s` | Toggle sort (Name/Last Active) |
 | `?` | Show help |
 
 ## Configuration
