@@ -3103,8 +3103,16 @@ func (m *Model) updateTableColumns(totalWidth int) {
 		pr = 12
 	}
 
-	worktree := maxInt(12, totalWidth-status-ab-last-pr-4)
-	excess := worktree + status + ab + pr + last - totalWidth
+	// The table library handles separators internally (3 spaces per separator)
+	// So we need to account for them: (numColumns - 1) * 3
+	numColumns := 4
+	if m.prDataLoaded {
+		numColumns = 5
+	}
+	separatorSpace := (numColumns - 1) * 3
+
+	worktree := maxInt(12, totalWidth-status-ab-last-pr-separatorSpace)
+	excess := worktree + status + ab + pr + last + separatorSpace - totalWidth
 	for excess > 0 && last > 10 {
 		last--
 		excess--
@@ -3129,6 +3137,16 @@ func (m *Model) updateTableColumns(totalWidth int) {
 	}
 	if excess > 0 {
 		worktree = maxInt(6, worktree-excess)
+	}
+
+	// Final adjustment: ensure column widths + separators sum exactly to totalWidth
+	actualTotal := worktree + status + ab + last + pr + separatorSpace
+	if actualTotal < totalWidth {
+		// Distribute remaining space to the worktree column
+		worktree += (totalWidth - actualTotal)
+	} else if actualTotal > totalWidth {
+		// Remove excess from worktree column
+		worktree = maxInt(6, worktree-(actualTotal-totalWidth))
 	}
 
 	columns := []table.Column{
