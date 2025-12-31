@@ -76,6 +76,8 @@ changelog:
       - Merge branch
       - go mod tidy
       - Update README.md
+      - Update coverage badge
+      - Brew cask update
 
 universal_binaries:
   - ids:
