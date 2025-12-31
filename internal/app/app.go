@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/url"
 	"os"
 	"os/exec"
@@ -12,6 +13,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/charmbracelet/bubbles/table"
@@ -205,16 +207,56 @@ type Model struct {
 	// Exit
 	selectedPath string
 	quitting     bool
+
+	// Debug logging
+	debugLogger  *log.Logger
+	debugLogFile *os.File
 }
 
 // NewModel creates a new application model
 func NewModel(cfg *config.AppConfig, initialFilter string) *Model {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	notify := func(_ string, _ string) {}
-	notifyOnce := func(_ string, _ string, _ string) {}
+	var debugLogFile *os.File
+	var debugLogger *log.Logger
+	var debugMu sync.Mutex
+	debugNotified := map[string]bool{}
+
+	if strings.TrimSpace(cfg.DebugLog) != "" {
+		logDir := filepath.Dir(cfg.DebugLog)
+		if err := os.MkdirAll(logDir, 0o750); err == nil {
+			file, err := os.OpenFile(cfg.DebugLog, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+			if err == nil {
+				debugLogFile = file
+				debugLogger = log.New(file, "", log.LstdFlags)
+				debugLogger.Printf("debug logging enabled")
+			}
+		}
+	}
+
+	notify := func(message string, severity string) {
+		if debugLogger == nil {
+			return
+		}
+		debugMu.Lock()
+		defer debugMu.Unlock()
+		debugLogger.Printf("[%s] %s", severity, message)
+	}
+	notifyOnce := func(key string, message string, severity string) {
+		if debugLogger == nil {
+			return
+		}
+		debugMu.Lock()
+		defer debugMu.Unlock()
+		if debugNotified[key] {
+			return
+		}
+		debugNotified[key] = true
+		debugLogger.Printf("[%s] %s", severity, message)
+	}
 
 	gitService := git.NewService(notify, notifyOnce)
+	gitService.SetDebugLogger(debugLogger)
 	trustManager := security.NewTrustManager()
 
 	columns := []table.Column{
@@ -284,6 +326,8 @@ func NewModel(cfg *config.AppConfig, initialFilter string) *Model {
 		focusedPane:     0,
 		infoContent:     errNoWorktreeSelected,
 		statusContent:   "Loading...",
+		debugLogger:     debugLogger,
+		debugLogFile:    debugLogFile,
 	}
 
 	if initialFilter != "" {
@@ -309,6 +353,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
+		m.debugf("window: %dx%d", msg.Width, msg.Height)
 		m.setWindowSize(msg.Width, msg.Height)
 		return m, nil
 
@@ -316,6 +361,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleMouse(msg)
 
 	case tea.KeyMsg:
+		m.debugf("key: %s screen=%s focus=%d filter=%t", msg.String(), screenName(m.currentScreen), m.focusedPane, m.showingFilter)
 		if m.currentScreen != screenNone {
 			return m.handleScreenKey(msg)
 		}
@@ -706,6 +752,33 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, tea.Batch(cmds...)
+}
+
+func screenName(screen screenType) string {
+	switch screen {
+	case screenNone:
+		return "none"
+	case screenConfirm:
+		return "confirm"
+	case screenInput:
+		return "input"
+	case screenHelp:
+		return "help"
+	case screenTrust:
+		return "trust"
+	case screenWelcome:
+		return "welcome"
+	case screenCommit:
+		return "commit"
+	case screenPalette:
+		return "palette"
+	case screenDiff:
+		return "diff"
+	case screenPRSelect:
+		return "pr-select"
+	default:
+		return "unknown"
+	}
 }
 
 // handleMouse processes mouse events for scrolling and clicking
@@ -1694,6 +1767,7 @@ func (m *Model) showAbsorbWorktree() tea.Cmd {
 }
 
 func (m *Model) showCommandPalette() tea.Cmd {
+	m.debugf("open palette")
 	items := []paletteItem{
 		{id: "create", label: "Create worktree (c)", description: "Add a new worktree from base branch"},
 		{id: "create-from-pr", label: "Create from PR/MR", description: "Create a worktree from a pull/merge request"},
@@ -1711,6 +1785,7 @@ func (m *Model) showCommandPalette() tea.Cmd {
 
 	m.paletteScreen = NewCommandPaletteScreen(items)
 	m.paletteSubmit = func(action string) tea.Cmd {
+		m.debugf("palette action: %s", action)
 		if _, ok := m.config.CustomCommands[action]; ok {
 			return m.executeCustomCommand(action)
 		}
@@ -2001,6 +2076,7 @@ func sanitizePRURL(raw string) (string, error) {
 }
 
 func (m *Model) handleScreenKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	m.debugf("screen key: %s screen=%s", msg.String(), screenName(m.currentScreen))
 	switch m.currentScreen {
 	case screenHelp:
 		if m.helpScreen == nil {
@@ -2340,6 +2416,13 @@ func (m *Model) GetSelectedPath() string {
 	return m.selectedPath
 }
 
+func (m *Model) debugf(format string, args ...interface{}) {
+	if m.debugLogger == nil {
+		return
+	}
+	m.debugLogger.Printf(format, args...)
+}
+
 func (m *Model) persistCurrentSelection() {
 	idx := m.selectedIndex
 	if idx < 0 || idx >= len(m.filteredWts) {
@@ -2355,6 +2438,7 @@ func (m *Model) persistLastSelected(path string) {
 	if strings.TrimSpace(path) == "" {
 		return
 	}
+	m.debugf("persist last-selected: %s", path)
 	repoKey := m.getRepoKey()
 	lastSelectedPath := filepath.Join(m.getWorktreeDir(), repoKey, models.LastSelectedFilename)
 	if err := os.MkdirAll(filepath.Dir(lastSelectedPath), 0o750); err != nil {
@@ -2366,6 +2450,10 @@ func (m *Model) persistLastSelected(path string) {
 // Close releases background resources (cancel contexts, timers)
 func (m *Model) Close() {
 	m.persistCurrentSelection()
+	m.debugf("close")
+	if m.debugLogFile != nil {
+		_ = m.debugLogFile.Close()
+	}
 	if m.detailUpdateCancel != nil {
 		m.detailUpdateCancel()
 	}

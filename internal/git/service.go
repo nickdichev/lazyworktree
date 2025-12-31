@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -50,6 +51,7 @@ type Service struct {
 	gitHost     string
 	notifiedSet map[string]bool
 	useDelta    bool
+	debugLogger *log.Logger
 }
 
 // NewService constructs a Service and sets up concurrency limits.
@@ -78,6 +80,18 @@ func NewService(notify NotifyFn, notifyOnce NotifyOnceFn) *Service {
 	s.detectDelta()
 
 	return s
+}
+
+// SetDebugLogger attaches a logger for debug output.
+func (s *Service) SetDebugLogger(logger *log.Logger) {
+	s.debugLogger = logger
+}
+
+func (s *Service) debugf(format string, args ...interface{}) {
+	if s.debugLogger == nil {
+		return
+	}
+	s.debugLogger.Printf(format, args...)
 }
 
 func prepareAllowedCommand(ctx context.Context, args []string) (*exec.Cmd, error) {
@@ -136,6 +150,7 @@ func (s *Service) ExecuteCommands(ctx context.Context, cmdList []string, cwd str
 			continue
 		}
 
+		s.debugf("exec: %s (cwd=%s)", cmdStr, cwd)
 		if cmdStr == "link_topsymlinks" {
 			mainPath := env["MAIN_WORKTREE_PATH"]
 			wtPath := env["WORKTREE_PATH"]
@@ -186,14 +201,17 @@ func (s *Service) releaseSemaphore() {
 
 // RunGit executes a git command and optionally trims its output.
 func (s *Service) RunGit(ctx context.Context, args []string, cwd string, okReturncodes []int, strip bool, silent bool) string {
+	command := strings.Join(args, " ")
+	if command == "" {
+		command = "<empty>"
+	}
+	s.debugf("run: %s (cwd=%s)", command, cwd)
+
 	cmd, err := prepareAllowedCommand(ctx, args)
 	if err != nil {
-		command := ""
-		if len(args) > 0 {
-			command = strings.Join(args, " ")
-		}
 		key := fmt.Sprintf("unsupported_cmd:%s", command)
 		s.notifyOnce(key, fmt.Sprintf("Unsupported command: %s", command), "error")
+		s.debugf("error: %s (unsupported command)", command)
 		return ""
 	}
 	if cwd != "" {
@@ -213,10 +231,10 @@ func (s *Service) RunGit(ctx context.Context, args []string, cwd string, okRetur
 			}
 			if !allowed {
 				if silent {
+					s.debugf("error: %s (exit %d, silenced)", command, returnCode)
 					return ""
 				}
 				stderr := string(exitError.Stderr)
-				command := strings.Join(args, " ")
 				suffix := ""
 				if stderr != "" {
 					suffix = ": " + strings.TrimSpace(stderr)
@@ -225,6 +243,7 @@ func (s *Service) RunGit(ctx context.Context, args []string, cwd string, okRetur
 				}
 				key := fmt.Sprintf("git_fail:%s:%s", cwd, command)
 				s.notifyOnce(key, fmt.Sprintf("Command failed: %s%s", command, suffix), "error")
+				s.debugf("error: %s%s", command, suffix)
 				return ""
 			}
 		} else {
@@ -235,6 +254,7 @@ func (s *Service) RunGit(ctx context.Context, args []string, cwd string, okRetur
 				}
 				key := fmt.Sprintf("cmd_missing:%s", command)
 				s.notifyOnce(key, fmt.Sprintf("Command not found: %s", command), "error")
+				s.debugf("error: command not found: %s", command)
 			}
 			return ""
 		}
@@ -244,11 +264,18 @@ func (s *Service) RunGit(ctx context.Context, args []string, cwd string, okRetur
 	if strip {
 		out = strings.TrimSpace(out)
 	}
+	s.debugf("ok: %s", command)
 	return out
 }
 
 // RunCommandChecked runs the provided git command and reports failures via notify callbacks.
 func (s *Service) RunCommandChecked(ctx context.Context, args []string, cwd string, errorPrefix string) bool {
+	command := strings.Join(args, " ")
+	if command == "" {
+		command = "<empty>"
+	}
+	s.debugf("run: %s (cwd=%s)", command, cwd)
+
 	cmd, err := prepareAllowedCommand(ctx, args)
 	if err != nil {
 		message := fmt.Sprintf("%s: %v", errorPrefix, err)
@@ -256,6 +283,7 @@ func (s *Service) RunCommandChecked(ctx context.Context, args []string, cwd stri
 			message = fmt.Sprintf("command error: %v", err)
 		}
 		s.notify(message, "error")
+		s.debugf("error: %s", message)
 		return false
 	}
 	if cwd != "" {
@@ -267,12 +295,15 @@ func (s *Service) RunCommandChecked(ctx context.Context, args []string, cwd stri
 		detail := strings.TrimSpace(string(output))
 		if detail != "" {
 			s.notify(fmt.Sprintf("%s: %s", errorPrefix, detail), "error")
+			s.debugf("error: %s: %s", errorPrefix, detail)
 		} else {
 			s.notify(fmt.Sprintf("%s: %v", errorPrefix, err), "error")
+			s.debugf("error: %s: %v", errorPrefix, err)
 		}
 		return false
 	}
 
+	s.debugf("ok: %s", command)
 	return true
 }
 
