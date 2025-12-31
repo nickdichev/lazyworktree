@@ -14,6 +14,9 @@ builds:
     ldflags:
       - -w
       - -s
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
 archives:
   - name_template: >-
       {{ .Binary }}_
@@ -33,8 +36,8 @@ brews:
     homepage: "https://github.com/chmouel/lazyworktree"
     description: "lazyworktree - A TUI tool to manage git worktrees"
     install: |
-      bin.install "lazyworktree" => "lazyworktree"
-checksum:
+      bin.install "lazyworktree"
+checksums:
   name_template: "checksums.txt"
 
 snapshot:

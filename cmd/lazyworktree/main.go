@@ -13,15 +13,28 @@ import (
 	"github.com/chmouel/lazyworktree/internal/config"
 )
 
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
+
 func main() {
 	var worktreeDir string
 	var debugLog string
 	var outputSelection string
+	var showVersion bool
 
 	flag.StringVar(&worktreeDir, "worktree-dir", "", "Override the default worktree root directory")
 	flag.StringVar(&debugLog, "debug-log", "", "Path to debug log file")
 	flag.StringVar(&outputSelection, "output-selection", "", "Write selected worktree path to a file")
+	flag.BoolVar(&showVersion, "version", false, "Print version information")
 	flag.Parse()
+
+	if showVersion {
+		fmt.Printf("lazyworktree version %s\ncommit: %s\nbuilt at: %s\n", version, commit, date)
+		return
+	}
 
 	initialFilter := strings.Join(flag.Args(), " ")
 
