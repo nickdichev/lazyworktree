@@ -33,6 +33,7 @@ type AppConfig struct {
 	TrustMode         string
 	DebugLog          string
 	CustomCommands    map[string]*CustomCommand
+	BranchNameScript  string // Script to generate branch name suggestions from diff
 }
 
 // RepoConfig represents repository-scoped commands from .wt
@@ -221,6 +222,13 @@ func parseConfig(data map[string]interface{}) *AppConfig {
 		trustMode = strings.ToLower(strings.TrimSpace(trustMode))
 		if trustMode == "tofu" || trustMode == "never" || trustMode == "always" {
 			cfg.TrustMode = trustMode
+		}
+	}
+
+	if branchNameScript, ok := data["branch_name_script"].(string); ok {
+		branchNameScript = strings.TrimSpace(branchNameScript)
+		if branchNameScript != "" {
+			cfg.BranchNameScript = branchNameScript
 		}
 	}
 

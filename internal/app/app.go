@@ -99,6 +99,7 @@ type (
 	createFromChangesReadyMsg struct {
 		worktree      *models.WorktreeInfo
 		currentBranch string
+		diff          string // git diff output for branch name generation
 	}
 )
 
@@ -1501,9 +1502,16 @@ func (m *Model) showCreateWorktreeFromChanges() tea.Cmd {
 			return errMsg{err: fmt.Errorf("failed to get current branch")}
 		}
 
+		// Get diff if branch_name_script is configured
+		var diff string
+		if m.config.BranchNameScript != "" {
+			diff = m.git.RunGit(m.ctx, []string{"git", "diff", "HEAD"}, wt.Path, []int{0}, false, true)
+		}
+
 		return createFromChangesReadyMsg{
 			worktree:      wt,
 			currentBranch: currentBranch,
+			diff:          diff,
 		}
 	}
 }
@@ -1514,6 +1522,16 @@ func (m *Model) handleCreateFromChangesReady(msg createFromChangesReadyMsg) tea.
 
 	// Generate default name based on current branch
 	defaultName := fmt.Sprintf("%s-changes", currentBranch)
+
+	// If branch_name_script is configured, run it to generate a suggested name
+	if m.config.BranchNameScript != "" && msg.diff != "" {
+		if generatedName, err := runBranchNameScript(m.ctx, m.config.BranchNameScript, msg.diff); err != nil {
+			// Log error but continue with default name
+			m.statusContent = fmt.Sprintf("Branch name script error: %v", err)
+		} else if generatedName != "" {
+			defaultName = generatedName
+		}
+	}
 
 	// Show input screen for worktree name
 	m.inputScreen = NewInputScreen("Create worktree from changes: branch name", "feature/my-branch", defaultName)

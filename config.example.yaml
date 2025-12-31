@@ -13,6 +13,14 @@ delta_args:
 # Options: "tofu" (default - ask on first use/change), "never", "always"
 trust_mode: "tofu"
 
+# Script to generate branch name suggestions when creating worktrees from changes.
+# The script receives the git diff on stdin and should output a branch name.
+# Useful for AI-powered branch name generation.
+# Examples:
+#   branch_name_script: "aichat -m gemini:gemini-2.5-flash 'Generate a short git branch name for this diff'"
+#   branch_name_script: "claude 'Suggest a branch name based on this diff'"
+# branch_name_script: ""
+
 init_commands:
   - link_topsymlinks
 terminate_commands:

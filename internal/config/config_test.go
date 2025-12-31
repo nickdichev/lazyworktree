@@ -25,6 +25,7 @@ func TestDefaultConfig(t *testing.T) {
 	assert.Empty(t, cfg.DebugLog)
 	assert.NotNil(t, cfg.CustomCommands)
 	assert.Empty(t, cfg.CustomCommands)
+	assert.Empty(t, cfg.BranchNameScript)
 }
 
 func TestNormalizeArgsList(t *testing.T) {
@@ -532,6 +533,33 @@ func TestParseConfig(t *testing.T) {
 			},
 			validate: func(t *testing.T, cfg *AppConfig) {
 				assert.Equal(t, "tofu", cfg.TrustMode)
+			},
+		},
+		{
+			name: "branch_name_script",
+			data: map[string]interface{}{
+				"branch_name_script": "echo feature/test",
+			},
+			validate: func(t *testing.T, cfg *AppConfig) {
+				assert.Equal(t, "echo feature/test", cfg.BranchNameScript)
+			},
+		},
+		{
+			name: "branch_name_script empty string",
+			data: map[string]interface{}{
+				"branch_name_script": "",
+			},
+			validate: func(t *testing.T, cfg *AppConfig) {
+				assert.Empty(t, cfg.BranchNameScript)
+			},
+		},
+		{
+			name: "branch_name_script with spaces is trimmed",
+			data: map[string]interface{}{
+				"branch_name_script": "  aichat -m gemini:gemini-2.5-flash  ",
+			},
+			validate: func(t *testing.T, cfg *AppConfig) {
+				assert.Equal(t, "aichat -m gemini:gemini-2.5-flash", cfg.BranchNameScript)
 			},
 		},
 	}

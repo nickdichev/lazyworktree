@@ -1,13 +1,54 @@
 package app
 
 import (
+	"bytes"
+	"context"
 	"fmt"
+	"os/exec"
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/chmouel/lazyworktree/internal/models"
 )
+
+// runBranchNameScript executes the configured branch_name_script with the diff as stdin.
+// It returns the generated branch name or an error.
+func runBranchNameScript(ctx context.Context, script, diff string) (string, error) {
+	if script == "" {
+		return "", nil
+	}
+
+	// Create a context with timeout to prevent hanging
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	// #nosec G204 -- script is user-configured and trusted
+	cmd := exec.CommandContext(ctx, "sh", "-c", script)
+	cmd.Stdin = strings.NewReader(diff)
+
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("branch name script failed: %w (stderr: %s)", err, stderr.String())
+	}
+
+	// Trim whitespace and get first line only
+	output := strings.TrimSpace(stdout.String())
+	if output == "" {
+		return "", nil
+	}
+
+	// Get only the first line
+	if idx := strings.IndexAny(output, "\n\r"); idx >= 0 {
+		output = output[:idx]
+	}
+
+	return strings.TrimSpace(output), nil
+}
 
 type scoredPaletteItem struct {
 	item  paletteItem

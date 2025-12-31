@@ -309,6 +309,7 @@ Notes:
 - Set `auto_fetch_prs` to `true` to fetch PR data on startup.
 - Use `max_untracked_diffs: 0` to hide untracked diffs; `max_diff_chars: 0` disables truncation.
 - `delta_args` sets arguments passed to `delta` (default: `--syntax-theme Dracula`).
+- `branch_name_script` runs a script to generate branch name suggestions when creating worktrees from changes. The script receives the git diff on stdin and should output a branch name. See [AI-powered branch names](#ai-powered-branch-names) below.
 
 ## CI Status Display
 
@@ -321,6 +322,35 @@ When viewing a worktree with an associated PR/MR, lazyworktree automatically fet
 - `⊘` **Gray** - Cancelled
 
 CI status is fetched lazily (only for the selected worktree) and cached for 30 seconds to keep the UI snappy. Press `p` to force a refresh of CI status.
+
+## AI-Powered Branch Names
+
+When creating a worktree from changes (via the command palette), you can configure an external script to suggest branch names. The script receives the git diff on stdin and should output a single branch name.
+
+This is useful for integrating AI tools like `aichat`, `claude`, or any other CLI tool that can generate meaningful branch names from code changes.
+
+### Configuration
+
+Add `branch_name_script` to your `~/.config/lazyworktree/config.yaml`:
+
+```yaml
+# Using aichat with Gemini
+branch_name_script: "aichat -m gemini:gemini-2.5-flash-lite 'Generate a short git branch name (no spaces, use hyphens) for this diff. Output only the branch name, nothing else.'"
+```
+
+### How It Works
+
+1. When you select "Create from changes" in the command palette
+2. If `branch_name_script` is configured, the current diff is piped to the script
+3. The script's output (first line only) is used as the suggested branch name
+4. You can edit the suggestion before confirming
+
+### Script Requirements
+
+- The script receives the git diff on stdin
+- It should output just the branch name (first line is used)
+- If the script fails or returns empty, the default name (`{current-branch}-changes`) is used
+- The script has a 30-second timeout to prevent hanging
 
 ## Speed performance
 

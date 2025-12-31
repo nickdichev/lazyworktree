@@ -423,3 +423,92 @@ func TestMaxInt(t *testing.T) {
 		})
 	}
 }
+
+func TestRunBranchNameScript(t *testing.T) {
+	ctx := t.Context()
+
+	tests := []struct {
+		name    string
+		script  string
+		diff    string
+		want    string
+		wantErr bool
+	}{
+		{
+			name:    "empty script returns empty",
+			script:  "",
+			diff:    "some diff",
+			want:    "",
+			wantErr: false,
+		},
+		{
+			name:    "simple echo script",
+			script:  "echo feature/test-branch",
+			diff:    "some diff",
+			want:    "feature/test-branch",
+			wantErr: false,
+		},
+		{
+			name:    "script with trailing newline",
+			script:  "printf 'feature/branch'",
+			diff:    "some diff",
+			want:    "feature/branch",
+			wantErr: false,
+		},
+		{
+			name:    "script outputs multiple lines, only first is used",
+			script:  "printf 'first-branch\nsecond-line'",
+			diff:    "some diff",
+			want:    "first-branch",
+			wantErr: false,
+		},
+		{
+			name:    "script receives diff on stdin",
+			script:  "cat | head -c 10",
+			diff:    "diff --git a/file.txt",
+			want:    "diff --git",
+			wantErr: false,
+		},
+		{
+			name:    "script returns empty output",
+			script:  "echo ''",
+			diff:    "some diff",
+			want:    "",
+			wantErr: false,
+		},
+		{
+			name:    "script that fails",
+			script:  "exit 1",
+			diff:    "some diff",
+			want:    "",
+			wantErr: true,
+		},
+		{
+			name:    "script with whitespace output",
+			script:  "echo '  feature/trimmed  '",
+			diff:    "some diff",
+			want:    "feature/trimmed",
+			wantErr: false,
+		},
+		{
+			name:    "command not found",
+			script:  "nonexistent_command_xyz123",
+			diff:    "some diff",
+			want:    "",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := runBranchNameScript(ctx, tt.script, tt.diff)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("runBranchNameScript() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("runBranchNameScript() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
