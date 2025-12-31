@@ -19,7 +19,7 @@ A Bubble Tea-based TUI for managing Git worktrees efficiently. Visualize status,
 
 ## Screenshots
 
-<img width="3835" height="2107" alt="image" src="https://github.com/user-attachments/assets/17ac93bf-6247-496c-981d-7156b8186b33" />
+<img width="1733" height="1057" alt="image" src="https://github.com/user-attachments/assets/90363fa2-b0ea-48de-b24c-ccd05ebfbe72" />
 
 ## Prerequisites
 
