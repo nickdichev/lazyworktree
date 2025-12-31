@@ -17,6 +17,7 @@ type WorktreeInfo struct {
 	Dirty        bool
 	Ahead        int
 	Behind       int
+	HasUpstream  bool
 	LastActive   string
 	LastActiveTS int64
 	PR           *PRInfo

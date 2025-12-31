@@ -191,8 +191,8 @@ func NewModel(cfg *config.AppConfig, initialFilter string) *Model {
 		{Title: "Worktree", Width: 20},
 		{Title: "Status", Width: 8},
 		{Title: "±", Width: 10},
-		{Title: "PR", Width: 15},
 		{Title: "Last Active", Width: 20},
+		{Title: "PR", Width: 15},
 	}
 
 	t := table.New(
@@ -695,7 +695,7 @@ func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		if targetPane == 0 && len(m.filteredWts) > 0 {
 			// Calculate which row was clicked in the worktree table
 			// Account for pane border and title
-			relativeY := mouseY - leftY - 3 // 3 = border + title + header
+			relativeY := mouseY - leftY - 4 // 4 = border + title + header + header_border
 			if relativeY >= 0 && relativeY < len(m.filteredWts) {
 				// Create a key message to move cursor
 				for i := 0; i < len(m.filteredWts); i++ {
@@ -708,7 +708,7 @@ func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			}
 		} else if targetPane == 2 && len(m.logEntries) > 0 {
 			// Calculate which row was clicked in the log table
-			relativeY := mouseY - rightBottomY - 3
+			relativeY := mouseY - rightBottomY - 4
 			if relativeY >= 0 && relativeY < len(m.logEntries) {
 				m.logTable.SetCursor(relativeY)
 			}
@@ -910,15 +910,20 @@ func (m *Model) updateTable() {
 			status = "✎"
 		}
 
-		abStr := ""
-		if wt.Ahead > 0 {
-			abStr += fmt.Sprintf("↑%d ", wt.Ahead)
-		}
-		if wt.Behind > 0 {
-			abStr += fmt.Sprintf("↓%d ", wt.Behind)
-		}
-		if abStr == "" {
-			abStr = "0"
+		// Build lazygit-style sync status: ↓N↑M, ✓ (in sync), or - (no upstream)
+		var abStr string
+		switch {
+		case !wt.HasUpstream:
+			abStr = "-"
+		case wt.Ahead == 0 && wt.Behind == 0:
+			abStr = "✓"
+		default:
+			if wt.Behind > 0 {
+				abStr += fmt.Sprintf("↓%d", wt.Behind)
+			}
+			if wt.Ahead > 0 {
+				abStr += fmt.Sprintf("↑%d", wt.Ahead)
+			}
 		}
 
 		prStr := "-"
@@ -935,8 +940,8 @@ func (m *Model) updateTable() {
 			name,
 			status,
 			abStr,
-			prStr,
 			wt.LastActive,
+			prStr,
 		})
 	}
 
@@ -2398,8 +2403,8 @@ func (m *Model) updateTableColumns(totalWidth int) {
 		{Title: "Worktree", Width: worktree},
 		{Title: "Status", Width: status},
 		{Title: "±", Width: ab},
-		{Title: "PR", Width: pr},
 		{Title: "Last Active", Width: last},
+		{Title: "PR", Width: pr},
 	})
 }
 

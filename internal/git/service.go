@@ -378,13 +378,18 @@ func (s *Service) GetWorktrees(ctx context.Context) ([]*models.WorktreeInfo, err
 
 			ahead := 0
 			behind := 0
+			hasUpstream := false
 			untracked := 0
 			modified := 0
 			staged := 0
 
 			for _, line := range strings.Split(statusRaw, "\n") {
 				switch {
+				case strings.HasPrefix(line, "# branch.upstream "):
+					hasUpstream = true
 				case strings.HasPrefix(line, "# branch.ab "):
+					// branch.ab only appears when upstream is set per Git porcelain v2 spec
+					hasUpstream = true
 					parts := strings.Fields(line)
 					if len(parts) >= 4 {
 						aheadStr := strings.TrimPrefix(parts[2], "+")
@@ -425,6 +430,7 @@ func (s *Service) GetWorktrees(ctx context.Context) ([]*models.WorktreeInfo, err
 				Dirty:        (untracked + modified + staged) > 0,
 				Ahead:        ahead,
 				Behind:       behind,
+				HasUpstream:  hasUpstream,
 				LastActive:   lastActive,
 				LastActiveTS: lastActiveTS,
 				Untracked:    untracked,
