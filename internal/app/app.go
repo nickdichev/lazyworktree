@@ -55,6 +55,9 @@ type (
 	debouncedDetailsMsg     struct {
 		selectedIndex int
 	}
+	cachedWorktreesMsg struct {
+		worktrees []*models.WorktreeInfo
+	}
 	pruneResultMsg struct {
 		worktrees []*models.WorktreeInfo
 		err       error
@@ -170,6 +173,7 @@ type Model struct {
 	divergenceCache map[string]string
 	notifiedErrors  map[string]bool
 	ciCache         map[string]*ciCacheEntry // branch -> CI checks cache
+	worktreesLoaded bool
 
 	// Services
 	trustManager *security.TrustManager
@@ -560,6 +564,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case worktreesLoadedMsg:
+		m.worktreesLoaded = true
 		if msg.err != nil {
 			return m, nil
 		}
@@ -581,6 +586,18 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.fetchPRData()
 		}
 		return m, m.updateDetailsView()
+
+	case cachedWorktreesMsg:
+		if m.worktreesLoaded || len(msg.worktrees) == 0 {
+			return m, nil
+		}
+		m.worktrees = msg.worktrees
+		m.updateTable()
+		if m.selectedIndex >= 0 && m.selectedIndex < len(m.filteredWts) {
+			m.infoContent = m.buildInfoContent(m.filteredWts[m.selectedIndex])
+		}
+		m.statusContent = "Refreshing worktrees..."
+		return m, nil
 
 	case prDataLoadedMsg:
 		if msg.err == nil && msg.prMap != nil {
@@ -1042,6 +1059,13 @@ func (m *Model) updateDetailsView() tea.Cmd {
 	}
 
 	wt := m.filteredWts[m.selectedIndex]
+	if !m.worktreesLoaded {
+		m.infoContent = m.buildInfoContent(wt)
+		if m.statusContent == "" || m.statusContent == "Loading..." {
+			m.statusContent = "Refreshing worktrees..."
+		}
+		return nil
+	}
 	return func() tea.Msg {
 		// Get status (using porcelain format for reliable machine parsing)
 		statusRaw := m.git.RunGit(m.ctx, []string{"git", "status", "--porcelain=v2"}, wt.Path, []int{0}, true, false)
@@ -2262,10 +2286,17 @@ func (m *Model) loadCache() tea.Cmd {
 		if err != nil {
 			return nil
 		}
-		if err := json.Unmarshal(data, &m.cache); err != nil {
+
+		var payload struct {
+			Worktrees []*models.WorktreeInfo `json:"worktrees"`
+		}
+		if err := json.Unmarshal(data, &payload); err != nil {
 			return errMsg{err: err}
 		}
-		return nil
+		if len(payload.Worktrees) == 0 {
+			return nil
+		}
+		return cachedWorktreesMsg{worktrees: payload.Worktrees}
 	}
 }
 
@@ -2277,8 +2308,10 @@ func (m *Model) saveCache() {
 		return
 	}
 
-	cacheData := map[string]interface{}{
-		"worktrees": m.worktrees,
+	cacheData := struct {
+		Worktrees []*models.WorktreeInfo `json:"worktrees"`
+	}{
+		Worktrees: m.worktrees,
 	}
 	data, _ := json.Marshal(cacheData)
 	if err := os.WriteFile(cachePath, data, 0o600); err != nil {
