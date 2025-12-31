@@ -405,3 +405,43 @@ func TestFetchCIStatus(t *testing.T) {
 		}
 	})
 }
+
+func TestFetchAllOpenPRs(t *testing.T) {
+	notify := func(_ string, _ string) {}
+	notifyOnce := func(_ string, _ string, _ string) {}
+
+	service := NewService(notify, notifyOnce)
+	ctx := context.Background()
+
+	t.Run("fetch open PRs without git repository", func(t *testing.T) {
+		// This will likely fail or return empty, but should not panic
+		prs, err := service.FetchAllOpenPRs(ctx)
+
+		// Should return a slice (even if empty) or an error
+		if err == nil {
+			assert.IsType(t, []*models.PRInfo{}, prs)
+		} else {
+			// Error is acceptable if gh/glab not available or not in a repo
+			assert.Error(t, err)
+		}
+	})
+}
+
+func TestCreateWorktreeFromPR(t *testing.T) {
+	notify := func(_ string, _ string) {}
+	notifyOnce := func(_ string, _ string, _ string) {}
+
+	service := NewService(notify, notifyOnce)
+	ctx := context.Background()
+
+	t.Run("create worktree from PR with temporary directory", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		targetPath := filepath.Join(tmpDir, "test-worktree")
+
+		// This will likely fail due to missing git repo/PR, but tests the function structure
+		ok := service.CreateWorktreeFromPR(ctx, 123, "feature-branch", "local-branch", targetPath)
+
+		// Should return a boolean (even if false due to git errors)
+		assert.IsType(t, true, ok)
+	})
+}

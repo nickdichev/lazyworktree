@@ -10,6 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/chmouel/lazyworktree/internal/config"
+	"github.com/chmouel/lazyworktree/internal/models"
 )
 
 type screenType int
@@ -24,6 +25,7 @@ const (
 	screenCommit
 	screenPalette
 	screenDiff
+	screenPRSelect
 
 	// Key constants (keyEnter and keyEsc are defined in app.go)
 	keyCtrlD = "ctrl+d"
@@ -100,6 +102,17 @@ type paletteItem struct {
 	id          string
 	label       string
 	description string
+}
+
+// PRSelectionScreen lets the user pick a PR from a filtered list.
+type PRSelectionScreen struct {
+	prs          []*models.PRInfo
+	filtered     []*models.PRInfo
+	filterInput  textinput.Model
+	cursor       int
+	scrollOffset int
+	width        int
+	height       int
 }
 
 // DiffScreen renders a full commit diff inside a viewport.
@@ -585,6 +598,225 @@ func (s *CommandPaletteScreen) Selected() (string, bool) {
 		return "", false
 	}
 	return s.filtered[s.cursor].id, true
+}
+
+// NewPRSelectionScreen builds a PR selection screen with 80% of screen size.
+func NewPRSelectionScreen(prs []*models.PRInfo, maxWidth, maxHeight int) *PRSelectionScreen {
+	// Use 80% of screen size
+	width := int(float64(maxWidth) * 0.8)
+	height := int(float64(maxHeight) * 0.8)
+
+	// Ensure minimum sizes
+	if width < 60 {
+		width = 60
+	}
+	if height < 20 {
+		height = 20
+	}
+
+	ti := textinput.New()
+	ti.Placeholder = "Filter PRs by number or title..."
+	ti.CharLimit = 100
+	ti.Prompt = "> "
+	ti.Focus()
+	ti.Width = width - 4 // padding
+
+	screen := &PRSelectionScreen{
+		prs:          prs,
+		filtered:     prs,
+		filterInput:  ti,
+		cursor:       0,
+		scrollOffset: 0,
+		width:        width,
+		height:       height,
+	}
+	return screen
+}
+
+// Init configures the PR selection input before Bubble Tea updates begin.
+func (s *PRSelectionScreen) Init() tea.Cmd {
+	return textinput.Blink
+}
+
+// Update handles updates for the PR selection screen.
+func (s *PRSelectionScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+	maxVisible := s.height - 6 // Account for header, input, footer
+
+	keyMsg, ok := msg.(tea.KeyMsg)
+	if ok {
+		switch keyMsg.String() {
+		case keyEnter:
+			return s, tea.Quit
+		case keyEsc:
+			s.cursor = -1
+			return s, tea.Quit
+		case keyUp, "k", "ctrl+p":
+			if s.cursor > 0 {
+				s.cursor--
+				if s.cursor < s.scrollOffset {
+					s.scrollOffset = s.cursor
+				}
+			}
+			return s, nil
+		case keyDown, "j", "ctrl+n":
+			if s.cursor < len(s.filtered)-1 {
+				s.cursor++
+				if s.cursor >= s.scrollOffset+maxVisible {
+					s.scrollOffset = s.cursor - maxVisible + 1
+				}
+			}
+			return s, nil
+		}
+	}
+
+	s.filterInput, cmd = s.filterInput.Update(msg)
+	s.applyFilter()
+	return s, cmd
+}
+
+func (s *PRSelectionScreen) applyFilter() {
+	query := strings.ToLower(strings.TrimSpace(s.filterInput.Value()))
+	if query == "" {
+		s.filtered = s.prs
+	} else {
+		s.filtered = []*models.PRInfo{}
+		for _, pr := range s.prs {
+			// Match by number or title
+			prNumStr := fmt.Sprintf("%d", pr.Number)
+			titleLower := strings.ToLower(pr.Title)
+			if strings.Contains(prNumStr, query) || strings.Contains(titleLower, query) {
+				s.filtered = append(s.filtered, pr)
+			}
+		}
+	}
+
+	// Reset cursor if needed
+	if s.cursor >= len(s.filtered) {
+		s.cursor = maxInt(0, len(s.filtered)-1)
+	}
+	if s.cursor < 0 && len(s.filtered) > 0 {
+		s.cursor = 0
+	}
+	s.scrollOffset = 0
+}
+
+// Selected returns the currently selected PR, if any.
+func (s *PRSelectionScreen) Selected() (*models.PRInfo, bool) {
+	if s.cursor < 0 || s.cursor >= len(s.filtered) {
+		return nil, false
+	}
+	return s.filtered[s.cursor], true
+}
+
+// View renders the PR selection screen.
+func (s *PRSelectionScreen) View() string {
+	maxVisible := s.height - 6 // Account for header, input, footer
+
+	// Styles
+	boxStyle := lipgloss.NewStyle().
+		Border(lipgloss.ThickBorder()).
+		BorderForeground(colorBorder).
+		Width(s.width).
+		Padding(0)
+
+	titleStyle := lipgloss.NewStyle().
+		Foreground(colorAccent).
+		Bold(true).
+		Border(lipgloss.NormalBorder(), false, false, true, false).
+		BorderForeground(colorBorderDim).
+		Width(s.width-2).
+		Padding(0, 1).
+		Render("Select PR/MR to Create Worktree")
+
+	inputStyle := lipgloss.NewStyle().
+		Padding(0, 1).
+		Width(s.width - 2).
+		Foreground(colorTextFg)
+
+	itemStyle := lipgloss.NewStyle().
+		Padding(0, 1).
+		Width(s.width - 2)
+
+	selectedStyle := lipgloss.NewStyle().
+		Padding(0, 1).
+		Width(s.width - 2).
+		Background(colorAccent).
+		Foreground(colorTextFg).
+		Bold(true)
+
+	noResultsStyle := lipgloss.NewStyle().
+		Padding(0, 1).
+		Width(s.width - 2).
+		Foreground(colorMutedFg).
+		Italic(true)
+
+	// Render Input
+	inputView := inputStyle.Render(s.filterInput.View())
+
+	// Render PRs
+	var itemViews []string
+
+	end := s.scrollOffset + maxVisible
+	if end > len(s.filtered) {
+		end = len(s.filtered)
+	}
+	start := s.scrollOffset
+	if start > end {
+		start = end
+	}
+
+	for i := start; i < end; i++ {
+		pr := s.filtered[i]
+		prLabel := fmt.Sprintf("#%d: %s", pr.Number, pr.Title)
+
+		// Truncate if too long
+		maxLabelLen := s.width - 10
+		if len(prLabel) > maxLabelLen {
+			prLabel = prLabel[:maxLabelLen-1] + "…"
+		}
+
+		var line string
+		if i == s.cursor {
+			line = selectedStyle.Render(prLabel)
+		} else {
+			line = itemStyle.Render(prLabel)
+		}
+		itemViews = append(itemViews, line)
+	}
+
+	if len(s.filtered) == 0 {
+		if len(s.prs) == 0 {
+			itemViews = append(itemViews, noResultsStyle.Render("No open PRs/MRs found."))
+		} else {
+			itemViews = append(itemViews, noResultsStyle.Render("No PRs match your filter."))
+		}
+	}
+
+	// Separator
+	separator := lipgloss.NewStyle().
+		Border(lipgloss.NormalBorder(), false, false, true, false).
+		BorderForeground(colorBorderDim).
+		Width(s.width - 2).
+		Render("")
+
+	// Footer
+	footerStyle := lipgloss.NewStyle().
+		Foreground(colorMutedFg).
+		Align(lipgloss.Right).
+		Width(s.width - 2).
+		PaddingTop(1)
+	footer := footerStyle.Render("Enter to select • Esc to cancel")
+
+	content := lipgloss.JoinVertical(lipgloss.Left,
+		titleStyle,
+		inputView,
+		separator,
+		strings.Join(itemViews, "\n"),
+		footer,
+	)
+
+	return boxStyle.Render(content)
 }
 
 // Init sets up the diff viewport state before rendering.

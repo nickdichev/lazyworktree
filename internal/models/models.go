@@ -7,6 +7,7 @@ type PRInfo struct {
 	State  string
 	Title  string
 	URL    string
+	Branch string // Branch name (headRefName for GitHub, source_branch for GitLab)
 }
 
 // CICheck represents a single CI check/job status.

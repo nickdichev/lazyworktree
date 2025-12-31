@@ -30,6 +30,9 @@ const (
 	ciPending   = "pending"
 	ciSkipped   = "skipped"
 	ciCancelled = "cancelled"
+
+	// PR state constants
+	prStateOpen = "OPEN"
 )
 
 // NotifyFn receives ongoing notifications.
@@ -507,7 +510,7 @@ func (s *Service) fetchGitLabPRs(ctx context.Context) (map[string]*models.PRInfo
 		state, _ := p["state"].(string)
 		state = strings.ToUpper(state)
 		if state == "OPENED" {
-			state = "OPEN"
+			state = prStateOpen
 		}
 
 		iid, _ := p["iid"].(float64)
@@ -521,6 +524,7 @@ func (s *Service) fetchGitLabPRs(ctx context.Context) (map[string]*models.PRInfo
 				State:  state,
 				Title:  title,
 				URL:    webURL,
+				Branch: sourceBranch,
 			}
 		}
 	}
@@ -569,11 +573,102 @@ func (s *Service) FetchPRMap(ctx context.Context) (map[string]*models.PRInfo, er
 				State:  state,
 				Title:  title,
 				URL:    url,
+				Branch: headRefName,
 			}
 		}
 	}
 
 	return prMap, nil
+}
+
+// FetchAllOpenPRs fetches all open PRs/MRs and returns them as a slice.
+func (s *Service) FetchAllOpenPRs(ctx context.Context) ([]*models.PRInfo, error) {
+	host := s.detectHost(ctx)
+	if host == gitHostGitLab {
+		return s.fetchGitLabOpenPRs(ctx)
+	}
+
+	// Default to GitHub
+	prRaw := s.RunGit(ctx, []string{
+		"gh", "pr", "list",
+		"--state", "open",
+		"--json", "headRefName,state,number,title,url",
+		"--limit", "100",
+	}, "", []int{0}, false, host == gitHostUnknown)
+
+	if prRaw == "" {
+		return []*models.PRInfo{}, nil
+	}
+
+	var prs []map[string]interface{}
+	if err := json.Unmarshal([]byte(prRaw), &prs); err != nil {
+		key := "pr_json_decode"
+		s.notifyOnce(key, fmt.Sprintf("Failed to parse PR data: %v", err), "error")
+		return nil, err
+	}
+
+	result := make([]*models.PRInfo, 0, len(prs))
+	for _, p := range prs {
+		state, _ := p["state"].(string)
+		if strings.ToUpper(state) != prStateOpen {
+			continue
+		}
+		number, _ := p["number"].(float64)
+		title, _ := p["title"].(string)
+		url, _ := p["url"].(string)
+		headRefName, _ := p["headRefName"].(string)
+
+		result = append(result, &models.PRInfo{
+			Number: int(number),
+			State:  prStateOpen,
+			Title:  title,
+			URL:    url,
+			Branch: headRefName,
+		})
+	}
+
+	return result, nil
+}
+
+func (s *Service) fetchGitLabOpenPRs(ctx context.Context) ([]*models.PRInfo, error) {
+	prRaw := s.RunGit(ctx, []string{"glab", "api", "merge_requests?state=opened&per_page=100"}, "", []int{0}, false, false)
+	if prRaw == "" {
+		return []*models.PRInfo{}, nil
+	}
+
+	var prs []map[string]interface{}
+	if err := json.Unmarshal([]byte(prRaw), &prs); err != nil {
+		key := "pr_json_decode_glab"
+		s.notifyOnce(key, fmt.Sprintf("Failed to parse GLAB PR data: %v", err), "error")
+		return nil, err
+	}
+
+	result := make([]*models.PRInfo, 0, len(prs))
+	for _, p := range prs {
+		state, _ := p["state"].(string)
+		state = strings.ToUpper(state)
+		if state == "OPENED" {
+			state = prStateOpen
+		}
+		if state != prStateOpen {
+			continue
+		}
+
+		iid, _ := p["iid"].(float64)
+		title, _ := p["title"].(string)
+		webURL, _ := p["web_url"].(string)
+		sourceBranch, _ := p["source_branch"].(string)
+
+		result = append(result, &models.PRInfo{
+			Number: int(iid),
+			State:  state,
+			Title:  title,
+			URL:    webURL,
+			Branch: sourceBranch,
+		})
+	}
+
+	return result, nil
 }
 
 // FetchCIStatus fetches CI check statuses for a PR from GitHub or GitLab.
@@ -730,6 +825,43 @@ func (s *Service) RenameWorktree(ctx context.Context, oldPath, newPath, oldBranc
 	}
 
 	return true
+}
+
+// CreateWorktreeFromPR creates a worktree from a PR's remote branch.
+// It fetches the remote branch and creates a new worktree with the specified local branch name.
+func (s *Service) CreateWorktreeFromPR(ctx context.Context, prNumber int, remoteBranch, localBranch, targetPath string) bool {
+	host := s.detectHost(ctx)
+
+	// 1. Fetch the PR branch using the appropriate method for the host
+	switch host {
+	case gitHostGithub:
+		// For GitHub, use the PR number to fetch: pull/{PR_NUMBER}/head
+		prRefspec := fmt.Sprintf("pull/%d/head:%s", prNumber, localBranch)
+		if !s.RunCommandChecked(ctx, []string{"git", "fetch", "origin", prRefspec}, "", fmt.Sprintf("Failed to fetch PR #%d", prNumber)) {
+			return false
+		}
+		// Create worktree from the local branch we just fetched
+		return s.RunCommandChecked(ctx, []string{"git", "worktree", "add", targetPath, localBranch}, "", fmt.Sprintf("Failed to create worktree from PR #%d", prNumber))
+	case gitHostGitLab:
+		// For GitLab, try to fetch the branch normally
+		// First try fetching the branch
+		if !s.RunCommandChecked(ctx, []string{"git", "fetch", "origin", remoteBranch}, "", fmt.Sprintf("Failed to fetch remote branch %s", remoteBranch)) {
+			// If that fails, try fetching all refs and then the specific branch
+			if !s.RunCommandChecked(ctx, []string{"git", "fetch", "origin"}, "", "Failed to fetch from origin") {
+				return false
+			}
+		}
+		// Create worktree from the remote branch
+		remoteRef := fmt.Sprintf("origin/%s", remoteBranch)
+		return s.RunCommandChecked(ctx, []string{"git", "worktree", "add", "-b", localBranch, targetPath, remoteRef}, "", fmt.Sprintf("Failed to create worktree from PR branch %s", remoteBranch))
+	default:
+		// Unknown host, try standard fetch
+		if !s.RunCommandChecked(ctx, []string{"git", "fetch", "origin", remoteBranch}, "", fmt.Sprintf("Failed to fetch remote branch %s", remoteBranch)) {
+			return false
+		}
+		remoteRef := fmt.Sprintf("origin/%s", remoteBranch)
+		return s.RunCommandChecked(ctx, []string{"git", "worktree", "add", "-b", localBranch, targetPath, remoteRef}, "", fmt.Sprintf("Failed to create worktree from PR branch %s", remoteBranch))
+	}
 }
 
 // ResolveRepoName resolves the repository name using various methods

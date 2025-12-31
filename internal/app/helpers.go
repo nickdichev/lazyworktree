@@ -1,8 +1,12 @@
 package app
 
 import (
+	"fmt"
+	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/chmouel/lazyworktree/internal/models"
 )
 
 type scoredPaletteItem struct {
@@ -116,6 +120,39 @@ func minInt(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// generatePRWorktreeName creates a worktree name from a PR in the format pr{number}-{sanitized-title}
+// The name is sanitized to be a valid git branch name and truncated to 100 characters.
+func generatePRWorktreeName(pr *models.PRInfo) string {
+	// Start with pr{number}-
+	name := fmt.Sprintf("pr%d", pr.Number)
+
+	// Sanitize the title
+	title := strings.ToLower(pr.Title)
+
+	// Replace spaces and special characters with hyphens
+	re := regexp.MustCompile(`[^a-z0-9]+`)
+	title = re.ReplaceAllString(title, "-")
+
+	// Remove leading/trailing hyphens and consecutive hyphens
+	title = strings.Trim(title, "-")
+	re2 := regexp.MustCompile(`-+`)
+	title = re2.ReplaceAllString(title, "-")
+
+	// Combine: pr{number}-{title}
+	if title != "" {
+		name = name + "-" + title
+	}
+
+	// Truncate to 100 characters
+	if len(name) > 100 {
+		name = name[:100]
+		// Make sure we don't end with a hyphen
+		name = strings.TrimRight(name, "-")
+	}
+
+	return name
 }
 
 func maxInt(a, b int) int {

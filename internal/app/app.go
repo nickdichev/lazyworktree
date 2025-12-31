@@ -75,6 +75,10 @@ type (
 		checks []*models.CICheck
 		err    error
 	}
+	openPRsLoadedMsg struct {
+		prs []*models.PRInfo
+		err error
+	}
 )
 
 type commitLogEntry struct {
@@ -127,29 +131,31 @@ type Model struct {
 	filterInput    textinput.Model
 
 	// State
-	worktrees     []*models.WorktreeInfo
-	filteredWts   []*models.WorktreeInfo
-	selectedIndex int
-	filterQuery   string
-	sortByActive  bool
-	prDataLoaded  bool
-	repoKey       string
-	currentScreen screenType
-	helpScreen    *HelpScreen
-	trustScreen   *TrustScreen
-	inputScreen   *InputScreen
-	inputSubmit   func(string) (tea.Cmd, bool)
-	commitScreen  *CommitScreen
-	welcomeScreen *WelcomeScreen
-	paletteScreen *CommandPaletteScreen
-	paletteSubmit func(string) tea.Cmd
-	diffScreen    *DiffScreen
-	showingFilter bool
-	focusedPane   int // 0=table, 1=status, 2=log
-	windowWidth   int
-	windowHeight  int
-	infoContent   string
-	statusContent string
+	worktrees         []*models.WorktreeInfo
+	filteredWts       []*models.WorktreeInfo
+	selectedIndex     int
+	filterQuery       string
+	sortByActive      bool
+	prDataLoaded      bool
+	repoKey           string
+	currentScreen     screenType
+	helpScreen        *HelpScreen
+	trustScreen       *TrustScreen
+	inputScreen       *InputScreen
+	inputSubmit       func(string) (tea.Cmd, bool)
+	commitScreen      *CommitScreen
+	welcomeScreen     *WelcomeScreen
+	paletteScreen     *CommandPaletteScreen
+	paletteSubmit     func(string) tea.Cmd
+	prSelectionScreen *PRSelectionScreen
+	prSelectionSubmit func(*models.PRInfo) tea.Cmd
+	diffScreen        *DiffScreen
+	showingFilter     bool
+	focusedPane       int // 0=table, 1=status, 2=log
+	windowWidth       int
+	windowHeight      int
+	infoContent       string
+	statusContent     string
 
 	// Cache
 	cache           map[string]interface{}
@@ -582,6 +588,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.updateDetailsView()
 		}
 		return m, nil
+	case openPRsLoadedMsg:
+		return m, m.handleOpenPRsLoaded(msg)
 
 	case statusUpdatedMsg:
 		if msg.info != "" {
@@ -824,6 +832,10 @@ func (m *Model) View() string {
 	case screenPalette:
 		if m.paletteScreen != nil {
 			return m.overlayPopup(baseView, m.paletteScreen.View(), 3)
+		}
+	case screenPRSelect:
+		if m.prSelectionScreen != nil {
+			return m.overlayPopup(baseView, m.prSelectionScreen.View(), 2)
 		}
 	case screenHelp:
 		if m.helpScreen != nil {
@@ -1212,6 +1224,98 @@ func (m *Model) showCreateWorktree() tea.Cmd {
 	return textinput.Blink
 }
 
+func (m *Model) showCreateFromPR() tea.Cmd {
+	// Fetch all open PRs
+	return func() tea.Msg {
+		prs, err := m.git.FetchAllOpenPRs(m.ctx)
+		return openPRsLoadedMsg{
+			prs: prs,
+			err: err,
+		}
+	}
+}
+
+func (m *Model) handleOpenPRsLoaded(msg openPRsLoadedMsg) tea.Cmd {
+	if msg.err != nil {
+		m.statusContent = fmt.Sprintf("Failed to fetch PRs: %v", msg.err)
+		return nil
+	}
+
+	if len(msg.prs) == 0 {
+		m.statusContent = "No open PRs/MRs found."
+		return nil
+	}
+
+	// Show PR selection screen
+	m.prSelectionScreen = NewPRSelectionScreen(msg.prs, m.windowWidth, m.windowHeight)
+	m.prSelectionSubmit = func(pr *models.PRInfo) tea.Cmd {
+		// Generate worktree name
+		generatedName := generatePRWorktreeName(pr)
+
+		// Show input screen with generated name
+		m.inputScreen = NewInputScreen(
+			fmt.Sprintf("Create worktree from PR #%d", pr.Number),
+			"Worktree name",
+			generatedName,
+		)
+		m.inputSubmit = func(value string) (tea.Cmd, bool) {
+			newBranch := strings.TrimSpace(value)
+			if newBranch == "" {
+				m.inputScreen.errorMsg = "Branch name cannot be empty."
+				return nil, false
+			}
+
+			// Prevent duplicates
+			for _, wt := range m.worktrees {
+				if wt.Branch == newBranch {
+					m.inputScreen.errorMsg = fmt.Sprintf("Branch %q already exists.", newBranch)
+					return nil, false
+				}
+			}
+
+			targetPath := filepath.Join(m.getWorktreeDir(), newBranch)
+			if _, err := os.Stat(targetPath); err == nil {
+				m.inputScreen.errorMsg = fmt.Sprintf("Path already exists: %s", targetPath)
+				return nil, false
+			}
+
+			// Validate that PR has a branch
+			if pr.Branch == "" {
+				m.inputScreen.errorMsg = "PR branch information is missing."
+				return nil, false
+			}
+
+			m.inputScreen.errorMsg = ""
+			if err := os.MkdirAll(m.getWorktreeDir(), 0o750); err != nil {
+				return func() tea.Msg { return errMsg{err: fmt.Errorf("failed to create worktree directory: %w", err)} }, true
+			}
+
+			// Create worktree from PR branch
+			ok := m.git.CreateWorktreeFromPR(m.ctx, pr.Number, pr.Branch, newBranch, targetPath)
+			if !ok {
+				return func() tea.Msg {
+					return errMsg{err: fmt.Errorf("failed to create worktree from PR #%d (branch: %s)", pr.Number, pr.Branch)}
+				}, true
+			}
+
+			env := m.buildCommandEnv(newBranch, targetPath)
+			initCmds := m.collectInitCommands()
+			after := func() tea.Msg {
+				worktrees, err := m.git.GetWorktrees(m.ctx)
+				return worktreesLoadedMsg{
+					worktrees: worktrees,
+					err:       err,
+				}
+			}
+			return m.runCommandsWithTrust(initCmds, targetPath, env, after), true
+		}
+		m.currentScreen = screenInput
+		return textinput.Blink
+	}
+	m.currentScreen = screenPRSelect
+	return textinput.Blink
+}
+
 func (m *Model) showDeleteWorktree() tea.Cmd {
 	if m.selectedIndex < 0 || m.selectedIndex >= len(m.filteredWts) {
 		return nil
@@ -1422,6 +1526,7 @@ func (m *Model) showAbsorbWorktree() tea.Cmd {
 func (m *Model) showCommandPalette() tea.Cmd {
 	items := []paletteItem{
 		{id: "create", label: "Create worktree (c)", description: "Add a new worktree from base branch"},
+		{id: "create-from-pr", label: "Create from PR/MR", description: "Create a worktree from a pull/merge request"},
 		{id: "delete", label: "Delete worktree (D)", description: "Remove worktree and branch"},
 		{id: "rename", label: "Rename worktree (m)", description: "Rename worktree and branch"},
 		{id: "absorb", label: "Absorb worktree (A)", description: "Merge branch into main and remove worktree"},
@@ -1437,6 +1542,8 @@ func (m *Model) showCommandPalette() tea.Cmd {
 		switch action {
 		case "create":
 			return m.showCreateWorktree()
+		case "create-from-pr":
+			return m.showCreateFromPR()
 		case "delete":
 			return m.showDeleteWorktree()
 		case "rename":
@@ -1708,6 +1815,33 @@ func (m *Model) handleScreenKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		ps, cmd := m.paletteScreen.Update(msg)
 		if updated, ok := ps.(*CommandPaletteScreen); ok {
 			m.paletteScreen = updated
+		}
+		return m, cmd
+	case screenPRSelect:
+		if m.prSelectionScreen == nil {
+			m.currentScreen = screenNone
+			return m, nil
+		}
+		switch msg.String() {
+		case keyEsc:
+			m.currentScreen = screenNone
+			m.prSelectionScreen = nil
+			m.prSelectionSubmit = nil
+			return m, nil
+		case keyEnter:
+			if m.prSelectionSubmit != nil {
+				if pr, ok := m.prSelectionScreen.Selected(); ok {
+					cmd := m.prSelectionSubmit(pr)
+					// Don't set screenNone here - prSelectionSubmit sets screenInput
+					m.prSelectionScreen = nil
+					m.prSelectionSubmit = nil
+					return m, cmd
+				}
+			}
+		}
+		ps, cmd := m.prSelectionScreen.Update(msg)
+		if updated, ok := ps.(*PRSelectionScreen); ok {
+			m.prSelectionScreen = updated
 		}
 		return m, cmd
 	case screenConfirm:

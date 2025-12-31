@@ -8,6 +8,7 @@ A Bubble Tea-based TUI for managing Git worktrees efficiently. Visualize status,
 ## Features
 
 - **Worktree Management**: Create, rename, delete, absorb, and prune merged worktrees.
+- **Create from PR/MR**: Create worktrees directly from open pull/merge requests via command palette.
 - **Command Palette**: Fuzzy search and run actions quickly.
 - **Status at a Glance**: View dirty state, ahead/behind counts, and divergence from main.
 - **Forge Integration**: Fetch and display associated Pull Request (GitHub) or Merge Request (GitLab) status, including CI check results (via `gh` or `glab` CLI).
@@ -216,6 +217,7 @@ Custom commands support the same key formats as built-in keybindings:
 - **Special keys**: `enter`, `esc`, `tab`, `space`, etc.
 
 **Examples:**
+
 ```yaml
 custom_commands:
   "ctrl+e":
@@ -252,6 +254,10 @@ custom_commands:
 | `f`, `/` | Filter worktrees |
 | `s` | Toggle sort (Name/Last Active) |
 | `?` | Show help |
+
+**Command Palette Actions:**
+
+- **Create from PR/MR**: Select an open PR/MR to create a worktree. Auto-generates a name (`pr{number}-{sanitized-title}`) that you can edit.
 
 ### Mouse Controls
 
@@ -322,7 +328,7 @@ CI status is fetched lazily (only for the selected worktree) and cached for 30 s
 
 ## Trivia
 
-This used to be a python textual application, but the startup-time was too slow and I have decided to move it to a go [charmbracelet bubble](https://github.com/charmbracelet/bubbles) based TUI. You can still see or try if you want the old python interface here https://github.com/chmouel/lazyworktree/tree/python
+This used to be a python textual application, but the startup-time was too slow and I have decided to move it to a go [charmbracelet bubble](https://github.com/charmbracelet/bubbles) based TUI. You can still see or try if you want the old python interface here <https://github.com/chmouel/lazyworktree/tree/python>
 
 ## Copyright
 
