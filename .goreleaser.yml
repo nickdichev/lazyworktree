@@ -1,3 +1,4 @@
+version: 2
 builds:
   - id: lazyworktree
     env:
@@ -26,25 +27,20 @@ archives:
       {{- else }}{{ .Arch }}{{ end }}
     format_overrides:
       - goos: windows
-        format: zip
-brews:
+        formats: [zip]
+homebrew_casks:
   - name: lazyworktree
     repository:
       owner: chmouel
       name: lazyworktree
-    directory: Formula
+    directory: Casks
     homepage: "https://github.com/chmouel/lazyworktree"
     description: "lazyworktree - A TUI tool to manage git worktrees"
-    install: |
-      bin.install "lazyworktree"
-checksums:
-  name_template: "checksums.txt"
-
 snapshot:
-  name_template: "{{ .Tag }}-next"
+  version_template: "{{ .Tag }}-next"
 
 release:
-  prerelease: false
+  prerelease: "false"
 
 nfpms:
   - file_name_template: >-
