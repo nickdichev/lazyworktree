@@ -139,7 +139,7 @@ You can configure this behavior in `config.yaml` via the `trust_mode` setting:
 
 ### Special Commands
 
-- `link_topsymlinks`: This is a high-level automation command that:
+- `link_topsymlinks`: This is a built-in automation command (not a shell command) that runs without TOFU prompts once the `.wt` file is trusted. It performs:
   - Symlinks all untracked and ignored files from the root of the main worktree to the new worktree (excluding subdirectories).
   - Symlinks common editor configurations (`.vscode`, `.idea`, `.cursor`, `.claude`).
   - Ensures a `tmp/` directory exists in the new worktree.
