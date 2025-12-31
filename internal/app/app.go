@@ -179,7 +179,7 @@ type Model struct {
 	statusContent     string
 
 	// Cache
-	cache           map[string]interface{}
+	cache           map[string]any
 	divergenceCache map[string]string
 	notifiedErrors  map[string]bool
 	ciCache         map[string]*ciCacheEntry // branch -> CI checks cache
@@ -1156,7 +1156,7 @@ func (m *Model) updateDetailsView() tea.Cmd {
 
 		// Parse log
 		logEntries := []commitLogEntry{}
-		for _, line := range strings.Split(logRaw, "\n") {
+		for line := range strings.SplitSeq(logRaw, "\n") {
 			parts := strings.SplitN(line, "\t", 2)
 			if len(parts) == 2 {
 				message := parts[1]
