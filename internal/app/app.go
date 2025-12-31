@@ -1800,22 +1800,20 @@ func (m *Model) showAbsorbWorktree() tea.Cmd {
 	}
 
 	mainBranch := m.git.GetMainBranch(m.ctx)
+	mainPath := m.getMainWorktreePath()
+	if mainPath == "" {
+		m.statusContent = "Cannot find main worktree."
+		return nil
+	}
+
 	m.confirmScreen = NewConfirmScreen(fmt.Sprintf("Absorb worktree into %s?\n\nPath: %s\nBranch: %s -> %s", mainBranch, wt.Path, wt.Branch, mainBranch))
 	m.confirmAction = func() tea.Cmd {
 		return func() tea.Msg {
-			if !m.git.RunCommandChecked(m.ctx, []string{"git", "-C", wt.Path, "checkout", mainBranch}, "", fmt.Sprintf("Failed to checkout %s", mainBranch)) {
+			if !m.git.RunCommandChecked(m.ctx, []string{"git", "-C", mainPath, "merge", "--no-edit", wt.Branch}, "", fmt.Sprintf("Failed to merge %s into %s", wt.Branch, mainBranch)) {
 				return absorbMergeResultMsg{
 					path:   wt.Path,
 					branch: wt.Branch,
-					err:    fmt.Errorf("absorb canceled: checkout %s failed", mainBranch),
-				}
-			}
-
-			if !m.git.RunCommandChecked(m.ctx, []string{"git", "-C", wt.Path, "merge", "--no-edit", wt.Branch}, "", fmt.Sprintf("Failed to merge %s into %s", wt.Branch, mainBranch)) {
-				return absorbMergeResultMsg{
-					path:   wt.Path,
-					branch: wt.Branch,
-					err:    fmt.Errorf("merge failed; resolve conflicts in %s and retry", wt.Path),
+					err:    fmt.Errorf("merge failed; resolve conflicts in %s and retry", mainPath),
 				}
 			}
 
