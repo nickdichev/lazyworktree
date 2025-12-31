@@ -828,40 +828,52 @@ func (s *Service) RenameWorktree(ctx context.Context, oldPath, newPath, oldBranc
 }
 
 // CreateWorktreeFromPR creates a worktree from a PR's remote branch.
-// It fetches the remote branch and creates a new worktree with the specified local branch name.
+// It uses gh/glab CLI tools to checkout the PR with proper tracking, then creates a worktree.
 func (s *Service) CreateWorktreeFromPR(ctx context.Context, prNumber int, remoteBranch, localBranch, targetPath string) bool {
 	host := s.detectHost(ctx)
 
-	// 1. Fetch the PR branch using the appropriate method for the host
+	// Save current branch to restore it later
+	currentBranch := s.RunGit(ctx, []string{"git", "branch", "--show-current"}, "", []int{0}, true, true)
+	if currentBranch == "" {
+		// If we're in detached HEAD, get the commit
+		currentBranch = s.RunGit(ctx, []string{"git", "rev-parse", "HEAD"}, "", []int{0}, true, true)
+	}
+
+	// Use gh/glab to checkout the PR with proper configuration
 	switch host {
 	case gitHostGithub:
-		// For GitHub, use the PR number to fetch: pull/{PR_NUMBER}/head
-		prRefspec := fmt.Sprintf("pull/%d/head:%s", prNumber, localBranch)
-		if !s.RunCommandChecked(ctx, []string{"git", "fetch", "origin", prRefspec}, "", fmt.Sprintf("Failed to fetch PR #%d", prNumber)) {
+		// Use gh pr checkout which sets up all the proper tracking
+		if !s.RunCommandChecked(ctx, []string{"gh", "pr", "checkout", fmt.Sprintf("%d", prNumber), "-b", localBranch}, "", fmt.Sprintf("Failed to checkout PR #%d", prNumber)) {
 			return false
 		}
-		// Create worktree from the local branch we just fetched
-		return s.RunCommandChecked(ctx, []string{"git", "worktree", "add", targetPath, localBranch}, "", fmt.Sprintf("Failed to create worktree from PR #%d", prNumber))
 	case gitHostGitLab:
-		// For GitLab, try to fetch the branch normally
-		// First try fetching the branch
-		if !s.RunCommandChecked(ctx, []string{"git", "fetch", "origin", remoteBranch}, "", fmt.Sprintf("Failed to fetch remote branch %s", remoteBranch)) {
-			// If that fails, try fetching all refs and then the specific branch
-			if !s.RunCommandChecked(ctx, []string{"git", "fetch", "origin"}, "", "Failed to fetch from origin") {
-				return false
-			}
+		// Use glab mr checkout which sets up all the proper tracking
+		if !s.RunCommandChecked(ctx, []string{"glab", "mr", "checkout", fmt.Sprintf("%d", prNumber), "-b", localBranch}, "", fmt.Sprintf("Failed to checkout MR #%d", prNumber)) {
+			return false
 		}
-		// Create worktree from the remote branch
-		remoteRef := fmt.Sprintf("origin/%s", remoteBranch)
-		return s.RunCommandChecked(ctx, []string{"git", "worktree", "add", "-b", localBranch, targetPath, remoteRef}, "", fmt.Sprintf("Failed to create worktree from PR branch %s", remoteBranch))
 	default:
-		// Unknown host, try standard fetch
+		// Unknown host, fall back to manual fetch
 		if !s.RunCommandChecked(ctx, []string{"git", "fetch", "origin", remoteBranch}, "", fmt.Sprintf("Failed to fetch remote branch %s", remoteBranch)) {
 			return false
 		}
 		remoteRef := fmt.Sprintf("origin/%s", remoteBranch)
-		return s.RunCommandChecked(ctx, []string{"git", "worktree", "add", "-b", localBranch, targetPath, remoteRef}, "", fmt.Sprintf("Failed to create worktree from PR branch %s", remoteBranch))
+		if !s.RunCommandChecked(ctx, []string{"git", "worktree", "add", "-b", localBranch, targetPath, remoteRef}, "", fmt.Sprintf("Failed to create worktree from PR branch %s", remoteBranch)) {
+			return false
+		}
+		return true
 	}
+
+	// Restore the original branch in the main worktree
+	if currentBranch != "" {
+		s.RunGit(ctx, []string{"git", "checkout", currentBranch}, "", []int{0, 1}, true, true)
+	}
+
+	// Now create a new worktree from the branch that gh/glab just created
+	if !s.RunCommandChecked(ctx, []string{"git", "worktree", "add", targetPath, localBranch}, "", fmt.Sprintf("Failed to create worktree from branch %s", localBranch)) {
+		return false
+	}
+
+	return true
 }
 
 // ResolveRepoName resolves the repository name using various methods
