@@ -1159,9 +1159,14 @@ func (m *Model) updateDetailsView() tea.Cmd {
 		for _, line := range strings.Split(logRaw, "\n") {
 			parts := strings.SplitN(line, "\t", 2)
 			if len(parts) == 2 {
+				message := parts[1]
+				// Truncate long commit messages to 80 characters
+				if len(message) > 80 {
+					message = message[:80] + "…"
+				}
 				logEntries = append(logEntries, commitLogEntry{
 					sha:     parts[0],
-					message: parts[1],
+					message: message,
 				})
 			}
 		}
@@ -2404,7 +2409,7 @@ func (m *Model) getCachedDetails(wt *models.WorktreeInfo) (string, string) {
 
 	// Get status (using porcelain format for reliable machine parsing)
 	statusRaw := m.git.RunGit(m.ctx, []string{"git", "status", "--porcelain=v2"}, wt.Path, []int{0}, true, false)
-	logRaw := m.git.RunGit(m.ctx, []string{"git", "log", "-20", "--pretty=format:%h%x09%s"}, wt.Path, []int{0}, true, false)
+	logRaw := m.git.RunGit(m.ctx, []string{"git", "log", "-50", "--pretty=format:%h%x09%s"}, wt.Path, []int{0}, true, false)
 
 	m.detailsCache[cacheKey] = &detailsCacheEntry{
 		statusRaw: statusRaw,
