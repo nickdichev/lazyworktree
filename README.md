@@ -224,7 +224,7 @@ CI status is fetched lazily (only for the selected worktree) and cached for 30 s
 
 `lazyworktree` is designed to be super snappy:
 
-- **Caching**: It stores the state of your worktrees in `.worktree-cache.json` within your repository-specific folder in your worktree root. This allows the TUI to render in milliseconds upon startup.
+- **Caching**: It caches worktree metadata in `.worktree-cache.json` (located at `<worktree_dir>/<repo_name>/`), allowing the TUI to render in milliseconds upon startup.
 - **Background Updates**: As soon as the UI is visible, a background task refreshes the data from Git and updates the cache automatically.
 - **Welcome Screen**: If no worktrees are detected (e.g., during first-time use or in an unconfigured directory), a welcome screen guides you through the setup.
 
