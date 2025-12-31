@@ -29,6 +29,10 @@ archives:
     format_overrides:
       - goos: windows
         formats: [zip]
+    files:
+      - LICENSE
+      - README.md
+      - config.example.yaml
 homebrew_casks:
   - name: lazyworktree
     repository:
@@ -57,6 +61,9 @@ nfpms:
       - deb
       - rpm
     bindir: /usr/bin
+    contents:
+      - src: config.example.yaml
+        dst: /usr/share/doc/lazyworktree/config.example.yaml
 changelog:
   sort: asc
   use: github
@@ -90,3 +97,6 @@ aurs:
 
       # license
       install -Dm644 "./LICENSE" "${pkgdir}/usr/share/licenses/lazyworktree/LICENSE"
+
+      # config example
+      install -Dm644 "./config.example.yaml" "${pkgdir}/usr/share/doc/lazyworktree/config.example.yaml"
