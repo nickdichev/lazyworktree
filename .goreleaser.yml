@@ -20,11 +20,12 @@ builds:
       - -X main.date={{.Date}}
 archives:
   - name_template: >-
-      {{ .Binary }}_
-      {{- .Version }}_
-      {{- .OS }}_
+      {{- .ProjectName }}_
+      {{- title .Os }}_
       {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
       {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end -}}
     format_overrides:
       - goos: windows
         formats: [zip]
@@ -46,11 +47,7 @@ checksum:
   name_template: "checksums.txt"
 
 nfpms:
-  - file_name_template: >-
-      lazyworktree-
-      {{- .Version}}_{{.OS}}-
-      {{- if eq .Arch "amd64" }}x86_64
-      {{- else }}{{ .Arch }}{{ end }}
+  - file_name_template: "{{ .ConventionalFileName }}"
     homepage: https://github.com/chmouel/lazyworktree
     description: "lazyworktree - A TUI tool to manage git worktrees"
     maintainer: Chmouel Boudjnah <chmouel@chmouel.com>
