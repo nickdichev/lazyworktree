@@ -1703,7 +1703,7 @@ func (m *Model) showCommandPalette() tea.Cmd {
 		{id: "absorb", label: "Absorb worktree (A)", description: "Merge branch into main and remove worktree"},
 		{id: "prune", label: "Prune merged (X)", description: "Remove merged PR worktrees"},
 		{id: "refresh", label: "Refresh (r)", description: "Reload worktrees"},
-		{id: "fetch", label: "Fetch remotes (f)", description: "git fetch --all"},
+		{id: "fetch", label: "Fetch remotes (R)", description: "git fetch --all"},
 		{id: "pr", label: "Open PR (o)", description: "Open PR in browser"},
 		{id: "help", label: "Help (?)", description: "Show help"},
 	}
