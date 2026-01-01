@@ -8,6 +8,7 @@ A Bubble Tea-based TUI for managing Git worktrees efficiently. Visualize status,
 ## Features
 
 - **Worktree Management**: Create, rename, delete, absorb, and prune merged worktrees.
+- **Base Selection**: Pick a base branch or commit from a list (or enter a ref) when creating a worktree.
 - **Create from PR/MR**: Create worktrees directly from open pull/merge requests via command palette.
 - **Command Palette**: Fuzzy search and run actions quickly.
 - **Status at a Glance**: View dirty state, ahead/behind counts, and divergence from main.

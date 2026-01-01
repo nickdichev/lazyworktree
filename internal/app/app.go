@@ -130,6 +130,7 @@ type ciCacheEntry struct {
 const (
 	minLeftPaneWidth  = 32
 	minRightPaneWidth = 32
+	mainWorktreeName  = "main"
 )
 
 var (
@@ -177,6 +178,8 @@ type Model struct {
 	paletteSubmit     func(string) tea.Cmd
 	prSelectionScreen *PRSelectionScreen
 	prSelectionSubmit func(*models.PRInfo) tea.Cmd
+	listScreen        *ListSelectionScreen
+	listSubmit        func(selectionItem) tea.Cmd
 	diffScreen        *DiffScreen
 	spinner           spinner.Model
 	loading           bool
@@ -890,6 +893,8 @@ func screenName(screen screenType) string {
 		return "diff"
 	case screenPRSelect:
 		return "pr-select"
+	case screenListSelect:
+		return "list-select"
 	default:
 		return "unknown"
 	}
@@ -1068,6 +1073,10 @@ func (m *Model) View() string {
 		if m.prSelectionScreen != nil {
 			return m.overlayPopup(baseView, m.prSelectionScreen.View(), 2)
 		}
+	case screenListSelect:
+		if m.listScreen != nil {
+			return m.overlayPopup(baseView, m.listScreen.View(), 2)
+		}
 	case screenHelp:
 		if m.helpScreen != nil {
 			// Center the help popup
@@ -1168,7 +1177,7 @@ func (m *Model) updateTable() {
 		for _, wt := range m.worktrees {
 			name := filepath.Base(wt.Path)
 			if wt.IsMain {
-				name = "main"
+				name = mainWorktreeName
 			}
 			haystacks := []string{strings.ToLower(name), strings.ToLower(wt.Branch)}
 			if hasPathSep {
@@ -1199,7 +1208,7 @@ func (m *Model) updateTable() {
 	for _, wt := range m.filteredWts {
 		name := filepath.Base(wt.Path)
 		if wt.IsMain {
-			name = "main"
+			name = mainWorktreeName
 		}
 
 		status := "✔"
@@ -1405,70 +1414,7 @@ func (m *Model) fetchRemotes() tea.Cmd {
 
 func (m *Model) showCreateWorktree() tea.Cmd {
 	defaultBase := m.git.GetMainBranch(m.ctx)
-
-	// Stage 1: branch name
-	m.inputScreen = NewInputScreen("Create worktree: branch name", "feature/my-branch", "")
-	m.inputSubmit = func(value string) (tea.Cmd, bool) {
-		newBranch := strings.TrimSpace(value)
-		if newBranch == "" {
-			m.inputScreen.errorMsg = errBranchEmpty
-			return nil, false
-		}
-
-		// Prevent duplicates
-		for _, wt := range m.worktrees {
-			if wt.Branch == newBranch {
-				m.inputScreen.errorMsg = fmt.Sprintf("Branch %q already exists.", newBranch)
-				return nil, false
-			}
-		}
-
-		targetPath := filepath.Join(m.getWorktreeDir(), newBranch)
-		if _, err := os.Stat(targetPath); err == nil {
-			m.inputScreen.errorMsg = fmt.Sprintf("Path already exists: %s", targetPath)
-			return nil, false
-		}
-
-		// Stage 2: base branch prompt
-		m.inputScreen = NewInputScreen(fmt.Sprintf("Base branch for %q", newBranch), defaultBase, defaultBase)
-		m.inputSubmit = func(baseVal string) (tea.Cmd, bool) {
-			baseBranch := strings.TrimSpace(baseVal)
-			if baseBranch == "" {
-				m.inputScreen.errorMsg = "Base branch cannot be empty."
-				return nil, false
-			}
-
-			m.inputScreen.errorMsg = ""
-			if err := os.MkdirAll(m.getWorktreeDir(), defaultDirPerms); err != nil {
-				return func() tea.Msg { return errMsg{err: fmt.Errorf("failed to create worktree directory: %w", err)} }, true
-			}
-
-			ok := m.git.RunCommandChecked(
-				m.ctx,
-				[]string{"git", "worktree", "add", "-b", newBranch, targetPath, baseBranch},
-				"",
-				fmt.Sprintf("Failed to create worktree %s", newBranch),
-			)
-			if !ok {
-				return func() tea.Msg { return errMsg{err: fmt.Errorf("failed to create worktree %s", newBranch)} }, true
-			}
-
-			env := m.buildCommandEnv(newBranch, targetPath)
-			initCmds := m.collectInitCommands()
-			after := func() tea.Msg {
-				worktrees, err := m.git.GetWorktrees(m.ctx)
-				return worktreesLoadedMsg{
-					worktrees: worktrees,
-					err:       err,
-				}
-			}
-			return m.runCommandsWithTrust(initCmds, targetPath, env, after), true
-		}
-
-		return textinput.Blink, false
-	}
-	m.currentScreen = screenInput
-	return textinput.Blink
+	return m.showBaseSelection(defaultBase)
 }
 
 func (m *Model) showCreateFromPR() tea.Cmd {
@@ -2306,6 +2252,31 @@ func (m *Model) handleScreenKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.prSelectionScreen = updated
 		}
 		return m, cmd
+	case screenListSelect:
+		if m.listScreen == nil {
+			m.currentScreen = screenNone
+			return m, nil
+		}
+		keyStr := msg.String()
+		if isEscKey(keyStr) {
+			m.listScreen = nil
+			m.listSubmit = nil
+			m.currentScreen = screenNone
+			return m, nil
+		}
+		if keyStr == keyEnter {
+			if m.listSubmit != nil {
+				if item, ok := m.listScreen.Selected(); ok {
+					cmd := m.listSubmit(item)
+					return m, cmd
+				}
+			}
+		}
+		ls, cmd := m.listScreen.Update(msg)
+		if updated, ok := ls.(*ListSelectionScreen); ok {
+			m.listScreen = updated
+		}
+		return m, cmd
 	case screenConfirm:
 		if m.confirmScreen != nil {
 			_, cmd := m.confirmScreen.Update(msg)
@@ -2503,6 +2474,10 @@ func (m *Model) renderScreen() string {
 				return lipgloss.Place(m.windowWidth, m.windowHeight, lipgloss.Center, lipgloss.Center, content)
 			}
 			return content
+		}
+	case screenListSelect:
+		if m.listScreen != nil {
+			return m.listScreen.View()
 		}
 	}
 	return ""

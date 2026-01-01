@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -142,6 +143,64 @@ func TestShowCreateWorktreeFromChangesNoSelection(t *testing.T) {
 	}
 }
 
+func TestShowCreateWorktreeStartsWithBasePicker(t *testing.T) {
+	cfg := &config.AppConfig{
+		WorktreeDir: t.TempDir(),
+	}
+	m := NewModel(cfg, "")
+
+	cmd := m.showCreateWorktree()
+	if cmd == nil {
+		t.Fatal("showCreateWorktree returned nil command")
+	}
+	if m.currentScreen != screenListSelect {
+		t.Fatalf("expected currentScreen screenListSelect, got %v", m.currentScreen)
+	}
+	if m.listScreen == nil {
+		t.Fatal("listScreen should be initialized")
+	}
+	if m.listScreen.title != "Select base for new worktree" {
+		t.Fatalf("unexpected list title: %q", m.listScreen.title)
+	}
+	if len(m.listScreen.items) != 3 {
+		t.Fatalf("expected 3 base options, got %d", len(m.listScreen.items))
+	}
+	if m.listScreen.items[0].id != "branch-list" {
+		t.Fatalf("expected first option branch-list, got %q", m.listScreen.items[0].id)
+	}
+}
+
+func TestShowBranchNameInputUsesDefaultName(t *testing.T) {
+	cfg := &config.AppConfig{
+		WorktreeDir: t.TempDir(),
+	}
+	m := NewModel(cfg, "")
+
+	cmd := m.showBranchNameInput(mainWorktreeName, mainWorktreeName)
+	if cmd == nil {
+		t.Fatal("showBranchNameInput returned nil command")
+	}
+	if m.currentScreen != screenInput {
+		t.Fatalf("expected currentScreen screenInput, got %v", m.currentScreen)
+	}
+	if m.inputScreen == nil {
+		t.Fatal("inputScreen should be initialized")
+	}
+	got := m.inputScreen.input.Value()
+	if !strings.HasPrefix(got, mainWorktreeName) {
+		t.Fatalf("expected default input value to start with %q, got %q", mainWorktreeName, got)
+	}
+	if got != mainWorktreeName {
+		suffix := strings.TrimPrefix(got, mainWorktreeName+"-")
+		if suffix == got || suffix == "" {
+			t.Fatalf("expected numeric suffix after %q, got %q", mainWorktreeName, got)
+		}
+		if _, err := strconv.Atoi(suffix); err != nil {
+			t.Fatalf("expected numeric suffix after %q, got %q", mainWorktreeName, got)
+		}
+	}
+}
+
 func TestPersistLastSelectedWritesFile(t *testing.T) {
 	worktreeDir := t.TempDir()
 	cfg := &config.AppConfig{
@@ -261,12 +320,12 @@ func TestCreateFromChangesReadyMsg(t *testing.T) {
 	// Create a mock worktree
 	wt := &models.WorktreeInfo{
 		Path:   "/tmp/test-worktree",
-		Branch: "main",
+		Branch: mainWorktreeName,
 	}
 
 	msg := createFromChangesReadyMsg{
 		worktree:      wt,
-		currentBranch: "main",
+		currentBranch: mainWorktreeName,
 	}
 
 	// Handle the message
@@ -399,7 +458,7 @@ func TestShowAbsorbWorktreeOnMainWorktree(t *testing.T) {
 
 	// Set up main worktree
 	m.worktrees = []*models.WorktreeInfo{
-		{Path: "/path/to/main", Branch: "main", IsMain: true},
+		{Path: "/path/to/main", Branch: mainWorktreeName, IsMain: true},
 	}
 	m.filteredWts = m.worktrees
 	m.selectedIndex = 0
@@ -421,7 +480,7 @@ func TestShowAbsorbWorktreeCreatesConfirmScreen(t *testing.T) {
 
 	// Set up main and feature worktrees
 	m.worktrees = []*models.WorktreeInfo{
-		{Path: "/path/to/main", Branch: "main", IsMain: true},
+		{Path: "/path/to/main", Branch: mainWorktreeName, IsMain: true},
 		{Path: "/path/to/feature", Branch: "feature-branch", IsMain: false},
 	}
 	m.filteredWts = m.worktrees
