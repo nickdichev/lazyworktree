@@ -17,6 +17,7 @@ A Bubble Tea-based TUI for managing Git worktrees efficiently. Visualize status,
 - **Commit Details**: Open commit metadata and diffs directly from the log pane.
 - **Repo Automation**: `.wt` init/terminate commands with TOFU security.
 - **LazyGit Integration**: Launch `lazygit` directly for the selected worktree.
+- **Tmux Integration**: Create and manage tmux sessions per worktree with multi-window support.
 - **Shell Integration**: Jump (cd) directly to selected worktrees upon exit.
 - **Mouse Support**: Full mouse support for scrolling and clicking to select items and focus panes.
 
