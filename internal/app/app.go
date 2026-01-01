@@ -247,6 +247,7 @@ func NewModel(cfg *config.AppConfig, initialFilter string) *Model {
 			if err == nil {
 				debugLogFile = file
 				debugLogger = log.New(file, "", log.LstdFlags)
+				debugLogger.SetFlags(log.LstdFlags | log.Lmicroseconds)
 				debugLogger.Printf("debug logging enabled")
 			}
 		}
