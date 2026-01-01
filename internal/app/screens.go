@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/chmouel/lazyworktree/internal/config"
 	"github.com/chmouel/lazyworktree/internal/models"
+	"github.com/chmouel/lazyworktree/internal/theme"
 )
 
 type screenType int
@@ -42,6 +43,7 @@ type ConfirmScreen struct {
 	message        string
 	result         chan bool
 	selectedButton int // 0 = Confirm, 1 = Cancel
+	thm            *theme.Theme
 }
 
 // InputScreen provides a prompt along with a text input and inline validation.
@@ -54,6 +56,7 @@ type InputScreen struct {
 	boxWidth    int
 	result      chan string
 	validate    func(string) string
+	thm         *theme.Theme
 }
 
 // HelpScreen renders searchable documentation for the app controls.
@@ -65,6 +68,7 @@ type HelpScreen struct {
 	searchInput textinput.Model
 	searching   bool
 	searchQuery string
+	thm         *theme.Theme
 }
 
 // TrustScreen surfaces trust warnings and records commands for a path.
@@ -73,6 +77,7 @@ type TrustScreen struct {
 	commands []string
 	viewport viewport.Model
 	result   chan string
+	thm      *theme.Theme
 }
 
 // WelcomeScreen shows the initial instructions when no worktrees are open.
@@ -80,6 +85,7 @@ type WelcomeScreen struct {
 	currentDir  string
 	worktreeDir string
 	result      chan bool
+	thm         *theme.Theme
 }
 
 // CommitScreen displays metadata, stats, and diff details for a single commit.
@@ -89,6 +95,7 @@ type CommitScreen struct {
 	diff     string
 	useDelta bool
 	viewport viewport.Model
+	thm      *theme.Theme
 }
 
 // CommandPaletteScreen lets the user pick a command from a filtered list.
@@ -98,6 +105,7 @@ type CommandPaletteScreen struct {
 	filterInput  textinput.Model
 	cursor       int
 	scrollOffset int
+	thm          *theme.Theme
 }
 
 type paletteItem struct {
@@ -121,6 +129,7 @@ type PRSelectionScreen struct {
 	scrollOffset int
 	width        int
 	height       int
+	thm          *theme.Theme
 }
 
 // ListSelectionScreen lets the user pick from a list of options.
@@ -135,6 +144,7 @@ type ListSelectionScreen struct {
 	title        string
 	placeholder  string
 	noResults    string
+	thm          *theme.Theme
 }
 
 // DiffScreen renders a full commit diff inside a viewport.
@@ -142,14 +152,16 @@ type DiffScreen struct {
 	title    string
 	content  string
 	viewport viewport.Model
+	thm      *theme.Theme
 }
 
 // NewConfirmScreen creates a confirm screen preloaded with a message.
-func NewConfirmScreen(message string) *ConfirmScreen {
+func NewConfirmScreen(message string, thm *theme.Theme) *ConfirmScreen {
 	return &ConfirmScreen{
 		message:        message,
 		result:         make(chan bool, 1),
 		selectedButton: 0, // Start with Confirm button focused
+		thm:            thm,
 	}
 }
 
@@ -197,7 +209,7 @@ func (s *ConfirmScreen) View() string {
 
 	boxStyle := lipgloss.NewStyle().
 		Border(lipgloss.ThickBorder()).
-		BorderForeground(colorBorder).
+		BorderForeground(s.thm.Border).
 		Padding(1, 2).
 		Width(width).
 		Height(height)
@@ -206,7 +218,7 @@ func (s *ConfirmScreen) View() string {
 		Width(width-4).
 		Height(height-6).
 		Align(lipgloss.Center, lipgloss.Center).
-		Foreground(colorTextFg)
+		Foreground(s.thm.TextFg)
 
 	// Focused confirm button
 	focusedConfirmStyle := lipgloss.NewStyle().
@@ -214,7 +226,7 @@ func (s *ConfirmScreen) View() string {
 		Align(lipgloss.Center).
 		Padding(0, 1).
 		Foreground(lipgloss.Color("#FFFFFF")).
-		Background(colorErrorFg).
+		Background(s.thm.ErrorFg).
 		Bold(true)
 
 	// Focused cancel button
@@ -223,14 +235,14 @@ func (s *ConfirmScreen) View() string {
 		Align(lipgloss.Center).
 		Padding(0, 1).
 		Foreground(lipgloss.Color("#000000")).
-		Background(colorAccent)
+		Background(s.thm.Accent)
 
 	unfocusedButtonStyle := lipgloss.NewStyle().
 		Width((width-6)/2).
 		Align(lipgloss.Center).
 		Padding(0, 1).
-		Foreground(colorTextFg).
-		Background(colorBorderDim)
+		Foreground(s.thm.TextFg).
+		Background(s.thm.BorderDim)
 
 	var confirmButton, cancelButton string
 	if s.selectedButton == 0 {
@@ -253,7 +265,7 @@ func (s *ConfirmScreen) View() string {
 }
 
 // NewInputScreen builds an input modal with prompt, placeholder, and initial value.
-func NewInputScreen(prompt, placeholder, value string) *InputScreen {
+func NewInputScreen(prompt, placeholder, value string, thm *theme.Theme) *InputScreen {
 	ti := textinput.New()
 	ti.Placeholder = placeholder
 	ti.SetValue(value)
@@ -273,6 +285,7 @@ func NewInputScreen(prompt, placeholder, value string) *InputScreen {
 		errorMsg:    "",
 		boxWidth:    60,
 		result:      make(chan string, 1),
+		thm:         thm,
 	}
 }
 
@@ -313,24 +326,24 @@ func (s *InputScreen) View() string {
 
 	boxStyle := lipgloss.NewStyle().
 		Border(lipgloss.ThickBorder()).
-		BorderForeground(colorBorder).
+		BorderForeground(s.thm.Border).
 		Padding(1, 2).
 		Width(width)
 
 	promptStyle := lipgloss.NewStyle().
-		Foreground(colorAccent).
+		Foreground(s.thm.Accent).
 		Bold(true).
 		Width(width - 6).
 		Align(lipgloss.Center)
 
 	inputWrapperStyle := lipgloss.NewStyle().
 		Border(lipgloss.NormalBorder()).
-		BorderForeground(colorBorderDim).
+		BorderForeground(s.thm.BorderDim).
 		Padding(0, 1).
 		Width(width - 6)
 
 	footerStyle := lipgloss.NewStyle().
-		Foreground(colorMutedFg).
+		Foreground(s.thm.MutedFg).
 		Width(width - 6).
 		Align(lipgloss.Center).
 		MarginTop(1)
@@ -342,7 +355,7 @@ func (s *InputScreen) View() string {
 
 	if s.errorMsg != "" {
 		errorStyle := lipgloss.NewStyle().
-			Foreground(colorErrorFg).
+			Foreground(s.thm.ErrorFg).
 			Width(width - 6).
 			Align(lipgloss.Center)
 		contentLines = append(contentLines, errorStyle.Render(s.errorMsg))
@@ -356,7 +369,7 @@ func (s *InputScreen) View() string {
 }
 
 // NewHelpScreen initializes help content with the available screen size.
-func NewHelpScreen(maxWidth, maxHeight int, customCommands map[string]*config.CustomCommand) *HelpScreen {
+func NewHelpScreen(maxWidth, maxHeight int, customCommands map[string]*config.CustomCommand, thm *theme.Theme) *HelpScreen {
 	helpText := `# Git Worktree Status Help
 
 **Navigation**
@@ -451,6 +464,7 @@ Press p to fetch PR information from GitHub.
 		height:      height,
 		fullText:    fullLines,
 		searchInput: ti,
+		thm:         thm,
 	}
 
 	hs.refreshContent()
@@ -458,7 +472,7 @@ Press p to fetch PR information from GitHub.
 }
 
 // NewCommandPaletteScreen builds a palette populated with candidate commands.
-func NewCommandPaletteScreen(items []paletteItem) *CommandPaletteScreen {
+func NewCommandPaletteScreen(items []paletteItem, thm *theme.Theme) *CommandPaletteScreen {
 	ti := textinput.New()
 	ti.Placeholder = "Type a command..."
 	ti.CharLimit = 100
@@ -472,12 +486,13 @@ func NewCommandPaletteScreen(items []paletteItem) *CommandPaletteScreen {
 		filterInput:  ti,
 		cursor:       0,
 		scrollOffset: 0,
+		thm:          thm,
 	}
 	return screen
 }
 
 // NewDiffScreen displays a commit diff title and body inside a viewport.
-func NewDiffScreen(title, diff string) *DiffScreen {
+func NewDiffScreen(title, diff string, thm *theme.Theme) *DiffScreen {
 	vp := viewport.New(100, 40)
 	content := title
 	if diff != "" {
@@ -488,6 +503,7 @@ func NewDiffScreen(title, diff string) *DiffScreen {
 		title:    title,
 		content:  content,
 		viewport: vp,
+		thm:      thm,
 	}
 }
 
@@ -623,7 +639,7 @@ func (s *CommandPaletteScreen) Selected() (string, bool) {
 }
 
 // NewListSelectionScreen builds a list selection screen with 80% of screen size.
-func NewListSelectionScreen(items []selectionItem, title, placeholder, noResults string, maxWidth, maxHeight int, initialID string) *ListSelectionScreen {
+func NewListSelectionScreen(items []selectionItem, title, placeholder, noResults string, maxWidth, maxHeight int, initialID string, thm *theme.Theme) *ListSelectionScreen {
 	// Use 80% of screen size
 	width := int(float64(maxWidth) * 0.8)
 	height := int(float64(maxHeight) * 0.8)
@@ -674,12 +690,13 @@ func NewListSelectionScreen(items []selectionItem, title, placeholder, noResults
 		title:        title,
 		placeholder:  placeholder,
 		noResults:    noResults,
+		thm:          thm,
 	}
 	return screen
 }
 
 // NewPRSelectionScreen builds a PR selection screen with 80% of screen size.
-func NewPRSelectionScreen(prs []*models.PRInfo, maxWidth, maxHeight int) *PRSelectionScreen {
+func NewPRSelectionScreen(prs []*models.PRInfo, maxWidth, maxHeight int, thm *theme.Theme) *PRSelectionScreen {
 	// Use 80% of screen size
 	width := int(float64(maxWidth) * 0.8)
 	height := int(float64(maxHeight) * 0.8)
@@ -707,6 +724,7 @@ func NewPRSelectionScreen(prs []*models.PRInfo, maxWidth, maxHeight int) *PRSele
 		scrollOffset: 0,
 		width:        width,
 		height:       height,
+		thm:          thm,
 	}
 	return screen
 }
@@ -869,15 +887,15 @@ func (s *PRSelectionScreen) View() string {
 	// Styles
 	boxStyle := lipgloss.NewStyle().
 		Border(lipgloss.ThickBorder()).
-		BorderForeground(colorBorder).
+		BorderForeground(s.thm.Border).
 		Width(s.width).
 		Padding(0)
 
 	titleStyle := lipgloss.NewStyle().
-		Foreground(colorAccent).
+		Foreground(s.thm.Accent).
 		Bold(true).
 		Border(lipgloss.NormalBorder(), false, false, true, false).
-		BorderForeground(colorBorderDim).
+		BorderForeground(s.thm.BorderDim).
 		Width(s.width-2).
 		Padding(0, 1).
 		Render("Select PR/MR to Create Worktree")
@@ -885,7 +903,7 @@ func (s *PRSelectionScreen) View() string {
 	inputStyle := lipgloss.NewStyle().
 		Padding(0, 1).
 		Width(s.width - 2).
-		Foreground(colorTextFg)
+		Foreground(s.thm.TextFg)
 
 	itemStyle := lipgloss.NewStyle().
 		Padding(0, 1).
@@ -894,14 +912,14 @@ func (s *PRSelectionScreen) View() string {
 	selectedStyle := lipgloss.NewStyle().
 		Padding(0, 1).
 		Width(s.width - 2).
-		Background(colorAccent).
-		Foreground(colorTextFg).
+		Background(s.thm.Accent).
+		Foreground(s.thm.TextFg).
 		Bold(true)
 
 	noResultsStyle := lipgloss.NewStyle().
 		Padding(0, 1).
 		Width(s.width - 2).
-		Foreground(colorMutedFg).
+		Foreground(s.thm.MutedFg).
 		Italic(true)
 
 	// Render Input
@@ -949,13 +967,13 @@ func (s *PRSelectionScreen) View() string {
 	// Separator
 	separator := lipgloss.NewStyle().
 		Border(lipgloss.NormalBorder(), false, false, true, false).
-		BorderForeground(colorBorderDim).
+		BorderForeground(s.thm.BorderDim).
 		Width(s.width - 2).
 		Render("")
 
 	// Footer
 	footerStyle := lipgloss.NewStyle().
-		Foreground(colorMutedFg).
+		Foreground(s.thm.MutedFg).
 		Align(lipgloss.Right).
 		Width(s.width - 2).
 		PaddingTop(1)
@@ -979,15 +997,15 @@ func (s *ListSelectionScreen) View() string {
 	// Styles
 	boxStyle := lipgloss.NewStyle().
 		Border(lipgloss.ThickBorder()).
-		BorderForeground(colorBorder).
+		BorderForeground(s.thm.Border).
 		Width(s.width).
 		Padding(0)
 
 	titleStyle := lipgloss.NewStyle().
-		Foreground(colorAccent).
+		Foreground(s.thm.Accent).
 		Bold(true).
 		Border(lipgloss.NormalBorder(), false, false, true, false).
-		BorderForeground(colorBorderDim).
+		BorderForeground(s.thm.BorderDim).
 		Width(s.width-2).
 		Padding(0, 1).
 		Render(s.title)
@@ -995,7 +1013,7 @@ func (s *ListSelectionScreen) View() string {
 	inputStyle := lipgloss.NewStyle().
 		Padding(0, 1).
 		Width(s.width - 2).
-		Foreground(colorTextFg)
+		Foreground(s.thm.TextFg)
 
 	itemStyle := lipgloss.NewStyle().
 		Padding(0, 1).
@@ -1004,20 +1022,20 @@ func (s *ListSelectionScreen) View() string {
 	selectedStyle := lipgloss.NewStyle().
 		Padding(0, 1).
 		Width(s.width - 2).
-		Background(colorAccent).
-		Foreground(colorTextFg).
+		Background(s.thm.Accent).
+		Foreground(s.thm.TextFg).
 		Bold(true)
 
 	descStyle := lipgloss.NewStyle().
-		Foreground(colorMutedFg)
+		Foreground(s.thm.MutedFg)
 
 	selectedDescStyle := lipgloss.NewStyle().
-		Foreground(colorTextFg)
+		Foreground(s.thm.TextFg)
 
 	noResultsStyle := lipgloss.NewStyle().
 		Padding(0, 1).
 		Width(s.width - 2).
-		Foreground(colorMutedFg).
+		Foreground(s.thm.MutedFg).
 		Italic(true)
 
 	// Render Input
@@ -1064,13 +1082,13 @@ func (s *ListSelectionScreen) View() string {
 	// Separator
 	separator := lipgloss.NewStyle().
 		Border(lipgloss.NormalBorder(), false, false, true, false).
-		BorderForeground(colorBorderDim).
+		BorderForeground(s.thm.BorderDim).
 		Width(s.width - 2).
 		Render("")
 
 	// Footer
 	footerStyle := lipgloss.NewStyle().
-		Foreground(colorMutedFg).
+		Foreground(s.thm.MutedFg).
 		Align(lipgloss.Right).
 		Width(s.width - 2).
 		PaddingTop(1)
@@ -1154,8 +1172,8 @@ func (s *HelpScreen) renderContent() string {
 
 	// Apply styling to help content
 	styledLines := []string{}
-	titleStyle := lipgloss.NewStyle().Foreground(colorAccent).Bold(true)
-	keyStyle := lipgloss.NewStyle().Foreground(colorSuccessFg)
+	titleStyle := lipgloss.NewStyle().Foreground(s.thm.Accent).Bold(true)
+	keyStyle := lipgloss.NewStyle().Foreground(s.thm.SuccessFg)
 
 	for _, line := range lines {
 		// Style section headers (lines that start with **)
@@ -1183,7 +1201,7 @@ func (s *HelpScreen) renderContent() string {
 	// Handle search filtering
 	if strings.TrimSpace(s.searchQuery) != "" {
 		query := strings.ToLower(strings.TrimSpace(s.searchQuery))
-		highlightStyle := lipgloss.NewStyle().Foreground(colorTextFg).Background(colorAccent).Bold(true)
+		highlightStyle := lipgloss.NewStyle().Foreground(s.thm.TextFg).Background(s.thm.Accent).Bold(true)
 		filteredLines := []string{}
 		for _, line := range styledLines {
 			lower := strings.ToLower(line)
@@ -1239,15 +1257,15 @@ func (s *HelpScreen) View() string {
 	// Styles
 	boxStyle := lipgloss.NewStyle().
 		Border(lipgloss.ThickBorder()).
-		BorderForeground(colorBorder).
+		BorderForeground(s.thm.Border).
 		Width(s.width).
 		Padding(0)
 
 	titleStyle := lipgloss.NewStyle().
-		Foreground(colorAccent).
+		Foreground(s.thm.Accent).
 		Bold(true).
 		Border(lipgloss.NormalBorder(), false, false, true, false).
-		BorderForeground(colorBorderDim).
+		BorderForeground(s.thm.BorderDim).
 		Width(s.width-2).
 		Padding(0, 1).
 		Render("Help")
@@ -1263,14 +1281,14 @@ func (s *HelpScreen) View() string {
 		// Add separator after search
 		searchView += "\n" + lipgloss.NewStyle().
 			Border(lipgloss.NormalBorder(), false, false, true, false).
-			BorderForeground(colorBorderDim).
+			BorderForeground(s.thm.BorderDim).
 			Width(s.width-2).
 			Render("")
 	}
 
 	// Footer
 	footerStyle := lipgloss.NewStyle().
-		Foreground(colorMutedFg).
+		Foreground(s.thm.MutedFg).
 		Align(lipgloss.Left).
 		Width(s.width - 2).
 		PaddingTop(1)
@@ -1301,14 +1319,14 @@ func (s *CommandPaletteScreen) View() string {
 	// Styles
 	boxStyle := lipgloss.NewStyle().
 		Border(lipgloss.ThickBorder()).
-		BorderForeground(colorBorder).
+		BorderForeground(s.thm.Border).
 		Width(width).
 		Padding(0)
 
 	inputStyle := lipgloss.NewStyle().
 		Padding(0, 1).
 		Width(width - 2).
-		Foreground(colorTextFg)
+		Foreground(s.thm.TextFg)
 
 	itemStyle := lipgloss.NewStyle().
 		Padding(0, 1).
@@ -1317,20 +1335,20 @@ func (s *CommandPaletteScreen) View() string {
 	selectedStyle := lipgloss.NewStyle().
 		Padding(0, 1).
 		Width(width - 2).
-		Background(colorAccent).
-		Foreground(colorTextFg).
+		Background(s.thm.Accent).
+		Foreground(s.thm.TextFg).
 		Bold(true)
 
 	descStyle := lipgloss.NewStyle().
-		Foreground(colorMutedFg)
+		Foreground(s.thm.MutedFg)
 
 	selectedDescStyle := lipgloss.NewStyle().
-		Foreground(colorTextFg)
+		Foreground(s.thm.TextFg)
 
 	noResultsStyle := lipgloss.NewStyle().
 		Padding(0, 1).
 		Width(width - 2).
-		Foreground(colorMutedFg).
+		Foreground(s.thm.MutedFg).
 		Italic(true)
 
 	// Render Input
@@ -1379,13 +1397,13 @@ func (s *CommandPaletteScreen) View() string {
 	// Separator
 	separator := lipgloss.NewStyle().
 		Border(lipgloss.NormalBorder(), false, false, true, false).
-		BorderForeground(colorBorderDim).
+		BorderForeground(s.thm.BorderDim).
 		Width(width - 2).
 		Render("")
 
 	// Footer
 	footerStyle := lipgloss.NewStyle().
-		Foreground(colorMutedFg).
+		Foreground(s.thm.MutedFg).
 		Align(lipgloss.Right).
 		Width(width - 2).
 		PaddingTop(1)
@@ -1403,20 +1421,20 @@ func (s *CommandPaletteScreen) View() string {
 
 // View renders the diff text inside a scrollable viewport.
 func (s *DiffScreen) View() string {
-	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(colorAccent)
+	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(s.thm.Accent)
 	title := titleStyle.Render(s.title)
 
 	content := lipgloss.JoinVertical(lipgloss.Left, title, "", s.viewport.View())
 	return lipgloss.NewStyle().
 		Border(lipgloss.ThickBorder()).
-		BorderForeground(colorBorder).
+		BorderForeground(s.thm.Border).
 		Padding(1, 2).
 		Width(maxInt(80, s.viewport.Width)).
 		Render(content)
 }
 
 // NewTrustScreen warns the user when a repo config has changed or is untrusted.
-func NewTrustScreen(filePath string, commands []string) *TrustScreen {
+func NewTrustScreen(filePath string, commands []string, thm *theme.Theme) *TrustScreen {
 	commandsText := strings.Join(commands, "\n")
 	question := fmt.Sprintf("The repository config '%s' defines the following commands.\nThis file has changed or hasn't been trusted yet.\nDo you trust these commands to run?", filePath)
 
@@ -1430,6 +1448,7 @@ func NewTrustScreen(filePath string, commands []string) *TrustScreen {
 		commands: commands,
 		viewport: vp,
 		result:   make(chan string, 1),
+		thm:      thm,
 	}
 }
 
@@ -1466,7 +1485,7 @@ func (s *TrustScreen) View() string {
 
 	boxStyle := lipgloss.NewStyle().
 		Border(lipgloss.ThickBorder()).
-		BorderForeground(colorBorder).
+		BorderForeground(s.thm.Border).
 		Padding(1, 2).
 		Width(width).
 		Height(height)
@@ -1478,15 +1497,15 @@ func (s *TrustScreen) View() string {
 		Margin(0, 1)
 
 	trustButton := buttonStyle.
-		Foreground(colorSuccessFg).
+		Foreground(s.thm.SuccessFg).
 		Render("[Trust & Run]")
 
 	blockButton := buttonStyle.
-		Foreground(colorWarnFg).
+		Foreground(s.thm.WarnFg).
 		Render("[Block (Skip)]")
 
 	cancelButton := buttonStyle.
-		Foreground(colorErrorFg).
+		Foreground(s.thm.ErrorFg).
 		Render("[Cancel Operation]")
 
 	content := fmt.Sprintf("%s\n\n%s  %s  %s",
@@ -1500,11 +1519,12 @@ func (s *TrustScreen) View() string {
 }
 
 // NewWelcomeScreen builds the greeting screen shown when no worktrees exist.
-func NewWelcomeScreen(currentDir, worktreeDir string) *WelcomeScreen {
+func NewWelcomeScreen(currentDir, worktreeDir string, thm *theme.Theme) *WelcomeScreen {
 	return &WelcomeScreen{
 		currentDir:  currentDir,
 		worktreeDir: worktreeDir,
 		result:      make(chan bool, 1),
+		thm:         thm,
 	}
 }
 
@@ -1536,14 +1556,14 @@ func (s *WelcomeScreen) View() string {
 
 	boxStyle := lipgloss.NewStyle().
 		Border(lipgloss.ThickBorder()).
-		BorderForeground(colorBorder).
+		BorderForeground(s.thm.Border).
 		Padding(1, 2).
 		Width(width).
 		Height(height)
 
 	titleStyle := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(colorAccent).
+		Foreground(s.thm.Accent).
 		Align(lipgloss.Center).
 		MarginBottom(1)
 
@@ -1558,11 +1578,11 @@ func (s *WelcomeScreen) View() string {
 		Margin(0, 1)
 
 	quitButton := buttonStyle.
-		Foreground(colorErrorFg).
+		Foreground(s.thm.ErrorFg).
 		Render("[Quit]")
 
 	retryButton := buttonStyle.
-		Foreground(colorAccent).
+		Foreground(s.thm.Accent).
 		Render("[Retry]")
 
 	message := fmt.Sprintf("No worktrees found.\n\nCurrent Directory: %s\nWorktree Root: %s\n\nPlease ensure you are in a git repository or the configured worktree root.\nYou may need to initialize a repository or configure 'worktree_dir' in config.",
@@ -1581,7 +1601,7 @@ func (s *WelcomeScreen) View() string {
 }
 
 // NewCommitScreen configures the commit detail viewer for the selected SHA.
-func NewCommitScreen(meta commitMeta, stat, diff string, useDelta bool) *CommitScreen {
+func NewCommitScreen(meta commitMeta, stat, diff string, useDelta bool, thm *theme.Theme) *CommitScreen {
 	vp := viewport.New(110, 60)
 
 	screen := &CommitScreen{
@@ -1590,6 +1610,7 @@ func NewCommitScreen(meta commitMeta, stat, diff string, useDelta bool) *CommitS
 		diff:     diff,
 		useDelta: useDelta,
 		viewport: vp,
+		thm:      thm,
 	}
 
 	screen.setViewportContent()
@@ -1650,10 +1671,10 @@ func (s *CommitScreen) buildBody() string {
 }
 
 func (s *CommitScreen) renderHeader() string {
-	label := lipgloss.NewStyle().Foreground(colorMutedFg).Bold(true)
-	value := lipgloss.NewStyle().Foreground(colorTextFg)
-	subjectStyle := lipgloss.NewStyle().Bold(true).Foreground(colorAccent)
-	bodyStyle := lipgloss.NewStyle().Foreground(colorMutedFg)
+	label := lipgloss.NewStyle().Foreground(s.thm.MutedFg).Bold(true)
+	value := lipgloss.NewStyle().Foreground(s.thm.TextFg)
+	subjectStyle := lipgloss.NewStyle().Bold(true).Foreground(s.thm.Accent)
+	bodyStyle := lipgloss.NewStyle().Foreground(s.thm.MutedFg)
 
 	lines := []string{
 		fmt.Sprintf("%s %s", label.Render("Commit:"), value.Render(s.meta.sha)),
@@ -1686,7 +1707,7 @@ func (s *CommitScreen) View() string {
 
 	boxStyle := lipgloss.NewStyle().
 		Border(lipgloss.ThickBorder()).
-		BorderForeground(colorBorder).
+		BorderForeground(s.thm.Border).
 		Padding(0, 1).
 		Width(width)
 

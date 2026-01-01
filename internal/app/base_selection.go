@@ -33,7 +33,7 @@ func (m *Model) showBaseSelection(defaultBase string) tea.Cmd {
 	}
 	title := "Select base for new worktree"
 
-	m.listScreen = NewListSelectionScreen(items, title, "Filter options...", "No base options available.", m.windowWidth, m.windowHeight, "")
+	m.listScreen = NewListSelectionScreen(items, title, "Filter options...", "No base options available.", m.windowWidth, m.windowHeight, "", m.theme)
 	m.listSubmit = func(item selectionItem) tea.Cmd {
 		switch item.id {
 		case "branch-list":
@@ -61,7 +61,7 @@ func (m *Model) showBaseSelection(defaultBase string) tea.Cmd {
 
 func (m *Model) showFreeformBaseInput(defaultBase string) tea.Cmd {
 	m.clearListSelection()
-	m.inputScreen = NewInputScreen("Base ref", defaultBase, defaultBase)
+	m.inputScreen = NewInputScreen("Base ref", defaultBase, defaultBase, m.theme)
 	m.inputSubmit = func(baseVal string) (tea.Cmd, bool) {
 		baseRef := strings.TrimSpace(baseVal)
 		if baseRef == "" {
@@ -81,7 +81,7 @@ func (m *Model) showFreeformBaseInput(defaultBase string) tea.Cmd {
 
 func (m *Model) showBranchSelection(title, placeholder, noResults, preferred string, onSelect func(string) tea.Cmd) tea.Cmd {
 	items := m.branchSelectionItems(preferred)
-	m.listScreen = NewListSelectionScreen(items, title, placeholder, noResults, m.windowWidth, m.windowHeight, preferred)
+	m.listScreen = NewListSelectionScreen(items, title, placeholder, noResults, m.windowWidth, m.windowHeight, preferred, m.theme)
 	m.listSubmit = func(item selectionItem) tea.Cmd {
 		return onSelect(item.id)
 	}
@@ -113,7 +113,7 @@ func (m *Model) showCommitSelection(baseBranch string) tea.Cmd {
 	title := fmt.Sprintf("Select commit from %q", baseBranch)
 	noResults := fmt.Sprintf("No commits found on %s.", baseBranch)
 
-	m.listScreen = NewListSelectionScreen(items, title, "Filter commits...", noResults, m.windowWidth, m.windowHeight, "")
+	m.listScreen = NewListSelectionScreen(items, title, "Filter commits...", noResults, m.windowWidth, m.windowHeight, "", m.theme)
 	m.listSubmit = func(item selectionItem) tea.Cmd {
 		m.clearListSelection()
 		commit, ok := commitLookup[item.id]
@@ -155,7 +155,7 @@ func (m *Model) showBranchNameInput(baseRef, defaultName string) tea.Cmd {
 	if suggested != "" {
 		suggested = m.suggestBranchName(suggested)
 	}
-	m.inputScreen = NewInputScreen("Create worktree: branch name", "feature/my-branch", suggested)
+	m.inputScreen = NewInputScreen("Create worktree: branch name", "feature/my-branch", suggested, m.theme)
 	m.inputSubmit = func(value string) (tea.Cmd, bool) {
 		newBranch := strings.TrimSpace(value)
 		if newBranch == "" {

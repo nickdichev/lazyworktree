@@ -444,7 +444,7 @@ func TestCommitScreenEscapeKey(t *testing.T) {
 
 	// Set up the commit screen
 	m.currentScreen = screenCommit
-	m.commitScreen = NewCommitScreen(commitMeta{sha: "abc123"}, "stat", "diff", false)
+	m.commitScreen = NewCommitScreen(commitMeta{sha: "abc123"}, "stat", "diff", false, m.theme)
 
 	// Simulate pressing ESC
 	escMsg := tea.KeyMsg{Type: tea.KeyEsc}
@@ -482,7 +482,7 @@ func TestCommitScreenRawEscapeKey(t *testing.T) {
 
 	// Set up the commit screen
 	m.currentScreen = screenCommit
-	m.commitScreen = NewCommitScreen(commitMeta{sha: "abc123"}, "stat", "diff", false)
+	m.commitScreen = NewCommitScreen(commitMeta{sha: "abc123"}, "stat", "diff", false, m.theme)
 
 	// Simulate pressing ESC as a raw rune (how some terminals send it)
 	rawEscMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{0x1b}}

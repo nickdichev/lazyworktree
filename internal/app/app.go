@@ -26,6 +26,7 @@ import (
 	"github.com/chmouel/lazyworktree/internal/git"
 	"github.com/chmouel/lazyworktree/internal/models"
 	"github.com/chmouel/lazyworktree/internal/security"
+	"github.com/chmouel/lazyworktree/internal/theme"
 	"github.com/muesli/reflow/wrap"
 )
 
@@ -133,24 +134,12 @@ const (
 	mainWorktreeName  = "main"
 )
 
-var (
-	// Dracula Theme Palette
-	colorAccent    = lipgloss.Color("#BD93F9") // Purple
-	colorAccentDim = lipgloss.Color("#44475A") // Current Line / Selection
-	colorBorder    = lipgloss.Color("#BD93F9") // Purple
-	colorBorderDim = lipgloss.Color("#6272A4") // Comment
-	colorMutedFg   = lipgloss.Color("#6272A4") // Comment
-	colorTextFg    = lipgloss.Color("#F8F8F2") // Foreground
-	colorSuccessFg = lipgloss.Color("#50FA7B") // Green
-	colorWarnFg    = lipgloss.Color("#FFB86C") // Orange
-	colorErrorFg   = lipgloss.Color("#FF5555") // Red
-)
-
 // Model represents the main application model
 type Model struct {
 	// Configuration
 	config *config.AppConfig
 	git    *git.Service
+	theme  *theme.Theme
 
 	// UI Components
 	worktreeTable  table.Model
@@ -239,6 +228,9 @@ type Model struct {
 func NewModel(cfg *config.AppConfig, initialFilter string) *Model {
 	ctx, cancel := context.WithCancel(context.Background())
 
+	// Load theme
+	thm := theme.GetTheme(cfg.Theme)
+
 	var debugLogFile *os.File
 	var debugLogger *log.Logger
 	var debugMu sync.Mutex
@@ -285,7 +277,7 @@ func NewModel(cfg *config.AppConfig, initialFilter string) *Model {
 	trustManager := security.NewTrustManager()
 
 	columns := []table.Column{
-		{Title: "Worktree", Width: 20},
+		{Title: "Name", Width: 20},
 		{Title: "Status", Width: 8},
 		{Title: "±", Width: 10},
 		{Title: "Last Active", Width: 20},
@@ -300,13 +292,13 @@ func NewModel(cfg *config.AppConfig, initialFilter string) *Model {
 	s := table.DefaultStyles()
 	s.Header = s.Header.
 		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(colorBorderDim).
+		BorderForeground(thm.BorderDim).
 		BorderBottom(true).
 		Bold(true).
-		Foreground(colorAccent)
+		Foreground(thm.Cyan)
 	s.Selected = s.Selected.
-		Foreground(colorTextFg).
-		Background(colorAccentDim). // Use darker selection color for better contrast
+		Foreground(thm.TextFg).
+		Background(thm.AccentDim).
 		Bold(true)
 	t.SetStyles(s)
 
@@ -327,16 +319,17 @@ func NewModel(cfg *config.AppConfig, initialFilter string) *Model {
 	filterInput := textinput.New()
 	filterInput.Placeholder = "Filter worktrees..."
 	filterInput.Width = 50
-	filterInput.PromptStyle = lipgloss.NewStyle().Foreground(colorAccent)
-	filterInput.TextStyle = lipgloss.NewStyle().Foreground(colorTextFg)
+	filterInput.PromptStyle = lipgloss.NewStyle().Foreground(thm.Accent)
+	filterInput.TextStyle = lipgloss.NewStyle().Foreground(thm.TextFg)
 
 	sp := spinner.New()
 	sp.Spinner = spinner.Pulse
-	sp.Style = lipgloss.NewStyle().Foreground(colorAccent)
+	sp.Style = lipgloss.NewStyle().Foreground(thm.Accent)
 
 	m := &Model{
 		config:          cfg,
 		git:             gitService,
+		theme:           thm,
 		worktreeTable:   t,
 		statusViewport:  statusVp,
 		logTable:        logT,
@@ -453,11 +446,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case commitLoadingMsg:
 		m.currentScreen = screenCommit
-		m.commitScreen = NewCommitScreen(msg.meta, "Loading…", "", m.git.UseDelta())
+		m.commitScreen = NewCommitScreen(msg.meta, "Loading…", "", m.git.UseDelta(), m.theme)
 		return m, nil
 
 	case commitLoadedMsg:
-		m.commitScreen = NewCommitScreen(msg.meta, msg.stat, msg.diff, m.git.UseDelta())
+		m.commitScreen = NewCommitScreen(msg.meta, msg.stat, msg.diff, m.git.UseDelta(), m.theme)
 		m.currentScreen = screenCommit
 		return m, nil
 	}
@@ -605,7 +598,7 @@ func (m *Model) handleBuiltInKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "?":
 		m.currentScreen = screenHelp
-		m.helpScreen = NewHelpScreen(m.windowWidth, m.windowHeight, m.config.CustomCommands)
+		m.helpScreen = NewHelpScreen(m.windowWidth, m.windowHeight, m.config.CustomCommands, m.theme)
 		return m, nil
 
 	case "g":
@@ -765,7 +758,7 @@ func (m *Model) handleWorktreesLoaded(msg worktreesLoadedMsg) (tea.Model, tea.Cm
 	m.saveCache()
 	if len(m.worktrees) == 0 {
 		cwd, _ := os.Getwd()
-		m.welcomeScreen = NewWelcomeScreen(cwd, m.getWorktreeDir())
+		m.welcomeScreen = NewWelcomeScreen(cwd, m.getWorktreeDir(), m.theme)
 		m.currentScreen = screenWelcome
 		return m, nil
 	}
@@ -1440,7 +1433,7 @@ func (m *Model) handleOpenPRsLoaded(msg openPRsLoadedMsg) tea.Cmd {
 	}
 
 	// Show PR selection screen
-	m.prSelectionScreen = NewPRSelectionScreen(msg.prs, m.windowWidth, m.windowHeight)
+	m.prSelectionScreen = NewPRSelectionScreen(msg.prs, m.windowWidth, m.windowHeight, m.theme)
 	m.prSelectionSubmit = func(pr *models.PRInfo) tea.Cmd {
 		// Generate worktree name
 		generatedName := generatePRWorktreeName(pr)
@@ -1450,6 +1443,7 @@ func (m *Model) handleOpenPRsLoaded(msg openPRsLoadedMsg) tea.Cmd {
 			fmt.Sprintf("Create worktree from PR #%d", pr.Number),
 			"Worktree name",
 			generatedName,
+			m.theme,
 		)
 		m.inputSubmit = func(value string) (tea.Cmd, bool) {
 			newBranch := strings.TrimSpace(value)
@@ -1563,7 +1557,7 @@ func (m *Model) handleCreateFromChangesReady(msg createFromChangesReadyMsg) tea.
 	}
 
 	// Show input screen for worktree name
-	m.inputScreen = NewInputScreen("Create worktree from changes: branch name", "feature/my-branch", defaultName)
+	m.inputScreen = NewInputScreen("Create worktree from changes: branch name", "feature/my-branch", defaultName, m.theme)
 	m.inputSubmit = func(value string) (tea.Cmd, bool) {
 		newBranch := strings.TrimSpace(value)
 		if newBranch == "" {
@@ -1670,7 +1664,7 @@ func (m *Model) showDeleteWorktree() tea.Cmd {
 	if wt.IsMain {
 		return nil
 	}
-	m.confirmScreen = NewConfirmScreen(fmt.Sprintf("Delete worktree?\n\nPath: %s\nBranch: %s", wt.Path, wt.Branch))
+	m.confirmScreen = NewConfirmScreen(fmt.Sprintf("Delete worktree?\n\nPath: %s\nBranch: %s", wt.Path, wt.Branch), m.theme)
 	m.confirmAction = m.deleteWorktreeCmd(wt)
 	m.currentScreen = screenConfirm
 	return nil
@@ -1691,7 +1685,7 @@ func (m *Model) showDiff() tea.Cmd {
 			}
 		}
 		diff = m.git.ApplyDelta(m.ctx, diff)
-		m.diffScreen = NewDiffScreen(fmt.Sprintf("Diff for %s", wt.Branch), diff)
+		m.diffScreen = NewDiffScreen(fmt.Sprintf("Diff for %s", wt.Branch), diff, m.theme)
 		m.currentScreen = screenDiff
 		return nil
 	}
@@ -1709,7 +1703,7 @@ func (m *Model) showRenameWorktree() tea.Cmd {
 	}
 
 	prompt := fmt.Sprintf("Enter new name for '%s'", wt.Branch)
-	m.inputScreen = NewInputScreen(prompt, "New branch name", wt.Branch)
+	m.inputScreen = NewInputScreen(prompt, "New branch name", wt.Branch, m.theme)
 	m.inputSubmit = func(value string) (tea.Cmd, bool) {
 		newBranch := strings.TrimSpace(value)
 		if newBranch == "" {
@@ -1777,7 +1771,7 @@ func (m *Model) showPruneMerged() tea.Cmd {
 		lines = append(lines, fmt.Sprintf("...and %d more", len(merged)-limit))
 	}
 
-	m.confirmScreen = NewConfirmScreen("Prune merged PR worktrees?\n\n" + strings.Join(lines, "\n"))
+	m.confirmScreen = NewConfirmScreen("Prune merged PR worktrees?\n\n"+strings.Join(lines, "\n"), m.theme)
 	m.confirmAction = func() tea.Cmd {
 		// Collect terminate commands once (same for all worktrees in this repo)
 		terminateCmds := m.collectTerminateCommands()
@@ -1843,7 +1837,7 @@ func (m *Model) showAbsorbWorktree() tea.Cmd {
 		return nil
 	}
 
-	m.confirmScreen = NewConfirmScreen(fmt.Sprintf("Absorb worktree into %s?\n\nPath: %s\nBranch: %s -> %s", mainBranch, wt.Path, wt.Branch, mainBranch))
+	m.confirmScreen = NewConfirmScreen(fmt.Sprintf("Absorb worktree into %s?\n\nPath: %s\nBranch: %s -> %s", mainBranch, wt.Path, wt.Branch, mainBranch), m.theme)
 	m.confirmAction = func() tea.Cmd {
 		return func() tea.Msg {
 			if !m.git.RunCommandChecked(m.ctx, []string{"git", "-C", mainPath, "merge", "--no-edit", wt.Branch}, "", fmt.Sprintf("Failed to merge %s into %s", wt.Branch, mainBranch)) {
@@ -1881,7 +1875,7 @@ func (m *Model) showCommandPalette() tea.Cmd {
 	}
 	items = append(items, m.customPaletteItems()...)
 
-	m.paletteScreen = NewCommandPaletteScreen(items)
+	m.paletteScreen = NewCommandPaletteScreen(items, m.theme)
 	m.paletteSubmit = func(action string) tea.Cmd {
 		m.debugf("palette action: %s", action)
 		if _, ok := m.config.CustomCommands[action]; ok {
@@ -2175,7 +2169,7 @@ func (m *Model) handleScreenKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch m.currentScreen {
 	case screenHelp:
 		if m.helpScreen == nil {
-			m.helpScreen = NewHelpScreen(m.windowWidth, m.windowHeight, m.config.CustomCommands)
+			m.helpScreen = NewHelpScreen(m.windowWidth, m.windowHeight, m.config.CustomCommands, m.theme)
 		}
 		keyStr := msg.String()
 		if keyStr == keyQ || isEscKey(keyStr) {
@@ -2430,7 +2424,7 @@ func (m *Model) renderScreen() string {
 	switch m.currentScreen {
 	case screenCommit:
 		if m.commitScreen == nil {
-			m.commitScreen = NewCommitScreen(commitMeta{}, "", "", m.git.UseDelta())
+			m.commitScreen = NewCommitScreen(commitMeta{}, "", "", m.git.UseDelta(), m.theme)
 		}
 		return m.commitScreen.View()
 	case screenConfirm:
@@ -2445,7 +2439,7 @@ func (m *Model) renderScreen() string {
 	case screenWelcome:
 		if m.welcomeScreen == nil {
 			cwd, _ := os.Getwd()
-			m.welcomeScreen = NewWelcomeScreen(cwd, m.getWorktreeDir())
+			m.welcomeScreen = NewWelcomeScreen(cwd, m.getWorktreeDir(), m.theme)
 		}
 		return m.welcomeScreen.View()
 	case screenPalette:
@@ -2702,7 +2696,7 @@ func (m *Model) runCommandsWithTrust(cmds []string, cwd string, env map[string]s
 		m.pendingCmdCwd = cwd
 		m.pendingAfter = after
 		m.pendingTrust = trustPath
-		m.trustScreen = NewTrustScreen(trustPath, cmds)
+		m.trustScreen = NewTrustScreen(trustPath, cmds, m.theme)
 		m.currentScreen = screenTrust
 	}
 	return nil
@@ -2849,8 +2843,8 @@ func (m *Model) computeLayout() layoutDims {
 		rightTopHeight = bodyHeight - rightBottomHeight - gapY
 	}
 
-	paneFrameX := basePaneStyle().GetHorizontalFrameSize()
-	paneFrameY := basePaneStyle().GetVerticalFrameSize()
+	paneFrameX := m.basePaneStyle().GetHorizontalFrameSize()
+	paneFrameY := m.basePaneStyle().GetVerticalFrameSize()
 
 	leftInnerWidth := maxInt(1, leftWidth-paneFrameX)
 	rightInnerWidth := maxInt(1, rightWidth-paneFrameX)
@@ -2900,14 +2894,14 @@ func (m *Model) applyLayout(layout layoutDims) {
 func (m *Model) renderHeader(layout layoutDims) string {
 	// Create a "toolbar" style header
 	headerStyle := lipgloss.NewStyle().
-		Background(colorAccent).
-		Foreground(colorAccentDim).
+		Background(m.theme.Accent).
+		Foreground(m.theme.AccentDim).
 		Bold(true).
 		Width(layout.width).
 		Padding(0, 1)
 
 	title := "Git Worktree Status"
-	repoStyle := lipgloss.NewStyle().Italic(true).Foreground(colorAccentDim)
+	repoStyle := lipgloss.NewStyle().Italic(true).Foreground(m.theme.AccentDim)
 	repoKey := strings.TrimSpace(m.repoKey)
 	content := title
 	if repoKey != "" && repoKey != "unknown" && !strings.HasPrefix(repoKey, "local-") {
@@ -2918,9 +2912,9 @@ func (m *Model) renderHeader(layout layoutDims) string {
 }
 
 func (m *Model) renderFilter(layout layoutDims) string {
-	labelStyle := lipgloss.NewStyle().Foreground(colorAccent).Bold(true)
+	labelStyle := lipgloss.NewStyle().Foreground(m.theme.Accent).Bold(true)
 	filterStyle := lipgloss.NewStyle().
-		Foreground(colorTextFg).
+		Foreground(m.theme.TextFg).
 		Padding(0, 1)
 	line := fmt.Sprintf("%s %s", labelStyle.Render("/ Filter:"), m.filterInput.View())
 	return filterStyle.Width(layout.width).Render(line)
@@ -2939,7 +2933,7 @@ func (m *Model) renderLeftPane(layout layoutDims) string {
 	title := m.renderPaneTitle(1, "Worktrees", m.focusedPane == 0, layout.leftInnerWidth)
 	tableView := m.worktreeTable.View()
 	content := lipgloss.JoinVertical(lipgloss.Left, title, tableView)
-	return paneStyle(m.focusedPane == 0).
+	return m.paneStyle(m.focusedPane == 0).
 		Width(layout.leftWidth).
 		Height(layout.bodyHeight).
 		Render(content)
@@ -2956,7 +2950,7 @@ func (m *Model) renderRightTopPane(layout layoutDims) string {
 	title := m.renderPaneTitle(2, "Info/Diff", m.focusedPane == 1, layout.rightInnerWidth)
 	infoBox := m.renderInnerBox("Info", m.infoContent, layout.rightInnerWidth, 0)
 
-	innerBoxStyle := baseInnerBoxStyle()
+	innerBoxStyle := m.baseInnerBoxStyle()
 	statusBoxHeight := layout.rightTopInnerHeight - lipgloss.Height(title) - lipgloss.Height(infoBox) - 2
 	if statusBoxHeight < 3 {
 		statusBoxHeight = 3
@@ -2977,7 +2971,7 @@ func (m *Model) renderRightTopPane(layout layoutDims) string {
 		infoBox,
 		statusBox,
 	)
-	return paneStyle(m.focusedPane == 1).
+	return m.paneStyle(m.focusedPane == 1).
 		Width(layout.rightWidth).
 		Height(layout.rightTopHeight).
 		Render(content)
@@ -2986,7 +2980,7 @@ func (m *Model) renderRightTopPane(layout layoutDims) string {
 func (m *Model) renderRightBottomPane(layout layoutDims) string {
 	title := m.renderPaneTitle(3, "Log", m.focusedPane == 2, layout.rightInnerWidth)
 	content := lipgloss.JoinVertical(lipgloss.Left, title, m.logTable.View())
-	return paneStyle(m.focusedPane == 2).
+	return m.paneStyle(m.focusedPane == 2).
 		Width(layout.rightWidth).
 		Height(layout.rightBottomHeight).
 		Render(content)
@@ -2994,7 +2988,8 @@ func (m *Model) renderRightBottomPane(layout layoutDims) string {
 
 func (m *Model) renderFooter(layout layoutDims) string {
 	footerStyle := lipgloss.NewStyle().
-		Foreground(colorMutedFg).
+		Foreground(m.theme.MutedFg).
+		Background(m.theme.Background).
 		Padding(0, 1)
 	hints := []string{
 		m.renderKeyHint("1-3", "Pane Focus"),
@@ -3057,17 +3052,17 @@ func (m *Model) customFooterHints() []string {
 }
 
 func (m *Model) renderKeyHint(key, label string) string {
-	keyStyle := lipgloss.NewStyle().Foreground(colorAccent).Bold(true)
-	labelStyle := lipgloss.NewStyle().Foreground(colorMutedFg)
+	keyStyle := lipgloss.NewStyle().Foreground(m.theme.Accent).Bold(true)
+	labelStyle := lipgloss.NewStyle().Foreground(m.theme.MutedFg)
 	return fmt.Sprintf("%s %s", keyStyle.Render(key), labelStyle.Render(label))
 }
 
 func (m *Model) renderPaneTitle(index int, title string, focused bool, width int) string {
-	numStyle := lipgloss.NewStyle().Foreground(colorAccentDim)
-	titleStyle := lipgloss.NewStyle().Foreground(colorMutedFg)
+	numStyle := lipgloss.NewStyle().Foreground(m.theme.MutedFg)
+	titleStyle := lipgloss.NewStyle().Foreground(m.theme.MutedFg)
 	if focused {
-		numStyle = numStyle.Foreground(colorAccent).Bold(true)
-		titleStyle = titleStyle.Foreground(colorTextFg)
+		numStyle = numStyle.Foreground(m.theme.Accent).Bold(true)
+		titleStyle = titleStyle.Foreground(m.theme.TextFg)
 	}
 	num := numStyle.Render(fmt.Sprintf("[%d]", index))
 	name := titleStyle.Render(title)
@@ -3079,9 +3074,9 @@ func (m *Model) renderInnerBox(title, content string, width, height int) string 
 		content = "No data available."
 	}
 
-	titleStyle := lipgloss.NewStyle().Foreground(colorMutedFg).Bold(true)
+	titleStyle := lipgloss.NewStyle().Foreground(m.theme.MutedFg).Bold(true)
 
-	style := baseInnerBoxStyle().Width(width)
+	style := m.baseInnerBoxStyle().Width(width)
 	if height > 0 {
 		style = style.Height(height)
 	}
@@ -3098,8 +3093,8 @@ func (m *Model) buildInfoContent(wt *models.WorktreeInfo) string {
 		return errNoWorktreeSelected
 	}
 
-	labelStyle := lipgloss.NewStyle().Foreground(colorAccent).Bold(true)
-	valueStyle := lipgloss.NewStyle().Foreground(colorTextFg)
+	labelStyle := lipgloss.NewStyle().Foreground(m.theme.Cyan).Bold(true)
+	valueStyle := lipgloss.NewStyle().Foreground(m.theme.TextFg)
 
 	infoLines := []string{
 		fmt.Sprintf("%s %s", labelStyle.Render("Path:"), valueStyle.Render(wt.Path)),
@@ -3107,16 +3102,15 @@ func (m *Model) buildInfoContent(wt *models.WorktreeInfo) string {
 	}
 	if wt.Divergence != "" {
 		// Colorize arrows to match Python: cyan ↑, red ↓
-		cyanStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("6")) // cyan
-		redStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("1"))  // red
-		coloredDiv := strings.ReplaceAll(wt.Divergence, "↑", cyanStyle.Render("↑"))
-		coloredDiv = strings.ReplaceAll(coloredDiv, "↓", redStyle.Render("↓"))
+		coloredDiv := strings.ReplaceAll(wt.Divergence, "↑", lipgloss.NewStyle().Foreground(m.theme.Cyan).Render("↑"))
+		coloredDiv = strings.ReplaceAll(coloredDiv, "↓", lipgloss.NewStyle().Foreground(m.theme.ErrorFg).Render("↓"))
 		infoLines = append(infoLines, fmt.Sprintf("%s %s", labelStyle.Render("Divergence:"), coloredDiv))
 	}
 	if wt.PR != nil {
 		// Match Python: white number, colored state (green=OPEN, magenta=MERGED, red=else)
-		whiteStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("15")) // white
-		stateColor := lipgloss.Color("2")                                  // green for OPEN
+		prLabelStyle := lipgloss.NewStyle().Foreground(m.theme.Pink).Bold(true) // Pink for PR prominence
+		whiteStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("15"))      // white
+		stateColor := lipgloss.Color("2")                                       // green for OPEN
 		switch wt.PR.State {
 		case "MERGED":
 			stateColor = lipgloss.Color("5") // magenta
@@ -3126,12 +3120,12 @@ func (m *Model) buildInfoContent(wt *models.WorktreeInfo) string {
 		stateStyle := lipgloss.NewStyle().Foreground(stateColor)
 		// Format: PR: #123 Title [STATE] (matches Python grid layout)
 		infoLines = append(infoLines, fmt.Sprintf("%s %s %s [%s]",
-			labelStyle.Render("PR:"),
+			prLabelStyle.Render("PR:"),
 			whiteStyle.Render(fmt.Sprintf("#%d", wt.PR.Number)),
 			wt.PR.Title,
 			stateStyle.Render(wt.PR.State)))
-		// URL styled with blue underline to match Python version
-		urlStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Underline(true)
+		// URL styled with cyan for consistency
+		urlStyle := lipgloss.NewStyle().Foreground(m.theme.Cyan).Underline(true)
 		infoLines = append(infoLines, fmt.Sprintf("     %s", urlStyle.Render(wt.PR.URL)))
 
 		// CI status from cache
@@ -3139,10 +3133,10 @@ func (m *Model) buildInfoContent(wt *models.WorktreeInfo) string {
 			infoLines = append(infoLines, "") // blank line before CI
 			infoLines = append(infoLines, labelStyle.Render("CI Checks:"))
 
-			greenStyle := lipgloss.NewStyle().Foreground(colorSuccessFg)
-			redStyle := lipgloss.NewStyle().Foreground(colorErrorFg)
-			yellowStyle := lipgloss.NewStyle().Foreground(colorWarnFg)
-			grayStyle := lipgloss.NewStyle().Foreground(colorMutedFg)
+			greenStyle := lipgloss.NewStyle().Foreground(m.theme.SuccessFg)
+			redStyle := lipgloss.NewStyle().Foreground(m.theme.ErrorFg)
+			yellowStyle := lipgloss.NewStyle().Foreground(m.theme.WarnFg)
+			grayStyle := lipgloss.NewStyle().Foreground(m.theme.MutedFg)
 
 			for _, check := range cached.checks {
 				var symbol, styledSymbol string
@@ -3176,13 +3170,13 @@ func (m *Model) buildInfoContent(wt *models.WorktreeInfo) string {
 func (m *Model) buildStatusContent(statusRaw string) string {
 	statusRaw = strings.TrimRight(statusRaw, "\n")
 	if strings.TrimSpace(statusRaw) == "" {
-		return lipgloss.NewStyle().Foreground(colorSuccessFg).Render("Clean working tree")
+		return lipgloss.NewStyle().Foreground(m.theme.SuccessFg).Render("Clean working tree")
 	}
 
-	modifiedStyle := lipgloss.NewStyle().Foreground(colorWarnFg)
-	addedStyle := lipgloss.NewStyle().Foreground(colorSuccessFg)
-	deletedStyle := lipgloss.NewStyle().Foreground(colorErrorFg)
-	untrackedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("243"))
+	modifiedStyle := lipgloss.NewStyle().Foreground(m.theme.WarnFg)
+	addedStyle := lipgloss.NewStyle().Foreground(m.theme.SuccessFg)
+	deletedStyle := lipgloss.NewStyle().Foreground(m.theme.ErrorFg)
+	untrackedStyle := lipgloss.NewStyle().Foreground(m.theme.Yellow)
 
 	lines := []string{}
 	for _, line := range strings.Split(statusRaw, "\n") {
@@ -3351,17 +3345,17 @@ func (m *Model) updateLogColumns(totalWidth int) {
 	})
 }
 
-func basePaneStyle() lipgloss.Style {
+func (m *Model) basePaneStyle() lipgloss.Style {
 	return lipgloss.NewStyle().
 		Border(lipgloss.ThickBorder()).
-		BorderForeground(colorBorderDim).
+		BorderForeground(m.theme.BorderDim).
 		Padding(0, 1)
 }
 
-func paneStyle(focused bool) lipgloss.Style {
-	borderColor := colorBorderDim
+func (m *Model) paneStyle(focused bool) lipgloss.Style {
+	borderColor := m.theme.BorderDim
 	if focused {
-		borderColor = colorAccent
+		borderColor = m.theme.Accent
 	}
 	return lipgloss.NewStyle().
 		Border(lipgloss.NormalBorder()).
@@ -3369,10 +3363,10 @@ func paneStyle(focused bool) lipgloss.Style {
 		Padding(0, 1)
 }
 
-func baseInnerBoxStyle() lipgloss.Style {
+func (m *Model) baseInnerBoxStyle() lipgloss.Style {
 	return lipgloss.NewStyle().
 		Border(lipgloss.ThickBorder()).
-		BorderForeground(colorBorderDim).
+		BorderForeground(m.theme.BorderDim).
 		Padding(0, 1)
 }
 

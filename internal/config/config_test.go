@@ -474,6 +474,37 @@ func TestParseConfig(t *testing.T) {
 			},
 		},
 		{
+			name: "theme lazygit sets default delta args when unset",
+			data: map[string]interface{}{
+				"theme": "lazygit",
+			},
+			validate: func(t *testing.T, cfg *AppConfig) {
+				assert.Equal(t, "lazygit", cfg.Theme)
+				assert.Equal(t, []string{"--syntax-theme", "OneHalfDark"}, cfg.DeltaArgs)
+			},
+		},
+		{
+			name: "theme light sets default delta args when unset",
+			data: map[string]interface{}{
+				"theme": "light",
+			},
+			validate: func(t *testing.T, cfg *AppConfig) {
+				assert.Equal(t, "light", cfg.Theme)
+				assert.Equal(t, []string{"--syntax-theme", "GitHub"}, cfg.DeltaArgs)
+			},
+		},
+		{
+			name: "custom delta_args not overridden by theme",
+			data: map[string]interface{}{
+				"theme":      "lazygit",
+				"delta_args": "--syntax-theme Nord",
+			},
+			validate: func(t *testing.T, cfg *AppConfig) {
+				assert.Equal(t, "lazygit", cfg.Theme)
+				assert.Equal(t, []string{"--syntax-theme", "Nord"}, cfg.DeltaArgs)
+			},
+		},
+		{
 			name: "negative max_untracked_diffs becomes 0",
 			data: map[string]interface{}{
 				"max_untracked_diffs": -5,

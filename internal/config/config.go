@@ -35,6 +35,7 @@ type AppConfig struct {
 	DebugLog          string
 	CustomCommands    map[string]*CustomCommand
 	BranchNameScript  string // Script to generate branch name suggestions from diff
+	Theme             string // Theme name: "dracula", "lazygit", or "light"
 }
 
 // RepoConfig represents repository-scoped commands from .wt
@@ -51,9 +52,10 @@ func DefaultConfig() *AppConfig {
 		AutoFetchPRs:      false,
 		MaxUntrackedDiffs: 10,
 		MaxDiffChars:      200000,
-		DeltaArgs:         []string{"--syntax-theme", "Dracula"},
+		DeltaArgs:         defaultDeltaArgsForTheme("dracula"),
 		DeltaPath:         "delta",
 		TrustMode:         "tofu",
+		Theme:             "dracula",
 		CustomCommands:    make(map[string]*CustomCommand),
 	}
 }
@@ -195,6 +197,7 @@ func parseCustomCommands(data map[string]any) map[string]*CustomCommand {
 
 func parseConfig(data map[string]any) *AppConfig {
 	cfg := DefaultConfig()
+	deltaArgsProvided := false
 
 	if worktreeDir, ok := data["worktree_dir"].(string); ok {
 		worktreeDir = strings.TrimSpace(worktreeDir)
@@ -218,6 +221,7 @@ func parseConfig(data map[string]any) *AppConfig {
 	cfg.MaxDiffChars = coerceInt(data["max_diff_chars"], 200000)
 	if _, ok := data["delta_args"]; ok {
 		cfg.DeltaArgs = normalizeArgsList(data["delta_args"])
+		deltaArgsProvided = true
 	}
 	if deltaPath, ok := data["delta_path"].(string); ok {
 		cfg.DeltaPath = strings.TrimSpace(deltaPath)
@@ -228,6 +232,17 @@ func parseConfig(data map[string]any) *AppConfig {
 		if trustMode == "tofu" || trustMode == "never" || trustMode == "always" {
 			cfg.TrustMode = trustMode
 		}
+	}
+
+	if theme, ok := data["theme"].(string); ok {
+		theme = strings.ToLower(strings.TrimSpace(theme))
+		if theme == "dracula" || theme == "lazygit" || theme == "light" {
+			cfg.Theme = theme
+		}
+	}
+
+	if !deltaArgsProvided {
+		cfg.DeltaArgs = defaultDeltaArgsForTheme(cfg.Theme)
 	}
 
 	if branchNameScript, ok := data["branch_name_script"].(string); ok {
@@ -365,4 +380,15 @@ func isPathWithin(base, target string) bool {
 		return false
 	}
 	return true
+}
+
+func defaultDeltaArgsForTheme(theme string) []string {
+	switch theme {
+	case "lazygit":
+		return []string{"--syntax-theme", "OneHalfDark"}
+	case "light":
+		return []string{"--syntax-theme", "GitHub"}
+	default:
+		return []string{"--syntax-theme", "Dracula"}
+	}
 }
