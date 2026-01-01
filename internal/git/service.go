@@ -949,40 +949,68 @@ func (s *Service) CreateWorktreeFromPR(ctx context.Context, prNumber int, remote
 // ResolveRepoName resolves the repository name using various methods
 // ResolveRepoName returns the repository identifier for caching purposes.
 func (s *Service) ResolveRepoName(ctx context.Context) string {
-	// Try gh repo view
-	out := s.RunGit(ctx, []string{"gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"}, "", []int{0}, true, true)
-	if out != "" {
-		return out
-	}
+	var repoName string
 
-	// Try glab repo view
-	out = s.RunGit(ctx, []string{"glab", "repo", "view", "-F", "json"}, "", []int{0}, false, true)
-	if out != "" {
-		var data map[string]any
-		if err := json.Unmarshal([]byte(out), &data); err == nil {
-			if path, ok := data["path_with_namespace"].(string); ok {
-				return path
+	// Try git remote get-url origin
+	remoteURL := s.RunGit(ctx, []string{"git", "remote", "get-url", "origin"}, "", []int{0}, true, true)
+
+	// Optimization: If it's a standard GitHub/GitLab URL, parse directly and avoid external tool overhead
+	if remoteURL != "" {
+		if strings.Contains(remoteURL, "github.com") {
+			re := regexp.MustCompile(`github\.com[:/](.+)(?:\.git)?$`)
+			matches := re.FindStringSubmatch(remoteURL)
+			if len(matches) > 1 {
+				repoName = matches[1]
+			}
+		} else if strings.Contains(remoteURL, "gitlab.com") {
+			re := regexp.MustCompile(`gitlab\.com[:/](.+)(?:\.git)?$`)
+			matches := re.FindStringSubmatch(remoteURL)
+			if len(matches) > 1 {
+				repoName = matches[1]
 			}
 		}
 	}
 
-	// Try git remote get-url origin
-	out = s.RunGit(ctx, []string{"git", "remote", "get-url", "origin"}, "", []int{0}, true, true)
-	if out != "" {
-		re := regexp.MustCompile(`[:/]([^/]+/[^/]+)(?:\.git)?$`)
-		matches := re.FindStringSubmatch(out)
-		if len(matches) > 1 {
-			return matches[1]
+	if repoName == "" {
+		// Try gh repo view
+		if out := s.RunGit(ctx, []string{"gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"}, "", []int{0}, true, true); out != "" {
+			repoName = out
 		}
 	}
 
-	// Try git rev-parse --show-toplevel
-	out = s.RunGit(ctx, []string{"git", "rev-parse", "--show-toplevel"}, "", []int{0}, true, true)
-	if out != "" {
-		return filepath.Base(out)
+	if repoName == "" {
+		// Try glab repo view
+		if out := s.RunGit(ctx, []string{"glab", "repo", "view", "-F", "json"}, "", []int{0}, false, true); out != "" {
+			var data map[string]any
+			if err := json.Unmarshal([]byte(out), &data); err == nil {
+				if path, ok := data["path_with_namespace"].(string); ok {
+					repoName = path
+				}
+			}
+		}
 	}
 
-	return "unknown"
+	if repoName == "" && remoteURL != "" {
+		// Fallback: Parse remote URL if we have it (even if not github/gitlab, maybe self-hosted?)
+		re := regexp.MustCompile(`[:/]([^/]+/[^/]+)(?:\.git)?$`)
+		matches := re.FindStringSubmatch(remoteURL)
+		if len(matches) > 1 {
+			repoName = matches[1]
+		}
+	}
+
+	if repoName == "" {
+		// Try git rev-parse --show-toplevel
+		if out := s.RunGit(ctx, []string{"git", "rev-parse", "--show-toplevel"}, "", []int{0}, true, true); out != "" {
+			repoName = filepath.Base(out)
+		}
+	}
+
+	if repoName == "" {
+		return "unknown"
+	}
+
+	return strings.TrimSuffix(repoName, ".git")
 }
 
 // BuildThreePartDiff assembles a comprehensive diff showing staged, modified, and untracked sections.
