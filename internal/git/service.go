@@ -3,12 +3,12 @@ package git
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"log"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"regexp"
 	"runtime"
 	"strconv"
@@ -946,7 +946,17 @@ func (s *Service) CreateWorktreeFromPR(ctx context.Context, prNumber int, remote
 	return true
 }
 
-// ResolveRepoName resolves the repository name using various methods
+// localRepoKey builds a stable, compact cache key when no remote name is available.
+func localRepoKey(path string) string {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return ""
+	}
+	sum := sha256.Sum256([]byte(path))
+	return fmt.Sprintf("local-%x", sum[:8])
+}
+
+// ResolveRepoName resolves the repository name using various methods.
 // ResolveRepoName returns the repository identifier for caching purposes.
 func (s *Service) ResolveRepoName(ctx context.Context) string {
 	var repoName string
@@ -1002,7 +1012,7 @@ func (s *Service) ResolveRepoName(ctx context.Context) string {
 	if repoName == "" {
 		// Try git rev-parse --show-toplevel
 		if out := s.RunGit(ctx, []string{"git", "rev-parse", "--show-toplevel"}, "", []int{0}, true, true); out != "" {
-			repoName = filepath.Base(out)
+			repoName = localRepoKey(out)
 		}
 	}
 

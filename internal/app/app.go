@@ -2922,7 +2922,7 @@ func (m *Model) renderHeader(layout layoutDims) string {
 	repoStyle := lipgloss.NewStyle().Italic(true).Foreground(colorAccentDim)
 	repoKey := strings.TrimSpace(m.repoKey)
 	content := title
-	if repoKey != "" && repoKey != "unknown" {
+	if repoKey != "" && repoKey != "unknown" && !strings.HasPrefix(repoKey, "local-") {
 		content = fmt.Sprintf("%s - %s", content, repoStyle.Render(repoKey))
 	}
 

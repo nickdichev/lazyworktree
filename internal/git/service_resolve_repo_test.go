@@ -88,4 +88,27 @@ func TestResolveRepoName(t *testing.T) {
 		name := service.ResolveRepoName(context.Background())
 		assert.Equal(t, "owner/repo", name)
 	})
+
+	t.Run("resolve local key when no remote is configured", func(t *testing.T) {
+		tmpDir := t.TempDir()
+
+		cmd := exec.Command("git", "init")
+		cmd.Dir = tmpDir
+		require.NoError(t, cmd.Run())
+
+		oldWd, err := os.Getwd()
+		require.NoError(t, err)
+		defer func() { _ = os.Chdir(oldWd) }()
+		require.NoError(t, os.Chdir(tmpDir))
+
+		notify := func(_ string, _ string) {}
+		notifyOnce := func(_ string, _ string, _ string) {}
+		service := NewService(notify, notifyOnce)
+
+		top := service.RunGit(context.Background(), []string{"git", "rev-parse", "--show-toplevel"}, "", []int{0}, true, true)
+		require.NotEmpty(t, top)
+
+		name := service.ResolveRepoName(context.Background())
+		assert.Equal(t, localRepoKey(top), name)
+	})
 }

@@ -271,7 +271,9 @@ custom_commands:
 
 Worktrees are expected to be organized under
 `~/.local/share/worktrees/<repo_name>` by default, though the script attempts
-to resolve locations via `gh repo view` or `glab repo view`.
+to resolve locations via `gh repo view` or `glab repo view`. If the repo name
+cannot be detected, lazyworktree falls back to a local `local-<hash>` key for
+cache and last-selected storage.
 
 ### Global Config (YAML)
 
@@ -358,7 +360,7 @@ branch_name_script: "aichat -m gemini:gemini-2.5-flash-lite 'Generate a short gi
 
 `lazyworktree` is designed to be super snappy:
 
-- **Caching**: It caches worktree metadata in `.worktree-cache.json` (located at `<worktree_dir>/<repo_name>/`), allowing the TUI to render in milliseconds upon startup.
+- **Caching**: It caches worktree metadata in `.worktree-cache.json` under `<worktree_dir>/<repo_key>/`; `repo_key` is the remote `owner/repo` when available, otherwise a local `local-<hash>` key derived from the repo path.
 - **Background Updates**: As soon as the UI is visible, a background task refreshes the data from Git and updates the cache automatically.
 - **Welcome Screen**: If no worktrees are detected (e.g., during first-time use or in an unconfigured directory), a welcome screen guides you through the setup.
 
