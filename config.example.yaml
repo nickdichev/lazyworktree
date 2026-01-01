@@ -4,6 +4,12 @@ auto_fetch_prs: false
 max_untracked_diffs: 10
 max_diff_chars: 200000
 
+# Path to delta executable (default: "delta")
+# Set to empty string to disable delta and use plain git diff output
+# Example: delta_path: ""  # disables delta
+# Example: delta_path: /usr/local/bin/delta  # custom path
+delta_path: delta
+
 # Extra arguments passed to delta for diff rendering
 delta_args:
   - --syntax-theme

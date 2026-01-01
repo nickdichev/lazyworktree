@@ -284,6 +284,7 @@ sort_by_active: true
 auto_fetch_prs: false
 max_untracked_diffs: 10
 max_diff_chars: 200000
+delta_path: delta
 delta_args:
   - --syntax-theme
   - Dracula
@@ -309,6 +310,7 @@ Notes:
 - Set `auto_fetch_prs` to `true` to fetch PR data on startup.
 - Use `max_untracked_diffs: 0` to hide untracked diffs; `max_diff_chars: 0` disables truncation.
 - `delta_args` sets arguments passed to `delta` (default: `--syntax-theme Dracula`).
+- `delta_path` sets path to delta executable (default: `delta`). Set to empty string to disable delta and use plain git diff output.
 - `branch_name_script` runs a script to generate branch name suggestions when creating worktrees from changes. The script receives the git diff on stdin and should output a branch name. See [AI-powered branch names](#ai-powered-branch-names) below.
 
 ## CI Status Display

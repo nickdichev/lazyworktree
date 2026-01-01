@@ -275,6 +275,7 @@ func NewModel(cfg *config.AppConfig, initialFilter string) *Model {
 
 	gitService := git.NewService(notify, notifyOnce)
 	gitService.SetDebugLogger(debugLogger)
+	gitService.SetDeltaPath(cfg.DeltaPath)
 	gitService.SetDeltaArgs(cfg.DeltaArgs)
 	trustManager := security.NewTrustManager()
 

@@ -57,6 +57,29 @@ func TestUseDelta(t *testing.T) {
 	assert.IsType(t, true, useDelta)
 }
 
+func TestSetDeltaPath(t *testing.T) {
+	notify := func(_ string, _ string) {}
+	notifyOnce := func(_ string, _ string, _ string) {}
+
+	service := NewService(notify, notifyOnce)
+
+	t.Run("empty path disables delta", func(t *testing.T) {
+		service.SetDeltaPath("")
+		assert.False(t, service.UseDelta())
+		assert.Empty(t, service.deltaPath)
+	})
+
+	t.Run("custom delta path", func(t *testing.T) {
+		service.SetDeltaPath("/custom/path/to/delta")
+		assert.Equal(t, "/custom/path/to/delta", service.deltaPath)
+	})
+
+	t.Run("whitespace trimmed from path", func(t *testing.T) {
+		service.SetDeltaPath("  delta  ")
+		assert.Equal(t, "delta", service.deltaPath)
+	})
+}
+
 func TestApplyDelta(t *testing.T) {
 	notify := func(_ string, _ string) {}
 	notifyOnce := func(_ string, _ string, _ string) {}

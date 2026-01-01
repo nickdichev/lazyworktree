@@ -30,6 +30,7 @@ type AppConfig struct {
 	MaxUntrackedDiffs int
 	MaxDiffChars      int
 	DeltaArgs         []string
+	DeltaPath         string
 	TrustMode         string
 	DebugLog          string
 	CustomCommands    map[string]*CustomCommand
@@ -51,6 +52,7 @@ func DefaultConfig() *AppConfig {
 		MaxUntrackedDiffs: 10,
 		MaxDiffChars:      200000,
 		DeltaArgs:         []string{"--syntax-theme", "Dracula"},
+		DeltaPath:         "delta",
 		TrustMode:         "tofu",
 		CustomCommands:    make(map[string]*CustomCommand),
 	}
@@ -216,6 +218,9 @@ func parseConfig(data map[string]any) *AppConfig {
 	cfg.MaxDiffChars = coerceInt(data["max_diff_chars"], 200000)
 	if _, ok := data["delta_args"]; ok {
 		cfg.DeltaArgs = normalizeArgsList(data["delta_args"])
+	}
+	if deltaPath, ok := data["delta_path"].(string); ok {
+		cfg.DeltaPath = strings.TrimSpace(deltaPath)
 	}
 
 	if trustMode, ok := data["trust_mode"].(string); ok {

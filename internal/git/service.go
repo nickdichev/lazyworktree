@@ -52,6 +52,7 @@ type Service struct {
 	notifiedSet map[string]bool
 	useDelta    bool
 	deltaArgs   []string
+	deltaPath   string
 	debugLogger *log.Logger
 }
 
@@ -100,6 +101,21 @@ func (s *Service) SetDeltaArgs(args []string) {
 	s.deltaArgs = append([]string{}, args...)
 }
 
+// SetDeltaPath sets the path to delta executable and enables/disables based on empty string.
+func (s *Service) SetDeltaPath(path string) {
+	s.deltaPath = strings.TrimSpace(path)
+	s.detectDelta()
+}
+
+func (s *Service) isDeltaAvailable() bool {
+	if s.deltaPath == "" {
+		return false
+	}
+	// #nosec G204 -- delta_path comes from local config and is controlled by the user
+	cmd := exec.Command(s.deltaPath, "--version")
+	return cmd.Run() == nil
+}
+
 func (s *Service) debugf(format string, args ...any) {
 	if s.debugLogger == nil {
 		return
@@ -128,8 +144,10 @@ func prepareAllowedCommand(ctx context.Context, args []string) (*exec.Cmd, error
 }
 
 func (s *Service) detectDelta() {
-	cmd := exec.Command("delta", "--version")
-	if err := cmd.Run(); err == nil {
+	if s.deltaPath == "" {
+		return
+	}
+	if s.isDeltaAvailable() {
 		s.useDelta = true
 	}
 }
@@ -145,7 +163,8 @@ func (s *Service) ApplyDelta(ctx context.Context, diff string) string {
 	if len(s.deltaArgs) > 0 {
 		args = append(args, s.deltaArgs...)
 	}
-	cmd := exec.CommandContext(ctx, "delta", args...)
+	// #nosec G204 -- delta_path comes from local config and is controlled by the user
+	cmd := exec.CommandContext(ctx, s.deltaPath, args...)
 	cmd.Stdin = strings.NewReader(diff)
 	output, err := cmd.Output()
 	if err != nil {

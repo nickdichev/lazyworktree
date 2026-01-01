@@ -18,6 +18,7 @@ func TestDefaultConfig(t *testing.T) {
 	assert.Equal(t, 10, cfg.MaxUntrackedDiffs)
 	assert.Equal(t, 200000, cfg.MaxDiffChars)
 	assert.Equal(t, []string{"--syntax-theme", "Dracula"}, cfg.DeltaArgs)
+	assert.Equal(t, "delta", cfg.DeltaPath)
 	assert.Equal(t, "tofu", cfg.TrustMode)
 	assert.Empty(t, cfg.WorktreeDir)
 	assert.Empty(t, cfg.InitCommands)
@@ -556,10 +557,44 @@ func TestParseConfig(t *testing.T) {
 		{
 			name: "branch_name_script with spaces is trimmed",
 			data: map[string]interface{}{
-				"branch_name_script": "  aichat -m gemini:gemini-2.5-flash  ",
+				"branch_name_script": "   echo test   ",
 			},
 			validate: func(t *testing.T, cfg *AppConfig) {
-				assert.Equal(t, "aichat -m gemini:gemini-2.5-flash", cfg.BranchNameScript)
+				assert.Equal(t, "echo test", cfg.BranchNameScript)
+			},
+		},
+		{
+			name: "delta_path default",
+			data: map[string]interface{}{},
+			validate: func(t *testing.T, cfg *AppConfig) {
+				assert.Equal(t, "delta", cfg.DeltaPath)
+			},
+		},
+		{
+			name: "delta_path custom",
+			data: map[string]interface{}{
+				"delta_path": "/usr/local/bin/delta",
+			},
+			validate: func(t *testing.T, cfg *AppConfig) {
+				assert.Equal(t, "/usr/local/bin/delta", cfg.DeltaPath)
+			},
+		},
+		{
+			name: "delta_path empty disables delta",
+			data: map[string]interface{}{
+				"delta_path": "",
+			},
+			validate: func(t *testing.T, cfg *AppConfig) {
+				assert.Empty(t, cfg.DeltaPath)
+			},
+		},
+		{
+			name: "delta_path with whitespace is trimmed",
+			data: map[string]interface{}{
+				"delta_path": "  delta  ",
+			},
+			validate: func(t *testing.T, cfg *AppConfig) {
+				assert.Equal(t, "delta", cfg.DeltaPath)
 			},
 		},
 	}
