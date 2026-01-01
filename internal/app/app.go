@@ -30,8 +30,9 @@ import (
 )
 
 const (
-	keyEnter = "enter"
-	keyEsc   = "esc"
+	keyEnter  = "enter"
+	keyEsc    = "esc"
+	keyEscRaw = "\x1b" // Raw escape byte for terminals that send ESC as a rune
 
 	errBranchEmpty           = "Branch name cannot be empty."
 	errNoWorktreeSelected    = "No worktree selected."
@@ -467,18 +468,17 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	// Handle filter input first - when filtering, only escape/enter should exit
 	if m.showingFilter {
-		switch msg.String() {
-		case keyEnter, keyEsc:
+		keyStr := msg.String()
+		if keyStr == keyEnter || isEscKey(keyStr) {
 			m.showingFilter = false
 			m.filterInput.Blur()
 			m.worktreeTable.Focus()
 			return m, nil
-		default:
-			m.filterInput, cmd = m.filterInput.Update(msg)
-			m.filterQuery = m.filterInput.Value()
-			m.updateTable()
-			return m, cmd
 		}
+		m.filterInput, cmd = m.filterInput.Update(msg)
+		m.filterQuery = m.filterInput.Value()
+		m.updateTable()
+		return m, cmd
 	}
 
 	// Check for custom commands first - allows users to override built-in keys
@@ -624,7 +624,7 @@ func (m *Model) handleBuiltInKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "X":
 		return m, m.showPruneMerged()
 
-	case keyEsc:
+	case keyEsc, keyEscRaw:
 		if m.currentScreen == screenPalette {
 			m.currentScreen = screenNone
 			m.paletteScreen = nil
@@ -2231,7 +2231,8 @@ func (m *Model) handleScreenKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.helpScreen == nil {
 			m.helpScreen = NewHelpScreen(m.windowWidth, m.windowHeight, m.config.CustomCommands)
 		}
-		if msg.String() == keyQ || msg.String() == keyEsc {
+		keyStr := msg.String()
+		if keyStr == keyQ || isEscKey(keyStr) {
 			// If currently searching, esc clears search; otherwise close help
 			if m.helpScreen.searching || m.helpScreen.searchQuery != "" {
 				m.helpScreen.searching = false
@@ -2255,12 +2256,13 @@ func (m *Model) handleScreenKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.currentScreen = screenNone
 			return m, nil
 		}
-		switch msg.String() {
-		case keyEsc:
+		keyStr := msg.String()
+		if isEscKey(keyStr) {
 			m.currentScreen = screenNone
 			m.paletteScreen = nil
 			return m, nil
-		case keyEnter:
+		}
+		if keyStr == keyEnter {
 			if m.paletteSubmit != nil {
 				if action, ok := m.paletteScreen.Selected(); ok {
 					cmd := m.paletteSubmit(action)
@@ -2281,13 +2283,14 @@ func (m *Model) handleScreenKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.currentScreen = screenNone
 			return m, nil
 		}
-		switch msg.String() {
-		case keyEsc:
+		keyStr := msg.String()
+		if isEscKey(keyStr) {
 			m.currentScreen = screenNone
 			m.prSelectionScreen = nil
 			m.prSelectionSubmit = nil
 			return m, nil
-		case keyEnter:
+		}
+		if keyStr == keyEnter {
 			if m.prSelectionSubmit != nil {
 				if pr, ok := m.prSelectionScreen.Selected(); ok {
 					cmd := m.prSelectionSubmit(pr)
@@ -2336,12 +2339,13 @@ func (m *Model) handleScreenKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 		}
 	case screenWelcome:
-		switch msg.String() {
-		case "r", "R":
+		keyStr := msg.String()
+		switch {
+		case keyStr == "r" || keyStr == "R":
 			m.currentScreen = screenNone
 			m.welcomeScreen = nil
 			return m, m.refreshWorktrees()
-		case keyQ, "Q", keyEsc:
+		case keyStr == keyQ || keyStr == "Q" || isEscKey(keyStr):
 			m.quitting = true
 			return m, tea.Quit
 		}
@@ -2350,8 +2354,9 @@ func (m *Model) handleScreenKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.currentScreen = screenNone
 			return m, nil
 		}
-		switch msg.String() {
-		case "t", "T":
+		keyStr := msg.String()
+		switch {
+		case keyStr == "t" || keyStr == "T":
 			if m.pendingTrust != "" {
 				_ = m.trustManager.TrustFile(m.pendingTrust)
 			}
@@ -2359,7 +2364,7 @@ func (m *Model) handleScreenKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.clearPendingTrust()
 			m.currentScreen = screenNone
 			return m, cmd
-		case "b", "B":
+		case keyStr == "b" || keyStr == "B":
 			after := m.pendingAfter
 			m.clearPendingTrust()
 			m.currentScreen = screenNone
@@ -2367,7 +2372,7 @@ func (m *Model) handleScreenKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m, after
 			}
 			return m, nil
-		case "c", "C", keyEsc:
+		case keyStr == "c" || keyStr == "C" || isEscKey(keyStr):
 			m.clearPendingTrust()
 			m.currentScreen = screenNone
 			return m, nil
@@ -2382,8 +2387,8 @@ func (m *Model) handleScreenKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.currentScreen = screenNone
 			return m, nil
 		}
-		switch msg.String() {
-		case keyQ, keyEsc:
+		keyStr := msg.String()
+		if keyStr == keyQ || isEscKey(keyStr) {
 			m.commitScreen = nil
 			m.currentScreen = screenNone
 			return m, nil
@@ -2398,8 +2403,8 @@ func (m *Model) handleScreenKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.currentScreen = screenNone
 			return m, nil
 		}
-		switch msg.String() {
-		case keyQ, keyEsc:
+		keyStr := msg.String()
+		if keyStr == keyQ || isEscKey(keyStr) {
 			m.diffScreen = nil
 			m.currentScreen = screenNone
 			return m, nil
@@ -2415,8 +2420,14 @@ func (m *Model) handleScreenKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
-		switch msg.String() {
-		case keyEnter:
+		keyStr := msg.String()
+		if isEscKey(keyStr) {
+			m.inputScreen = nil
+			m.inputSubmit = nil
+			m.currentScreen = screenNone
+			return m, nil
+		}
+		if keyStr == keyEnter {
 			if m.inputScreen.validate != nil {
 				if errMsg := strings.TrimSpace(m.inputScreen.validate(m.inputScreen.input.Value())); errMsg != "" {
 					m.inputScreen.errorMsg = errMsg
@@ -2435,11 +2446,6 @@ func (m *Model) handleScreenKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				}
 				return m, cmd
 			}
-		case keyEsc:
-			m.inputScreen = nil
-			m.inputSubmit = nil
-			m.currentScreen = screenNone
-			return m, nil
 		}
 
 		var cmd tea.Cmd
@@ -2610,6 +2616,13 @@ func (m *Model) debugf(format string, args ...any) {
 		return
 	}
 	m.debugLogger.Printf(format, args...)
+}
+
+// isEscKey checks if the key string represents an escape key.
+// Some terminals send ESC as "esc" (tea.KeyEsc) while others send it
+// as a raw escape byte "\x1b" (ASCII 27).
+func isEscKey(keyStr string) bool {
+	return keyStr == keyEsc || keyStr == keyEscRaw
 }
 
 func (m *Model) persistCurrentSelection() {

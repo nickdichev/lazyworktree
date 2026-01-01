@@ -434,3 +434,73 @@ func TestCommandPaletteCreateFromChanges(t *testing.T) {
 		t.Error("Command palette should be closed after pressing escape")
 	}
 }
+
+// TestCommitScreenEscapeKey tests that ESC key closes the commit screen
+func TestCommitScreenEscapeKey(t *testing.T) {
+	cfg := &config.AppConfig{
+		WorktreeDir: t.TempDir(),
+	}
+	m := NewModel(cfg, "")
+
+	// Set up the commit screen
+	m.currentScreen = screenCommit
+	m.commitScreen = NewCommitScreen(commitMeta{sha: "abc123"}, "stat", "diff", false)
+
+	// Simulate pressing ESC
+	escMsg := tea.KeyMsg{Type: tea.KeyEsc}
+
+	// Log what we're testing
+	t.Logf("ESC key string: %q", escMsg.String())
+	t.Logf("keyEsc constant: %q", keyEsc)
+
+	// Check if the key matches
+	if escMsg.String() != keyEsc {
+		t.Errorf("ESC key string %q doesn't match keyEsc %q", escMsg.String(), keyEsc)
+	}
+
+	// Call handleScreenKey
+	newModel, _ := m.handleScreenKey(escMsg)
+	updatedModel := newModel.(*Model)
+
+	// Verify the commit screen was closed
+	if updatedModel.currentScreen != screenNone {
+		t.Errorf("Expected currentScreen to be screenNone, got %v", updatedModel.currentScreen)
+	}
+
+	if updatedModel.commitScreen != nil {
+		t.Error("Expected commitScreen to be nil after pressing ESC")
+	}
+}
+
+// TestCommitScreenRawEscapeKey tests that raw ESC byte (0x1b) also closes the commit screen
+// Some terminals send ESC as a raw byte rather than the special tea.KeyEsc type
+func TestCommitScreenRawEscapeKey(t *testing.T) {
+	cfg := &config.AppConfig{
+		WorktreeDir: t.TempDir(),
+	}
+	m := NewModel(cfg, "")
+
+	// Set up the commit screen
+	m.currentScreen = screenCommit
+	m.commitScreen = NewCommitScreen(commitMeta{sha: "abc123"}, "stat", "diff", false)
+
+	// Simulate pressing ESC as a raw rune (how some terminals send it)
+	rawEscMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{0x1b}}
+
+	// Log what we're testing
+	t.Logf("Raw ESC key string: %q", rawEscMsg.String())
+	t.Logf("keyEscRaw constant: %q", keyEscRaw)
+
+	// Call handleScreenKey
+	newModel, _ := m.handleScreenKey(rawEscMsg)
+	updatedModel := newModel.(*Model)
+
+	// Verify the commit screen was closed
+	if updatedModel.currentScreen != screenNone {
+		t.Errorf("Expected currentScreen to be screenNone, got %v", updatedModel.currentScreen)
+	}
+
+	if updatedModel.commitScreen != nil {
+		t.Error("Expected commitScreen to be nil after pressing raw ESC")
+	}
+}
