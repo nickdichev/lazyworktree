@@ -35,7 +35,7 @@ type AppConfig struct {
 	DebugLog          string
 	CustomCommands    map[string]*CustomCommand
 	BranchNameScript  string // Script to generate branch name suggestions from diff
-	Theme             string // Theme name: "dracula", "lazygit", or "light"
+	Theme             string // Theme name: see AvailableThemes in internal/theme
 }
 
 // RepoConfig represents repository-scoped commands from .wt
@@ -236,7 +236,17 @@ func parseConfig(data map[string]any) *AppConfig {
 
 	if theme, ok := data["theme"].(string); ok {
 		theme = strings.ToLower(strings.TrimSpace(theme))
-		if theme == "dracula" || theme == "lazygit" || theme == "light" {
+		switch theme {
+		case "dracula",
+			"narna",
+			"clean-light",
+			"solarized-dark",
+			"solarized-light",
+			"gruvbox-dark",
+			"gruvbox-light",
+			"nord",
+			"monokai",
+			"catppuccin-mocha":
 			cfg.Theme = theme
 		}
 	}
@@ -384,11 +394,36 @@ func isPathWithin(base, target string) bool {
 
 func defaultDeltaArgsForTheme(theme string) []string {
 	switch theme {
-	case "lazygit":
+	case "narna":
 		return []string{"--syntax-theme", "OneHalfDark"}
-	case "light":
+	case "clean-light":
 		return []string{"--syntax-theme", "GitHub"}
+	case "solarized-dark":
+		return []string{"--syntax-theme", "Solarized (dark)"}
+	case "solarized-light":
+		return []string{"--syntax-theme", "Solarized (light)"}
+	case "gruvbox-dark":
+		return []string{"--syntax-theme", "Gruvbox Dark"}
+	case "gruvbox-light":
+		return []string{"--syntax-theme", "Gruvbox Light"}
+	case "nord":
+		return []string{"--syntax-theme", "Nord"}
+	case "monokai":
+		return []string{"--syntax-theme", "Monokai Extended"}
+	case "catppuccin-mocha":
+		return []string{"--syntax-theme", "Catppuccin Mocha"}
 	default:
 		return []string{"--syntax-theme", "Dracula"}
 	}
+}
+
+// SyntaxThemeForUITheme returns the default delta syntax theme for a UI theme.
+func SyntaxThemeForUITheme(theme string) string {
+	args := defaultDeltaArgsForTheme(theme)
+	for i := 0; i < len(args)-1; i++ {
+		if args[i] == "--syntax-theme" {
+			return args[i+1]
+		}
+	}
+	return ""
 }

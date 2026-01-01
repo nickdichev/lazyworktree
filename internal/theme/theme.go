@@ -39,11 +39,11 @@ func Dracula() *Theme {
 	}
 }
 
-// LazyGit returns a balanced LazyGit-inspired dark theme with blue accents.
-func LazyGit() *Theme {
+// Narna returns a balanced dark theme with blue accents.
+func Narna() *Theme {
 	return &Theme{
 		Background: lipgloss.Color("#0D1117"), // Charcoal background
-		Accent:     lipgloss.Color("#41ADFF"), // LazyGit blue accent
+		Accent:     lipgloss.Color("#41ADFF"), // Blue accent
 		AccentDim:  lipgloss.Color("#1A2230"), // Selected rows / panels
 		Border:     lipgloss.Color("#30363D"), // Subtle borders
 		BorderDim:  lipgloss.Color("#20252D"), // Dim borders
@@ -58,8 +58,8 @@ func LazyGit() *Theme {
 	}
 }
 
-// Light returns a theme optimized for light terminal backgrounds.
-func Light() *Theme {
+// CleanLight returns a theme optimized for light terminal backgrounds.
+func CleanLight() *Theme {
 	return &Theme{
 		Background: lipgloss.Color("#FFFFFF"), // White
 		Accent:     lipgloss.Color("#0066CC"), // Dark blue
@@ -77,13 +77,160 @@ func Light() *Theme {
 	}
 }
 
+// SolarizedDark returns the Solarized dark theme.
+func SolarizedDark() *Theme {
+	return &Theme{
+		Background: lipgloss.Color("#002B36"),
+		Accent:     lipgloss.Color("#268BD2"),
+		AccentDim:  lipgloss.Color("#073642"),
+		Border:     lipgloss.Color("#586E75"),
+		BorderDim:  lipgloss.Color("#073642"),
+		MutedFg:    lipgloss.Color("#586E75"),
+		TextFg:     lipgloss.Color("#EEE8D5"),
+		SuccessFg:  lipgloss.Color("#859900"),
+		WarnFg:     lipgloss.Color("#B58900"),
+		ErrorFg:    lipgloss.Color("#DC322F"),
+		Cyan:       lipgloss.Color("#2AA198"),
+		Pink:       lipgloss.Color("#D33682"),
+		Yellow:     lipgloss.Color("#B58900"),
+	}
+}
+
+// SolarizedLight returns the Solarized light theme.
+func SolarizedLight() *Theme {
+	return &Theme{
+		Background: lipgloss.Color("#FDF6E3"),
+		Accent:     lipgloss.Color("#268BD2"),
+		AccentDim:  lipgloss.Color("#EEE8D5"),
+		Border:     lipgloss.Color("#93A1A1"),
+		BorderDim:  lipgloss.Color("#E4DDC7"),
+		MutedFg:    lipgloss.Color("#93A1A1"),
+		TextFg:     lipgloss.Color("#073642"),
+		SuccessFg:  lipgloss.Color("#859900"),
+		WarnFg:     lipgloss.Color("#B58900"),
+		ErrorFg:    lipgloss.Color("#DC322F"),
+		Cyan:       lipgloss.Color("#2AA198"),
+		Pink:       lipgloss.Color("#D33682"),
+		Yellow:     lipgloss.Color("#B58900"),
+	}
+}
+
+// GruvboxDark returns the Gruvbox dark theme.
+func GruvboxDark() *Theme {
+	return &Theme{
+		Background: lipgloss.Color("#282828"),
+		Accent:     lipgloss.Color("#FABD2F"),
+		AccentDim:  lipgloss.Color("#3C3836"),
+		Border:     lipgloss.Color("#504945"),
+		BorderDim:  lipgloss.Color("#3C3836"),
+		MutedFg:    lipgloss.Color("#928374"),
+		TextFg:     lipgloss.Color("#EBDBB2"),
+		SuccessFg:  lipgloss.Color("#B8BB26"),
+		WarnFg:     lipgloss.Color("#FABD2F"),
+		ErrorFg:    lipgloss.Color("#FB4934"),
+		Cyan:       lipgloss.Color("#83A598"),
+		Pink:       lipgloss.Color("#D3869B"),
+		Yellow:     lipgloss.Color("#FABD2F"),
+	}
+}
+
+// GruvboxLight returns the Gruvbox light theme.
+func GruvboxLight() *Theme {
+	return &Theme{
+		Background: lipgloss.Color("#FBF1C7"),
+		Accent:     lipgloss.Color("#D79921"),
+		AccentDim:  lipgloss.Color("#E0CFA9"),
+		Border:     lipgloss.Color("#D5C4A1"),
+		BorderDim:  lipgloss.Color("#C0B58A"),
+		MutedFg:    lipgloss.Color("#7C6F64"),
+		TextFg:     lipgloss.Color("#3C3836"),
+		SuccessFg:  lipgloss.Color("#79740E"),
+		WarnFg:     lipgloss.Color("#D79921"),
+		ErrorFg:    lipgloss.Color("#9D0006"),
+		Cyan:       lipgloss.Color("#427B58"),
+		Pink:       lipgloss.Color("#B16286"),
+		Yellow:     lipgloss.Color("#D79921"),
+	}
+}
+
+// Nord returns the Nord theme.
+func Nord() *Theme {
+	return &Theme{
+		Background: lipgloss.Color("#2E3440"),
+		Accent:     lipgloss.Color("#88C0D0"),
+		AccentDim:  lipgloss.Color("#3B4252"),
+		Border:     lipgloss.Color("#4C566A"),
+		BorderDim:  lipgloss.Color("#434C5E"),
+		MutedFg:    lipgloss.Color("#81A1C1"),
+		TextFg:     lipgloss.Color("#E5E9F0"),
+		SuccessFg:  lipgloss.Color("#A3BE8C"),
+		WarnFg:     lipgloss.Color("#EBCB8B"),
+		ErrorFg:    lipgloss.Color("#BF616A"),
+		Cyan:       lipgloss.Color("#88C0D0"),
+		Pink:       lipgloss.Color("#B48EAD"),
+		Yellow:     lipgloss.Color("#EBCB8B"),
+	}
+}
+
+// Monokai returns the Monokai theme.
+func Monokai() *Theme {
+	return &Theme{
+		Background: lipgloss.Color("#272822"),
+		Accent:     lipgloss.Color("#A6E22E"),
+		AccentDim:  lipgloss.Color("#3E3D32"),
+		Border:     lipgloss.Color("#75715E"),
+		BorderDim:  lipgloss.Color("#3E3D32"),
+		MutedFg:    lipgloss.Color("#75715E"),
+		TextFg:     lipgloss.Color("#F8F8F2"),
+		SuccessFg:  lipgloss.Color("#A6E22E"),
+		WarnFg:     lipgloss.Color("#FD971F"),
+		ErrorFg:    lipgloss.Color("#F92672"),
+		Cyan:       lipgloss.Color("#66D9EF"),
+		Pink:       lipgloss.Color("#F92672"),
+		Yellow:     lipgloss.Color("#E6DB74"),
+	}
+}
+
+// CatppuccinMocha returns the Catppuccin Mocha theme.
+func CatppuccinMocha() *Theme {
+	return &Theme{
+		Background: lipgloss.Color("#1E1E2E"),
+		Accent:     lipgloss.Color("#B4BEFE"),
+		AccentDim:  lipgloss.Color("#313244"),
+		Border:     lipgloss.Color("#45475A"),
+		BorderDim:  lipgloss.Color("#313244"),
+		MutedFg:    lipgloss.Color("#6C7086"),
+		TextFg:     lipgloss.Color("#CDD6F4"),
+		SuccessFg:  lipgloss.Color("#A6E3A1"),
+		WarnFg:     lipgloss.Color("#F9E2AF"),
+		ErrorFg:    lipgloss.Color("#F38BA8"),
+		Cyan:       lipgloss.Color("#89DCEB"),
+		Pink:       lipgloss.Color("#F5C2E7"),
+		Yellow:     lipgloss.Color("#F9E2AF"),
+	}
+}
+
 // GetTheme returns a theme by name, or Dracula if not found.
 func GetTheme(name string) *Theme {
 	switch name {
-	case "lazygit":
-		return LazyGit()
-	case "light":
-		return Light()
+	case "narna":
+		return Narna()
+	case "clean-light":
+		return CleanLight()
+	case "solarized-dark":
+		return SolarizedDark()
+	case "solarized-light":
+		return SolarizedLight()
+	case "gruvbox-dark":
+		return GruvboxDark()
+	case "gruvbox-light":
+		return GruvboxLight()
+	case "nord":
+		return Nord()
+	case "monokai":
+		return Monokai()
+	case "catppuccin-mocha":
+		return CatppuccinMocha()
 	default:
 		return Dracula()
 	}
@@ -91,5 +238,16 @@ func GetTheme(name string) *Theme {
 
 // AvailableThemes returns a list of available theme names.
 func AvailableThemes() []string {
-	return []string{"dracula", "lazygit", "light"}
+	return []string{
+		"dracula",
+		"narna",
+		"clean-light",
+		"solarized-dark",
+		"solarized-light",
+		"gruvbox-dark",
+		"gruvbox-light",
+		"nord",
+		"monokai",
+		"catppuccin-mocha",
+	}
 }

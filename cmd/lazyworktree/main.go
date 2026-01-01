@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/chmouel/lazyworktree/internal/app"
 	"github.com/chmouel/lazyworktree/internal/config"
+	"github.com/chmouel/lazyworktree/internal/theme"
 )
 
 var (
@@ -24,15 +26,21 @@ func main() {
 	var debugLog string
 	var outputSelection string
 	var showVersion bool
+	var showSyntaxThemes bool
 
 	flag.StringVar(&worktreeDir, "worktree-dir", "", "Override the default worktree root directory")
 	flag.StringVar(&debugLog, "debug-log", "", "Path to debug log file")
 	flag.StringVar(&outputSelection, "output-selection", "", "Write selected worktree path to a file")
 	flag.BoolVar(&showVersion, "version", false, "Print version information")
+	flag.BoolVar(&showSyntaxThemes, "show-syntax-themes", false, "List available delta syntax themes")
 	flag.Parse()
 
 	if showVersion {
 		fmt.Printf("lazyworktree version %s\ncommit: %s\nbuilt at: %s\n", version, commit, date)
+		return
+	}
+	if showSyntaxThemes {
+		printSyntaxThemes()
 		return
 	}
 
@@ -118,4 +126,13 @@ func expandPath(path string) (string, error) {
 		path = filepath.Join(home, path[1:])
 	}
 	return os.ExpandEnv(path), nil
+}
+
+func printSyntaxThemes() {
+	names := theme.AvailableThemes()
+	sort.Strings(names)
+	fmt.Println("Available syntax themes (delta --syntax-theme defaults):")
+	for _, name := range names {
+		fmt.Printf("  %-16s -> %s\n", name, config.SyntaxThemeForUITheme(name))
+	}
 }

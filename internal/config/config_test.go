@@ -29,6 +29,36 @@ func TestDefaultConfig(t *testing.T) {
 	assert.Empty(t, cfg.BranchNameScript)
 }
 
+func TestSyntaxThemeForUITheme(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		inputTheme string
+		want       string
+	}{
+		{name: "default dracula", inputTheme: "dracula", want: "Dracula"},
+		{name: "narna", inputTheme: "narna", want: "OneHalfDark"},
+		{name: "clean-light", inputTheme: "clean-light", want: "GitHub"},
+		{name: "solarized-dark", inputTheme: "solarized-dark", want: "Solarized (dark)"},
+		{name: "solarized-light", inputTheme: "solarized-light", want: "Solarized (light)"},
+		{name: "gruvbox-dark", inputTheme: "gruvbox-dark", want: "Gruvbox Dark"},
+		{name: "gruvbox-light", inputTheme: "gruvbox-light", want: "Gruvbox Light"},
+		{name: "nord", inputTheme: "nord", want: "Nord"},
+		{name: "monokai", inputTheme: "monokai", want: "Monokai Extended"},
+		{name: "catppuccin-mocha", inputTheme: "catppuccin-mocha", want: "Catppuccin Mocha"},
+		{name: "unknown falls back to dracula", inputTheme: "unknown", want: "Dracula"},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, SyntaxThemeForUITheme(tt.inputTheme))
+		})
+	}
+}
+
 func TestNormalizeArgsList(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -474,33 +504,103 @@ func TestParseConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "theme lazygit sets default delta args when unset",
+			name: "theme narna sets default delta args when unset",
 			data: map[string]interface{}{
-				"theme": "lazygit",
+				"theme": "narna",
 			},
 			validate: func(t *testing.T, cfg *AppConfig) {
-				assert.Equal(t, "lazygit", cfg.Theme)
+				assert.Equal(t, "narna", cfg.Theme)
 				assert.Equal(t, []string{"--syntax-theme", "OneHalfDark"}, cfg.DeltaArgs)
 			},
 		},
 		{
-			name: "theme light sets default delta args when unset",
+			name: "theme clean-light sets default delta args when unset",
 			data: map[string]interface{}{
-				"theme": "light",
+				"theme": "clean-light",
 			},
 			validate: func(t *testing.T, cfg *AppConfig) {
-				assert.Equal(t, "light", cfg.Theme)
+				assert.Equal(t, "clean-light", cfg.Theme)
 				assert.Equal(t, []string{"--syntax-theme", "GitHub"}, cfg.DeltaArgs)
+			},
+		},
+		{
+			name: "theme solarized-dark sets default delta args when unset",
+			data: map[string]interface{}{
+				"theme": "solarized-dark",
+			},
+			validate: func(t *testing.T, cfg *AppConfig) {
+				assert.Equal(t, "solarized-dark", cfg.Theme)
+				assert.Equal(t, []string{"--syntax-theme", "Solarized (dark)"}, cfg.DeltaArgs)
+			},
+		},
+		{
+			name: "theme solarized-light sets default delta args when unset",
+			data: map[string]interface{}{
+				"theme": "solarized-light",
+			},
+			validate: func(t *testing.T, cfg *AppConfig) {
+				assert.Equal(t, "solarized-light", cfg.Theme)
+				assert.Equal(t, []string{"--syntax-theme", "Solarized (light)"}, cfg.DeltaArgs)
+			},
+		},
+		{
+			name: "theme gruvbox-dark sets default delta args when unset",
+			data: map[string]interface{}{
+				"theme": "gruvbox-dark",
+			},
+			validate: func(t *testing.T, cfg *AppConfig) {
+				assert.Equal(t, "gruvbox-dark", cfg.Theme)
+				assert.Equal(t, []string{"--syntax-theme", "Gruvbox Dark"}, cfg.DeltaArgs)
+			},
+		},
+		{
+			name: "theme gruvbox-light sets default delta args when unset",
+			data: map[string]interface{}{
+				"theme": "gruvbox-light",
+			},
+			validate: func(t *testing.T, cfg *AppConfig) {
+				assert.Equal(t, "gruvbox-light", cfg.Theme)
+				assert.Equal(t, []string{"--syntax-theme", "Gruvbox Light"}, cfg.DeltaArgs)
+			},
+		},
+		{
+			name: "theme nord sets default delta args when unset",
+			data: map[string]interface{}{
+				"theme": "nord",
+			},
+			validate: func(t *testing.T, cfg *AppConfig) {
+				assert.Equal(t, "nord", cfg.Theme)
+				assert.Equal(t, []string{"--syntax-theme", "Nord"}, cfg.DeltaArgs)
+			},
+		},
+		{
+			name: "theme monokai sets default delta args when unset",
+			data: map[string]interface{}{
+				"theme": "monokai",
+			},
+			validate: func(t *testing.T, cfg *AppConfig) {
+				assert.Equal(t, "monokai", cfg.Theme)
+				assert.Equal(t, []string{"--syntax-theme", "Monokai Extended"}, cfg.DeltaArgs)
+			},
+		},
+		{
+			name: "theme catppuccin-mocha sets default delta args when unset",
+			data: map[string]interface{}{
+				"theme": "catppuccin-mocha",
+			},
+			validate: func(t *testing.T, cfg *AppConfig) {
+				assert.Equal(t, "catppuccin-mocha", cfg.Theme)
+				assert.Equal(t, []string{"--syntax-theme", "Catppuccin Mocha"}, cfg.DeltaArgs)
 			},
 		},
 		{
 			name: "custom delta_args not overridden by theme",
 			data: map[string]interface{}{
-				"theme":      "lazygit",
+				"theme":      "narna",
 				"delta_args": "--syntax-theme Nord",
 			},
 			validate: func(t *testing.T, cfg *AppConfig) {
-				assert.Equal(t, "lazygit", cfg.Theme)
+				assert.Equal(t, "narna", cfg.Theme)
 				assert.Equal(t, []string{"--syntax-theme", "Nord"}, cfg.DeltaArgs)
 			},
 		},

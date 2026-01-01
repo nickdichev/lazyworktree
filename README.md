@@ -287,7 +287,9 @@ sort_by_active: true
 auto_fetch_prs: false
 max_untracked_diffs: 10
 max_diff_chars: 200000
-theme: dracula  # Options: "dracula" (default), "lazygit", "light"
+theme: dracula  # Options: "dracula" (default), "narna", "clean-light", "solarized-dark",
+                #          "solarized-light", "gruvbox-dark", "gruvbox-light",
+                #          "nord", "monokai", "catppuccin-mocha"
 delta_path: delta
 delta_args:
   - --syntax-theme
@@ -308,30 +310,38 @@ custom_commands:
 Notes:
 
 - `--worktree-dir` overrides `worktree_dir`.
-- `theme` selects the color theme. Available themes: `dracula` (dark, vibrant), `lazygit` (dark with blue accents), `light` (light background). Default: `dracula`.
+- `theme` selects the color theme. Available themes: `dracula`, `narna`, `clean-light`, `solarized-dark`, `solarized-light`, `gruvbox-dark`, `gruvbox-light`, `nord`, `monokai`, `catppuccin-mocha`. Default: `dracula`.
 - `init_commands` and `terminate_commands` run before any repo-specific `.wt`
   commands (if present).
 - Set `sort_by_active` to `false` to sort by path.
 - Set `auto_fetch_prs` to `true` to fetch PR data on startup.
 - Use `max_untracked_diffs: 0` to hide untracked diffs; `max_diff_chars: 0` disables truncation.
-- `delta_args` sets arguments passed to `delta` (defaults follow the UI theme: Dracula → `Dracula`, LazyGit → `OneHalfDark`, Light → `GitHub`).
+- Run `lazyworktree --show-syntax-themes` to print the default delta `--syntax-theme` values for each UI theme.
+- `delta_args` sets arguments passed to `delta` (defaults follow the UI theme: Dracula → `Dracula`, Narna → `OneHalfDark`, Clean-Light → `GitHub`, Solarized Dark → `Solarized (dark)`, Solarized Light → `Solarized (light)`, Gruvbox Dark → `Gruvbox Dark`, Gruvbox Light → `Gruvbox Light`, Nord → `Nord`, Monokai → `Monokai Extended`, Catppuccin Mocha → `Catppuccin Mocha`).
 - `delta_path` sets path to delta executable (default: `delta`). Set to empty string to disable delta and use plain git diff output.
 - `branch_name_script` runs a script to generate branch name suggestions when creating worktrees from changes. The script receives the git diff on stdin and should output a branch name. See [AI-powered branch names](#ai-powered-branch-names) below.
 
 ## Themes
 
-lazyworktree includes three built-in themes:
+lazyworktree includes built-in themes:
 
 | Theme | Background | Best For |
 |-------|-----------|----------|
 | **dracula** | Dark (#282A36) | Dark terminals, vibrant colors, default |
-| **lazygit** | Charcoal (#0D1117) | Dark terminals, LazyGit-style blue highlights |
-| **light** | White (#FFFFFF) | Light terminals, soft colors |
+| **narna** | Charcoal (#0D1117) | Dark terminals, blue highlights |
+| **clean-light** | White (#FFFFFF) | Light terminals, soft colors |
+| **solarized-dark** | Deep teal (#002B36) | Classic Solarized dark palette |
+| **solarized-light** | Cream (#FDF6E3) | Classic Solarized light palette |
+| **gruvbox-dark** | Dark gray (#282828) | Gruvbox dark, warm accents |
+| **gruvbox-light** | Sand (#FBF1C7) | Gruvbox light, earthy tones |
+| **nord** | Midnight blue (#2E3440) | Nord calm cyan accents |
+| **monokai** | Olive black (#272822) | Monokai bright neon accents |
+| **catppuccin-mocha** | Mocha (#1E1E2E) | Catppuccin Mocha pastels |
 
 Select a theme in your config file:
 
 ```yaml
-theme: dracula  # or "lazygit" or "light"
+theme: dracula  # or any listed above
 ```
 
 ## CI Status Display

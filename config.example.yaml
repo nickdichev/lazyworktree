@@ -5,7 +5,8 @@ max_untracked_diffs: 10
 max_diff_chars: 200000
 
 # TUI theme (default: "dracula")
-# Options: "dracula", "lazygit", "light"
+# Options: "dracula", "narna", "clean-light", "solarized-dark", "solarized-light",
+#          "gruvbox-dark", "gruvbox-light", "nord", "monokai", "catppuccin-mocha"
 theme: dracula
 
 # Path to delta executable (default: "delta")
@@ -17,8 +18,8 @@ delta_path: delta
 # Extra arguments passed to delta for diff rendering.
 # If omitted, lazyworktree picks a syntax theme matching your UI:
 #   - dracula -> Dracula
-#   - lazygit -> OneHalfDark
-#   - light   -> GitHub
+#   - narna       -> OneHalfDark
+#   - clean-light -> GitHub
 delta_args:
   - --syntax-theme
   - Dracula
