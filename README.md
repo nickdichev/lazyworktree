@@ -34,6 +34,7 @@ A Bubble Tea-based TUI for managing Git worktrees efficiently. Visualize status,
 
 - **delta**: For syntax-highlighted diffs.
 - **lazygit**: For full TUI git control.
+- **tmux**: For TMUX integration support.
 
 ## Installation
 
