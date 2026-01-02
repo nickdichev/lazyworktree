@@ -298,6 +298,7 @@ custom_commands:
 | `?` | Show help |
 
 **Filter Mode:**
+
 - `alt+n`, `alt+p`: Navigate and update filter input with selected item
 - `↑`, `↓`: Navigate list without changing filter input
 - `Enter`: With empty filter, select highlighted item; with text, apply filter
@@ -435,6 +436,15 @@ branch_name_script: "aichat -m gemini:gemini-2.5-flash-lite 'Generate a short gi
 - It should output only the branch name (first line is used)
 - Should the script fail or return empty output, the default name (`{current-branch}-changes`) is employed
 - The script operates under a 30-second timeout to prevent hanging
+
+## How does it compare?
+
+lazyworktree covers a broader set of use cases than most Git worktree tools,
+especially for interactive and human-driven workflows.
+
+For a fair and detailed comparison with other popular worktree managers
+(including their respective strengths and trade-offs), see
+the [COMPARAISON](./COMPARAISON.md) document.
 
 ## Trivia
 

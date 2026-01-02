@@ -1937,7 +1937,7 @@ if [ -n "$untracked" ]; then
     echo
     count=$((count + 1))
   done <<< "$untracked"
-  
+
   if [ $total -gt $max_count ]; then
     echo "[...showing $count of $total untracked files]"
   fi
