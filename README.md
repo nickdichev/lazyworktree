@@ -1,6 +1,6 @@
 # lazyworktree - Lazy Git Worktree Manager
 
-A Bubble Tea-based TUI for managing Git worktrees efficiently. Visualize status, manage branches, and jump between worktrees with ease.
+A Bubble Tea-based TUI for managing Git worktrees efficiently. Visualise status, manage branches, and jump between worktrees with ease.
 
 ![Go](https://img.shields.io/badge/go-1.25%2B-blue)
 ![Coverage](https://img.shields.io/badge/Coverage-67.3%25-yellow)
@@ -82,7 +82,7 @@ yay -S lazyworktree-bin
 
 ## Shell Integration (Zsh)
 
-To enable the "jump" functionality (changing your shell's current directory on exit), add the helper functions from `shell/functions.shell` to your `.zshrc`. The helper uses `--output-selection` to write the selected path to a temp file.
+To enable the "jump" functionality (changing your shell's current directory on exit), add the helper functions from `shell/functions.shell` to your `.zshrc`. The helper uses `--output-selection` to write the selected path to a temporary file.
 
 Example configuration:
 
@@ -106,7 +106,7 @@ _pm() { _worktree_jump ~/path/to/your/main/repo; }
 compdef _pm pm
 ```
 
-If you want a shortcut to the last-selected worktree, use the built-in
+Should you require a shortcut to the last-selected worktree, use the built-in
 `worktree_go_last` helper (reads the `.last-selected` file):
 
 ```bash
@@ -115,7 +115,7 @@ alias pl='worktree_go_last ~/path/to/your/main/repo'
 
 ## Custom Initialization and Termination
 
-You can create a `.wt` file in your main repository to define custom commands to run when creating or removing a worktree. This format is inspired by [wt](https://github.com/taecontrol/wt).
+You may create a `.wt` file in your main repository to define custom commands to run when creating or removing a worktree. This format is inspired by [wt](https://github.com/taecontrol/wt).
 
 ### Example `.wt` configuration
 
@@ -145,7 +145,7 @@ Since `.wt` files allow executing arbitrary commands found in a repository, `laz
 - **Trusted**: Once trusted, commands run silently in the background until the `.wt` file changes again.
 - **Persistence**: Trusted file hashes are stored in `~/.local/share/lazyworktree/trusted.json`.
 
-You can configure this behavior in `config.yaml` via the `trust_mode` setting:
+You can configure this behaviour in `config.yaml` via the `trust_mode` setting:
 
 - **`tofu`** (Default): Prompts for confirmation on new or changed files. Secure and usable.
 - **`never`**: Never runs commands from `.wt` files. Safest for untrusted environments.
@@ -273,7 +273,7 @@ custom_commands:
 
 ### Key Precedence
 
-**Custom commands take precedence over built-in keys.** If you define a custom command with key `s`, it will override the built-in sort toggle. This allows you to fully customize your workflow.
+**Custom commands take precedence over built-in keys.** If you define a custom command with key `s`, it will override the built-in sort toggle. This allows you to fully customise your workflow.
 
 ## Key Bindings
 
@@ -313,7 +313,7 @@ custom_commands:
 
 ## Configuration
 
-Worktrees are expected to be organized under
+Worktrees are expected to be organised under
 `~/.local/share/worktrees/<repo_name>` by default, though the script attempts
 to resolve locations via `gh repo view` or `glab repo view`. If the repo name
 cannot be detected, lazyworktree falls back to a local `local-<hash>` key for
@@ -356,7 +356,7 @@ custom_commands:
 Notes:
 
 - `--worktree-dir` overrides `worktree_dir`.
-- `theme` selects the color theme. Available themes: `dracula`, `narna`, `clean-light`, `solarized-dark`, `solarized-light`, `gruvbox-dark`, `gruvbox-light`, `nord`, `monokai`, `catppuccin-mocha`. Default: `dracula`.
+- `theme` selects the colour theme. Available themes: `dracula`, `narna`, `clean-light`, `solarized-dark`, `solarized-light`, `gruvbox-dark`, `gruvbox-light`, `nord`, `monokai`, `catppuccin-mocha`. Default: `dracula`.
 - `init_commands` and `terminate_commands` run before any repo-specific `.wt`
   commands (if present).
 - Set `sort_by_active` to `false` to sort by path.
@@ -377,12 +377,12 @@ lazyworktree includes built-in themes:
 
 | Theme | Background | Best For |
 |-------|-----------|----------|
-| **dracula** | Dark (#282A36) | Dark terminals, vibrant colors, default |
+| **dracula** | Dark (#282A36) | Dark terminals, vibrant colours, default |
 | **narna** | Charcoal (#0D1117) | Dark terminals, blue highlights |
-| **clean-light** | White (#FFFFFF) | Light terminals, soft colors |
+| **clean-light** | White (#FFFFFF) | Light terminals, soft colours |
 | **solarized-dark** | Deep teal (#002B36) | Classic Solarized dark palette |
 | **solarized-light** | Cream (#FDF6E3) | Classic Solarized light palette |
-| **gruvbox-dark** | Dark gray (#282828) | Gruvbox dark, warm accents |
+| **gruvbox-dark** | Dark grey (#282828) | Gruvbox dark, warm accents |
 | **gruvbox-light** | Sand (#FBF1C7) | Gruvbox light, earthy tones |
 | **nord** | Midnight blue (#2E3440) | Nord calm cyan accents |
 | **monokai** | Olive black (#272822) | Monokai bright neon accents |
@@ -401,8 +401,8 @@ When viewing a worktree with an associated PR/MR, lazyworktree automatically fet
 - `✓` **Green** - Passed
 - `✗` **Red** - Failed
 - `●` **Yellow** - Pending/Running
-- `○` **Gray** - Skipped
-- `⊘` **Gray** - Cancelled
+- `○` **Grey** - Skipped
+- `⊘` **Grey** - Cancelled
 
 CI status is fetched lazily (only for the selected worktree) and cached for 30 seconds to keep the UI snappy. Press `p` to force a refresh of CI status.
 
