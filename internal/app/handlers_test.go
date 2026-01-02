@@ -130,7 +130,7 @@ func TestHandleCIStatusLoadedUpdatesCache(t *testing.T) {
 				Number: 1,
 				State:  "OPEN",
 				Title:  "Test",
-				URL:    "https://example.com/pr/1",
+				URL:    testPRURL,
 			},
 		},
 	}

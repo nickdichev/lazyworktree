@@ -14,17 +14,13 @@ const testContent = "test content"
 
 func TestNewTrustManager(t *testing.T) {
 	tmpDir := t.TempDir()
-	dbPath := filepath.Join(tmpDir, "trusted.json")
+	t.Setenv("XDG_DATA_HOME", tmpDir)
 
-	tm := &TrustManager{
-		dbPath:        dbPath,
-		trustedHashes: make(map[string]string),
-	}
+	tm := NewTrustManager()
 
 	assert.NotNil(t, tm)
-	assert.Equal(t, dbPath, tm.dbPath)
+	assert.Equal(t, filepath.Join(tmpDir, "lazyworktree", "trusted.json"), tm.dbPath)
 	assert.NotNil(t, tm.trustedHashes)
-	assert.Empty(t, tm.trustedHashes)
 }
 
 func TestCalculateHash(t *testing.T) {

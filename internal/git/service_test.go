@@ -2,9 +2,13 @@ package git
 
 import (
 	"context"
+	"io"
+	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/chmouel/lazyworktree/internal/config"
@@ -80,6 +84,35 @@ func TestSetDeltaPath(t *testing.T) {
 	})
 }
 
+func TestSetDebugLogger(t *testing.T) {
+	notify := func(_ string, _ string) {}
+	notifyOnce := func(_ string, _ string, _ string) {}
+
+	service := NewService(notify, notifyOnce)
+	logger := log.New(io.Discard, "", 0)
+	service.SetDebugLogger(logger)
+
+	assert.Equal(t, logger, service.debugLogger)
+}
+
+func TestSetDeltaArgs(t *testing.T) {
+	notify := func(_ string, _ string) {}
+	notifyOnce := func(_ string, _ string, _ string) {}
+
+	service := NewService(notify, notifyOnce)
+
+	service.SetDeltaArgs([]string{"--color-only"})
+	assert.Equal(t, []string{"--color-only"}, service.deltaArgs)
+
+	args := []string{"--side-by-side"}
+	service.SetDeltaArgs(args)
+	args[0] = "--changed"
+	assert.Equal(t, []string{"--side-by-side"}, service.deltaArgs)
+
+	service.SetDeltaArgs(nil)
+	assert.Nil(t, service.deltaArgs)
+}
+
 func TestApplyDelta(t *testing.T) {
 	notify := func(_ string, _ string) {}
 	notifyOnce := func(_ string, _ string, _ string) {}
@@ -127,6 +160,30 @@ func TestGetMainBranch(t *testing.T) {
 	assert.NotEmpty(t, branch)
 	// Should be one of the common main branches
 	assert.Contains(t, []string{"main", "master"}, branch)
+}
+
+func TestGetMainWorktreePathFallback(t *testing.T) {
+	notify := func(_ string, _ string) {}
+	notifyOnce := func(_ string, _ string, _ string) {}
+
+	service := NewService(notify, notifyOnce)
+	ctx := context.Background()
+
+	origDir, err := os.Getwd()
+	require.NoError(t, err)
+	defer func() {
+		_ = os.Chdir(origDir)
+	}()
+
+	tmpDir := t.TempDir()
+	require.NoError(t, os.Chdir(tmpDir))
+
+	path := service.GetMainWorktreePath(ctx)
+	expected, err := filepath.EvalSymlinks(tmpDir)
+	require.NoError(t, err)
+	actual, err := filepath.EvalSymlinks(path)
+	require.NoError(t, err)
+	assert.Equal(t, expected, actual)
 }
 
 func TestRenameWorktree(t *testing.T) {
@@ -467,4 +524,138 @@ func TestCreateWorktreeFromPR(t *testing.T) {
 		// Should return a boolean (even if false due to git errors)
 		assert.IsType(t, true, ok)
 	})
+}
+
+func TestDetectHost(t *testing.T) {
+	ctx := context.Background()
+	cases := []struct {
+		name   string
+		remote string
+		want   string
+	}{
+		{name: "github", remote: "git@github.com:org/repo.git", want: gitHostGithub},
+		{name: "gitlab", remote: "https://gitlab.com/group/repo.git", want: gitHostGitLab},
+		{name: "unknown", remote: "ssh://example.com/repo.git", want: gitHostUnknown},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := t.TempDir()
+			runGit(t, repo, "init")
+			runGit(t, repo, "remote", "add", "origin", tc.remote)
+			withCwd(t, repo)
+
+			service := NewService(func(string, string) {}, func(string, string, string) {})
+			if got := service.detectHost(ctx); got != tc.want {
+				t.Fatalf("expected %q, got %q", tc.want, got)
+			}
+		})
+	}
+}
+
+func TestFetchGitHubCIParsesOutput(t *testing.T) {
+	ctx := context.Background()
+	writeStubCommand(t, "gh", "GH_OUTPUT")
+	t.Setenv("GH_OUTPUT", `[{"name":"build","state":"completed","bucket":"pass"}]`)
+
+	service := NewService(func(string, string) {}, func(string, string, string) {})
+	checks, err := service.fetchGitHubCI(ctx, 1)
+	require.NoError(t, err)
+	require.Len(t, checks, 1)
+	assert.Equal(t, "build", checks[0].Name)
+	assert.Equal(t, "completed", checks[0].Status)
+	assert.Equal(t, ciSuccess, checks[0].Conclusion)
+}
+
+func TestFetchGitHubCIInvalidJSON(t *testing.T) {
+	ctx := context.Background()
+	writeStubCommand(t, "gh", "GH_OUTPUT")
+	t.Setenv("GH_OUTPUT", "not-json")
+
+	service := NewService(func(string, string) {}, func(string, string, string) {})
+	_, err := service.fetchGitHubCI(ctx, 1)
+	require.Error(t, err)
+}
+
+func TestFetchGitLabCIParsesPipeline(t *testing.T) {
+	ctx := context.Background()
+	writeStubCommand(t, "glab", "GLAB_OUTPUT")
+	t.Setenv("GLAB_OUTPUT", `{"jobs":[{"name":"build","status":"success"},{"name":"lint","status":"failed"}]}`)
+
+	service := NewService(func(string, string) {}, func(string, string, string) {})
+	checks, err := service.fetchGitLabCI(ctx, "main")
+	require.NoError(t, err)
+	require.Len(t, checks, 2)
+	assert.Equal(t, "build", checks[0].Name)
+	assert.Equal(t, ciSuccess, checks[0].Conclusion)
+	assert.Equal(t, "lint", checks[1].Name)
+	assert.Equal(t, ciFailure, checks[1].Conclusion)
+}
+
+func TestFetchGitLabCIParsesJobArray(t *testing.T) {
+	ctx := context.Background()
+	writeStubCommand(t, "glab", "GLAB_OUTPUT")
+	t.Setenv("GLAB_OUTPUT", `[{"name":"unit","status":"running"}]`)
+
+	service := NewService(func(string, string) {}, func(string, string, string) {})
+	checks, err := service.fetchGitLabCI(ctx, "main")
+	require.NoError(t, err)
+	require.Len(t, checks, 1)
+	assert.Equal(t, "unit", checks[0].Name)
+	assert.Equal(t, ciPending, checks[0].Conclusion)
+}
+
+func TestFetchGitLabCIInvalidJSON(t *testing.T) {
+	ctx := context.Background()
+	writeStubCommand(t, "glab", "GLAB_OUTPUT")
+	t.Setenv("GLAB_OUTPUT", "not-json")
+
+	service := NewService(func(string, string) {}, func(string, string, string) {})
+	_, err := service.fetchGitLabCI(ctx, "main")
+	require.Error(t, err)
+}
+
+func runGit(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %s failed: %v\n%s", strings.Join(args, " "), err, output)
+	}
+	return strings.TrimSpace(string(output))
+}
+
+func withCwd(t *testing.T, dir string) {
+	t.Helper()
+
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(wd)
+	})
+}
+
+func writeStubCommand(t *testing.T, name, envVar string) {
+	t.Helper()
+
+	if runtime.GOOS == "windows" {
+		t.Skip("requires sh")
+	}
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, name)
+	script := "#!/bin/sh\nprintf '%s' \"$" + envVar + "\"\n"
+	// #nosec G306 -- test helper needs an executable stub in a temp dir.
+	if err := os.WriteFile(path, []byte(script), 0o700); err != nil {
+		t.Fatalf("write stub command: %v", err)
+	}
+	pathEnv := os.Getenv("PATH")
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+pathEnv)
 }

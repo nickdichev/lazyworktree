@@ -12,11 +12,6 @@ import (
 	"github.com/chmouel/lazyworktree/internal/models"
 )
 
-const (
-	integrationBranch = "feature"
-	integrationPRURL  = "https://example.com/pr/1"
-)
-
 type recordedCommand struct {
 	name string
 	args []string
@@ -89,9 +84,9 @@ func TestIntegrationKeyBindingsTriggerCommands(t *testing.T) {
 	worktreePath := cfg.WorktreeDir + "/wt"
 	wt := &models.WorktreeInfo{
 		Path:   worktreePath,
-		Branch: integrationBranch,
+		Branch: featureBranch,
 		PR: &models.PRInfo{
-			URL: integrationPRURL,
+			URL: testPRURL,
 		},
 	}
 
@@ -137,11 +132,11 @@ func TestIntegrationKeyBindingsTriggerCommands(t *testing.T) {
 		t.Fatalf("expected %q to be started, got %+v", expectedOpen, recorder.starts)
 	}
 	if runtime.GOOS == osWindows {
-		if len(openCmd.args) < 2 || openCmd.args[1] != integrationPRURL {
+		if len(openCmd.args) < 2 || openCmd.args[1] != testPRURL {
 			t.Fatalf("unexpected windows opener args: %+v", openCmd.args)
 		}
 	} else {
-		if len(openCmd.args) != 1 || openCmd.args[0] != integrationPRURL {
+		if len(openCmd.args) != 1 || openCmd.args[0] != testPRURL {
 			t.Fatalf("unexpected opener args: %+v", openCmd.args)
 		}
 	}
@@ -206,7 +201,7 @@ func TestIntegrationPRAndCIFlowUpdatesView(t *testing.T) {
 	worktreePath := cfg.WorktreeDir + "/wt"
 	wt := &models.WorktreeInfo{
 		Path:   worktreePath,
-		Branch: integrationBranch,
+		Branch: featureBranch,
 	}
 
 	updated, cmd := m.Update(worktreesLoadedMsg{worktrees: []*models.WorktreeInfo{wt}})
@@ -225,7 +220,7 @@ func TestIntegrationPRAndCIFlowUpdatesView(t *testing.T) {
 
 	prMsg := prDataLoadedMsg{
 		prMap: map[string]*models.PRInfo{
-			integrationBranch: {Number: 12, State: "OPEN", Title: "Test", URL: integrationPRURL},
+			featureBranch: {Number: 12, State: "OPEN", Title: "Test", URL: testPRURL},
 		},
 	}
 	updated, cmd = m.Update(prMsg)
@@ -243,7 +238,7 @@ func TestIntegrationPRAndCIFlowUpdatesView(t *testing.T) {
 	}
 
 	ciMsg := ciStatusLoadedMsg{
-		branch: integrationBranch,
+		branch: featureBranch,
 		checks: []*models.CICheck{
 			{Name: "build", Status: "completed", Conclusion: "success"},
 		},

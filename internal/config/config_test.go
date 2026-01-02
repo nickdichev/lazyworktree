@@ -1306,3 +1306,24 @@ func TestParseConfig_CustomCommands(t *testing.T) {
 		})
 	}
 }
+
+func TestLoadConfigRejectsOutsideConfigDir(t *testing.T) {
+	configHome := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+
+	outside := filepath.Join(t.TempDir(), "config.yaml")
+	cfg, err := LoadConfig(outside)
+	require.Error(t, err)
+	assert.NotNil(t, cfg)
+	assert.Equal(t, DefaultConfig().SortByActive, cfg.SortByActive)
+}
+
+func TestIsPathWithin(t *testing.T) {
+	base := filepath.Join(t.TempDir(), "base")
+	inside := filepath.Join(base, "child")
+	outside := filepath.Join(base, "..", "other")
+
+	assert.True(t, isPathWithin(base, base))
+	assert.True(t, isPathWithin(base, inside))
+	assert.False(t, isPathWithin(base, outside))
+}

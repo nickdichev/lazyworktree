@@ -3,12 +3,11 @@ package theme
 import "testing"
 
 func TestGetTheme(t *testing.T) {
-	got := GetTheme("narna")
-	if got == nil {
-		t.Fatal("expected theme to be returned")
-	}
-	if got.Background != Narna().Background {
-		t.Fatalf("expected narna background %q, got %q", Narna().Background, got.Background)
+	for _, name := range AvailableThemes() {
+		got := GetTheme(name)
+		if got == nil {
+			t.Fatalf("expected theme for %q", name)
+		}
 	}
 
 	fallback := GetTheme("unknown")

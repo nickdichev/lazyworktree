@@ -129,7 +129,7 @@ func TestOpenPRUsesCommandRunner(t *testing.T) {
 			Path:   testWorktreePath,
 			Branch: "feat",
 			PR: &models.PRInfo{
-				URL: "https://example.com/pr/1",
+				URL: testPRURL,
 			},
 		},
 	}
@@ -156,11 +156,11 @@ func TestOpenPRUsesCommandRunner(t *testing.T) {
 		t.Fatalf("expected %q command, got %q", expected, capture.name)
 	}
 	if runtime.GOOS == osWindows {
-		if len(capture.args) < 2 || capture.args[1] != "https://example.com/pr/1" {
+		if len(capture.args) < 2 || capture.args[1] != testPRURL {
 			t.Fatalf("expected windows URL args, got %v", capture.args)
 		}
 	} else {
-		if len(capture.args) != 1 || capture.args[0] != "https://example.com/pr/1" {
+		if len(capture.args) != 1 || capture.args[0] != testPRURL {
 			t.Fatalf("expected URL arg, got %v", capture.args)
 		}
 	}
