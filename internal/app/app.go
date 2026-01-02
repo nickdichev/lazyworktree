@@ -682,6 +682,9 @@ func (m *Model) handleBuiltInKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "X":
 		return m, m.showPruneMerged()
 
+	case "!":
+		return m, m.showRunCommand()
+
 	case keyEsc, keyEscRaw:
 		if m.currentScreen == screenPalette {
 			m.currentScreen = screenNone
@@ -1924,6 +1927,28 @@ func (m *Model) showRenameWorktree() tea.Cmd {
 	return textinput.Blink
 }
 
+func (m *Model) showRunCommand() tea.Cmd {
+	if m.selectedIndex < 0 || m.selectedIndex >= len(m.filteredWts) {
+		return nil
+	}
+
+	m.currentScreen = screenInput
+	m.inputScreen = NewInputScreen(
+		"Run command in worktree",
+		"e.g., make test, npm install, etc.",
+		"",
+		m.theme,
+	)
+	m.inputSubmit = func(value string) (tea.Cmd, bool) {
+		cmdStr := strings.TrimSpace(value)
+		if cmdStr == "" {
+			return nil, true // Close without running
+		}
+		return m.executeArbitraryCommand(cmdStr), true
+	}
+	return nil
+}
+
 func (m *Model) showPruneMerged() tea.Cmd {
 	merged := []*models.WorktreeInfo{}
 	for _, wt := range m.worktrees {
@@ -2310,6 +2335,45 @@ func (m *Model) executeCustomCommandWithPager(customCmd *config.CustomCommand, w
 	// Always run via shell to support pipes, redirects, and shell features
 	// #nosec G204 -- command comes from user's own config file
 	c := m.commandRunner("bash", "-c", cmdStr)
+	c.Dir = wt.Path
+	c.Env = envVars
+
+	return m.execProcess(c, func(err error) tea.Msg {
+		if err != nil {
+			return errMsg{err: err}
+		}
+		return refreshCompleteMsg{}
+	})
+}
+
+func (m *Model) executeArbitraryCommand(cmdStr string) tea.Cmd {
+	if m.selectedIndex < 0 || m.selectedIndex >= len(m.filteredWts) {
+		return nil
+	}
+
+	wt := m.filteredWts[m.selectedIndex]
+
+	// Build environment variables (same as custom commands)
+	env := m.buildCommandEnv(wt.Branch, wt.Path)
+	envVars := os.Environ()
+	for k, v := range env {
+		envVars = append(envVars, fmt.Sprintf("%s=%s", k, v))
+	}
+
+	// Get pager configuration
+	pager := m.pagerCommand()
+	pagerEnv := m.pagerEnv(pager)
+	pagerCmd := pager
+	if pagerEnv != "" {
+		pagerCmd = fmt.Sprintf("%s %s", pagerEnv, pager)
+	}
+
+	// Build command string that pipes output through pager
+	fullCmdStr := fmt.Sprintf("set -o pipefail; (%s) 2>&1 | %s", cmdStr, pagerCmd)
+
+	// Create command with bash shell
+	// #nosec G204 -- command comes from user input in TUI
+	c := m.commandRunner("bash", "-c", fullCmdStr)
 	c.Dir = wt.Path
 	c.Env = envVars
 

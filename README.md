@@ -285,6 +285,7 @@ custom_commands:
 | `F` | Full-screen diff viewer |
 | `A` | Absorb worktree into main |
 | `X` | Prune merged worktrees |
+| `!` | Run arbitrary command in selected worktree |
 | `p` | Fetch PR/MR status (also refreshes CI checks) |
 | `o` | Open PR/MR in browser |
 | `ctrl+p`, `P` | Command palette |

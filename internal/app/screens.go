@@ -545,6 +545,7 @@ func NewHelpScreen(maxWidth, maxHeight int, customCommands map[string]*config.Cu
 - D: Delete selected worktree
 - A: Absorb worktree into main (merge + delete)
 - X: Prune merged PR worktrees
+- !: Run arbitrary command in selected worktree
 - Ctrl+p, P: Command Palette
 - R: Fetch all remotes
 - p: Fetch PR status from GitHub

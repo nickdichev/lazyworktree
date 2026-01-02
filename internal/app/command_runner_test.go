@@ -18,7 +18,10 @@ type commandCapture struct {
 	env  []string
 }
 
-const testWorktreePath = "/tmp/wt"
+const (
+	testWorktreePath = "/tmp/wt"
+	testBashCmd      = "bash"
+)
 
 func (c *commandCapture) runner(name string, args ...string) *exec.Cmd {
 	c.name = name
@@ -99,7 +102,7 @@ func TestExecuteCustomCommandUsesCommandRunner(t *testing.T) {
 		t.Fatal("expected command to be returned")
 	}
 
-	if capture.name != "bash" {
+	if capture.name != testBashCmd {
 		t.Fatalf("expected bash command, got %q", capture.name)
 	}
 	if len(capture.args) != 2 || capture.args[0] != "-c" {
@@ -144,7 +147,7 @@ func TestExecuteCustomCommandShowsOutput(t *testing.T) {
 		t.Fatal("expected command to be returned")
 	}
 
-	if capture.name != "bash" {
+	if capture.name != testBashCmd {
 		t.Fatalf("expected bash command, got %q", capture.name)
 	}
 	if len(capture.args) != 2 || capture.args[0] != "-c" {
@@ -237,5 +240,63 @@ func TestAttachTmuxSessionCmdUsesCommandRunner(t *testing.T) {
 	}
 	if len(capture.args) != 3 || capture.args[0] != "attach-session" || capture.args[2] != "session" {
 		t.Fatalf("unexpected tmux args: %v", capture.args)
+	}
+}
+
+func TestExecuteArbitraryCommand(t *testing.T) {
+	cfg := &config.AppConfig{
+		WorktreeDir: t.TempDir(),
+		Pager:       "less -R",
+	}
+	m := NewModel(cfg, "")
+	m.filteredWts = []*models.WorktreeInfo{{Path: testWorktreePath, Branch: "feat"}}
+	m.selectedIndex = 0
+
+	capture := &commandCapture{}
+	m.commandRunner = capture.runner
+	m.execProcess = capture.exec
+
+	cmd := m.executeArbitraryCommand("make test")
+	if cmd == nil {
+		t.Fatal("expected command to be returned")
+	}
+
+	if capture.name != testBashCmd {
+		t.Fatalf("expected bash command, got %q", capture.name)
+	}
+	if len(capture.args) != 2 || capture.args[0] != "-c" {
+		t.Fatalf("expected bash -c args, got %v", capture.args)
+	}
+	if !strings.Contains(capture.args[1], "make test") {
+		t.Fatalf("expected command to include 'make test', got %q", capture.args[1])
+	}
+	if !strings.Contains(capture.args[1], "set -o pipefail") {
+		t.Fatalf("expected pipefail in command, got %q", capture.args[1])
+	}
+	if !strings.Contains(capture.args[1], "less -R") {
+		t.Fatalf("expected pager in command, got %q", capture.args[1])
+	}
+	if capture.dir != testWorktreePath {
+		t.Fatalf("expected worktree dir, got %q", capture.dir)
+	}
+	if value, ok := envValue(capture.env, "WORKTREE_PATH"); !ok || value != testWorktreePath {
+		t.Fatalf("expected WORKTREE_PATH in env, got %q (present=%v)", value, ok)
+	}
+	if value, ok := envValue(capture.env, "WORKTREE_BRANCH"); !ok || value != "feat" {
+		t.Fatalf("expected WORKTREE_BRANCH in env, got %q (present=%v)", value, ok)
+	}
+}
+
+func TestExecuteArbitraryCommandNoSelection(t *testing.T) {
+	cfg := &config.AppConfig{
+		WorktreeDir: t.TempDir(),
+	}
+	m := NewModel(cfg, "")
+	m.filteredWts = []*models.WorktreeInfo{}
+	m.selectedIndex = -1
+
+	cmd := m.executeArbitraryCommand("make test")
+	if cmd != nil {
+		t.Fatal("expected nil command when no worktree selected")
 	}
 }
