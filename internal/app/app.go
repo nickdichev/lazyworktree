@@ -3239,12 +3239,13 @@ func (m *Model) applyLayout(layout layoutDims) {
 	tableHeaderHeight := 1 // bubbles table has its own header
 
 	// Subtract 2 extra lines for safety margin
-	tableHeight := maxInt(1, layout.leftInnerHeight-titleHeight-tableHeaderHeight-2)
+	// Minimum height of 3 is required to prevent viewport slice bounds panic
+	tableHeight := maxInt(3, layout.leftInnerHeight-titleHeight-tableHeaderHeight-2)
 	m.worktreeTable.SetWidth(layout.leftInnerWidth)
 	m.worktreeTable.SetHeight(tableHeight)
 	m.updateTableColumns(layout.leftInnerWidth)
 
-	logHeight := maxInt(1, layout.rightBottomInnerHeight-titleHeight-tableHeaderHeight-2)
+	logHeight := maxInt(3, layout.rightBottomInnerHeight-titleHeight-tableHeaderHeight-2)
 	m.logTable.SetWidth(layout.rightInnerWidth)
 	m.logTable.SetHeight(logHeight)
 	m.updateLogColumns(layout.rightInnerWidth)

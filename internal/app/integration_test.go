@@ -239,6 +239,42 @@ func TestWindowResize(t *testing.T) {
 	}
 }
 
+// TestVerySmallTerminalSize tests handling of very small terminal sizes
+func TestVerySmallTerminalSize(t *testing.T) {
+	cfg := &config.AppConfig{
+		WorktreeDir: t.TempDir(),
+	}
+	m := NewModel(cfg, "")
+
+	// Send a very small window size message that previously caused a panic
+	msg := tea.WindowSizeMsg{
+		Width:  10,
+		Height: 5,
+	}
+
+	// This should not panic
+	newModel, _ := m.Update(msg)
+	updatedModel, ok := newModel.(*Model)
+	if !ok {
+		t.Fatal("Update returned wrong type")
+	}
+
+	// Verify the model was updated
+	if updatedModel.windowWidth != 10 {
+		t.Errorf("Expected windowWidth to be 10, got %d", updatedModel.windowWidth)
+	}
+
+	if updatedModel.windowHeight != 5 {
+		t.Errorf("Expected windowHeight to be 5, got %d", updatedModel.windowHeight)
+	}
+
+	// Try to render the view - this previously caused slice bounds panic
+	view := updatedModel.View()
+	if view == "" {
+		t.Error("Expected View() to return non-empty string even with tiny window")
+	}
+}
+
 // TestCommandPalette tests command palette functionality
 func TestCommandPalette(t *testing.T) {
 	cfg := &config.AppConfig{
