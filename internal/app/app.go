@@ -3552,14 +3552,10 @@ func (m *Model) renderHeader(layout layoutDims) string {
 
 	// Add decorative icon to title
 	title := "⚡ Lazy Worktree Manager"
-	repoStyle := lipgloss.NewStyle().
-		Italic(true).
-		Foreground(lipgloss.Color("#FFFFFF")).
-		Faint(true) // Subtle dimming for hierarchy
 	repoKey := strings.TrimSpace(m.repoKey)
 	content := title
 	if repoKey != "" && repoKey != "unknown" && !strings.HasPrefix(repoKey, "local-") {
-		content = fmt.Sprintf("%s  •  %s", content, repoStyle.Render(repoKey))
+		content = fmt.Sprintf("%s  •  %s", content, repoKey)
 	}
 
 	return headerStyle.Render(content)
