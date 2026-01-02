@@ -1,6 +1,6 @@
 # lazyworktree - Lazy Git Worktree Manager
 
-A Bubble Tea-based TUI for managing Git worktrees efficiently. Visualise status, manage branches, and jump between worktrees with ease.
+A [BubbleTea](https://github.com/charmbracelet/bubbletea)-based Terminal User Interface designed for efficient Git worktree management. Visualise the repository's status, oversee branches, and navigate between worktrees with ease.
 
 ![Go](https://img.shields.io/badge/go-1.25%2B-blue)
 ![Coverage](https://img.shields.io/badge/Coverage-67.3%25-yellow)
@@ -8,14 +8,14 @@ A Bubble Tea-based TUI for managing Git worktrees efficiently. Visualise status,
 ## Features
 
 - **Worktree Management**: Create, rename, delete, absorb, and prune merged worktrees.
-- **Base Selection**: Pick a base branch or commit from a list (or enter a ref) when creating a worktree.
+- **Base Selection**: Select a base branch or commit from a list, or enter a reference when creating a worktree.
 - **Forge Integration**: Fetch and display associated Pull Request (GitHub) or Merge Request (GitLab) status, including CI check results (via `gh` or `glab` CLI).
-- **Create from PR/MR**: Create worktrees directly from open pull/merge requests via command palette.
+- **Create from PR/MR**: Establish worktrees directly from open pull or merge requests via the command palette.
 - **Status at a Glance**: View dirty state, ahead/behind counts, and divergence from main.
 - **[Tmux](https://github.com/tmux/tmux/) Integration**: Create and manage tmux sessions per worktree with multi-window support.
 - **Diff Viewer**: View diff with optional [delta](https://github.com/dandavison/delta) support.
 - **Repo Automation**: `.wt` init/terminate commands with [TOFU](https://en.wikipedia.org/wiki/Trust_on_first_use) security.
-- **LazyGit Integration**: Launch [lazygit](https://github.com/jesseduffield/lazygit) directly for the selected worktree.
+- **LazyGit Integration**: Launch [lazygit](https://github.com/jesseduffield/lazygit) directly for the currently selected worktree.
 
 ## Screenshots
 
@@ -57,7 +57,7 @@ Or build and run directly:
 go run ./cmd/lazyworktree/main.go
 ```
 
-You can override the default worktree root:
+To override the default worktree root, use the following:
 
 ```bash
 lazyworktree --worktree-dir ~/worktrees
@@ -65,7 +65,7 @@ lazyworktree --worktree-dir ~/worktrees
 
 ### Pre-built Binaries
 
-Pre-built binaries for various platforms are available in the [Releases](https://github.com/chmouel/lazyworktree/releases) section.
+Pre-built binaries for various platforms are provided in the [Releases](https://github.com/chmouel/lazyworktree/releases) section.
 
 ### 🍺 Homebrew
 
@@ -82,7 +82,7 @@ yay -S lazyworktree-bin
 
 ## Shell Integration (Zsh)
 
-To enable the "jump" functionality (changing your shell's current directory on exit), add the helper functions from `shell/functions.shell` to your `.zshrc`. The helper uses `--output-selection` to write the selected path to a temporary file.
+To enable the "jump" functionality, which changes your shell's current directory upon exit, append the helper functions from `shell/functions.shell` to your `.zshrc`. The helper uses `--output-selection` to write the selected path to a temporary file.
 
 Example configuration:
 
@@ -96,9 +96,9 @@ source /path/to/lazyworktree/shell/functions.shell
 pm() { worktree_jump ~/path/to/your/main/repo "$@"; }
 ```
 
-Now you can run `pm` to open the TUI, select a worktree, and upon pressing `Enter`, your shell will `cd` into that directory.
+You can now run `pm` to open the Terminal User Interface, select a worktree, and upon pressing `Enter`, your shell will change directory to that location.
 
-You can also jump directly to a worktree by name and enable completion:
+To jump directly to a worktree by name with shell completion enabled, use the following:
 
 ```bash
 pm() { worktree_jump ~/path/to/your/main/repo "$@"; }
@@ -106,8 +106,7 @@ _pm() { _worktree_jump ~/path/to/your/main/repo; }
 compdef _pm pm
 ```
 
-Should you require a shortcut to the last-selected worktree, use the built-in
-`worktree_go_last` helper (reads the `.last-selected` file):
+Should you require a shortcut to the last-selected worktree, use the built-in `worktree_go_last` helper, which reads the `.last-selected` file:
 
 ```bash
 alias pl='worktree_go_last ~/path/to/your/main/repo'
@@ -115,7 +114,7 @@ alias pl='worktree_go_last ~/path/to/your/main/repo'
 
 ## Custom Initialization and Termination
 
-You may create a `.wt` file in your main repository to define custom commands to run when creating or removing a worktree. This format is inspired by [wt](https://github.com/taecontrol/wt).
+You may create a `.wt` file in your main repository to define custom commands that execute when creating or removing a worktree. This format is inspired by [wt](https://github.com/taecontrol/wt).
 
 ### Example `.wt` configuration
 
@@ -139,13 +138,13 @@ The following environment variables are available to your commands:
 
 ### Security: Trust on First Use (TOFU)
 
-Since `.wt` files allow executing arbitrary commands found in a repository, `lazyworktree` implements a **Trust on First Use** security model to prevent malicious repositories from running code on your machine automatically.
+Since `.wt` files permit the execution of arbitrary commands found within a repository, `lazyworktree` implements a **Trust on First Use** security model to prevent malicious repositories from automatically executing code on your system.
 
-- **First Run**: When `lazyworktree` encounters a new or modified `.wt` file, it will pause and display the commands it intends to run. You can **Trust** (run and save), **Block** (skip for now), or **Cancel** the operation.
+- **First Run**: Upon encountering a new or modified `.wt` file, `lazyworktree` will pause and display the commands it intends to execute. You may select **Trust** (run and save), **Block** (skip for now), or **Cancel** the operation.
 - **Trusted**: Once trusted, commands run silently in the background until the `.wt` file changes again.
 - **Persistence**: Trusted file hashes are stored in `~/.local/share/lazyworktree/trusted.json`.
 
-You can configure this behaviour in `config.yaml` via the `trust_mode` setting:
+This behaviour may be configured in `config.yaml` via the `trust_mode` setting:
 
 - **`tofu`** (Default): Prompts for confirmation on new or changed files. Secure and usable.
 - **`never`**: Never runs commands from `.wt` files. Safest for untrusted environments.
@@ -153,7 +152,7 @@ You can configure this behaviour in `config.yaml` via the `trust_mode` setting:
 
 ### Special Commands
 
-- `link_topsymlinks`: This is a built-in automation command (not a shell command) that runs without TOFU prompts once the `.wt` file is trusted. It performs:
+- `link_topsymlinks`: A built-in automation command (not a shell command) that executes without TOFU prompts once the `.wt` file is trusted. It performs the following:
   - Symlinks all untracked and ignored files from the root of the main worktree to the new worktree (excluding subdirectories).
   - Symlinks common editor configurations (`.vscode`, `.idea`, `.cursor`, `.claude`).
   - Ensures a `tmp/` directory exists in the new worktree.
@@ -161,10 +160,9 @@ You can configure this behaviour in `config.yaml` via the `trust_mode` setting:
 
 ## Custom Commands
 
-You can define custom keybindings in your `~/.config/lazyworktree/config.yaml` to execute commands in the selected worktree. Custom commands are executed interactively (the TUI suspends, just like when launching `lazygit`) and show up in the command palette. If you set `show_output`, lazyworktree pipes the command output through the configured pager.
+You may define custom keybindings in your `~/.config/lazyworktree/config.yaml` to execute commands within the selected worktree. Custom commands execute interactively (the Terminal User Interface suspends, much like when launching `lazygit`) and appear in the command palette. Should you set `show_output`, lazyworktree pipes the command output through the configured pager.
 
-By default, `t` opens a tmux session with a single `shell` window. You can override it by defining `custom_commands.t`.
-When `attach` is true, lazyworktree attaches to the session immediately. When `attach` is false, it shows an info modal with instructions to attach manually.
+By default, `t` opens a tmux session with a single `shell` window. You may override this by defining `custom_commands.t`. When `attach` is true, lazyworktree attaches to the session immediately; when false, it displays an information modal with instructions for manual attachment.
 
 ### Configuration Format
 
@@ -273,7 +271,7 @@ custom_commands:
 
 ### Key Precedence
 
-**Custom commands take precedence over built-in keys.** If you define a custom command with key `s`, it will override the built-in sort toggle. This allows you to fully customise your workflow.
+**Custom commands take precedence over built-in keys.** If you define a custom command with key `s`, it shall override the built-in sort toggle. This permits you to fully customise your workflow.
 
 ## Key Bindings
 
@@ -300,8 +298,8 @@ custom_commands:
 
 **Command Palette Actions:**
 
-- **Create from PR/MR**: Select an open PR/MR to create a worktree. Auto-generates a name (`pr{number}-{sanitized-title}`) that you can edit.
-- **Create from changes**: Create a new worktree from the current uncommitted changes in the selected worktree. Stashes all changes (including untracked files), creates a new worktree, and applies the stashed changes to it. Requires a worktree to be selected and have uncommitted changes.
+- **Create from PR/MR**: Select an open PR/MR to establish a worktree. A name is auto-generated (`pr{number}-{sanitized-title}`) which you may edit.
+- **Create from changes**: Establish a new worktree from current uncommitted changes in the selected worktree. This stashes all changes (including untracked files), creates a new worktree, and applies the stashed changes to it. Requires a worktree to be selected with uncommitted changes present.
 
 ### Mouse Controls
 
@@ -313,16 +311,11 @@ custom_commands:
 
 ## Configuration
 
-Worktrees are expected to be organised under
-`~/.local/share/worktrees/<repo_name>` by default, though the script attempts
-to resolve locations via `gh repo view` or `glab repo view`. If the repo name
-cannot be detected, lazyworktree falls back to a local `local-<hash>` key for
-cache and last-selected storage.
+Worktrees are expected to be organised under `~/.local/share/worktrees/<repo_name>` by default, although the application attempts to resolve locations via `gh repo view` or `glab repo view`. Should the repository name not be detectable, lazyworktree falls back to a local `local-<hash>` key for cache and last-selected storage.
 
-### Global Config (YAML)
+### Global Configuration (YAML)
 
-lazyworktree reads `~/.config/lazyworktree/config.yaml` (or `.yml`) for default
-settings. Example (also in [config.example.yaml](./config.example.yaml)):
+lazyworktree reads `~/.config/lazyworktree/config.yaml` (or `.yml`) for default settings. An example configuration is provided below (also available in [config.example.yaml](./config.example.yaml)):
 
 ```yaml
 worktree_dir: ~/.local/share/worktrees
@@ -355,21 +348,20 @@ custom_commands:
 
 Notes:
 
-- `--worktree-dir` overrides `worktree_dir`.
+- `--worktree-dir` overrides the `worktree_dir` setting.
 - `theme` selects the colour theme. Available themes: `dracula`, `narna`, `clean-light`, `solarized-dark`, `solarized-light`, `gruvbox-dark`, `gruvbox-light`, `nord`, `monokai`, `catppuccin-mocha`. Default: `dracula`.
-- `init_commands` and `terminate_commands` run before any repo-specific `.wt`
-  commands (if present).
+- `init_commands` and `terminate_commands` execute prior to any repository-specific `.wt` commands (if present).
 - Set `sort_by_active` to `false` to sort by path.
-- Set `auto_fetch_prs` to `true` to fetch PR data on startup.
-- Set `search_auto_select` to `true` to start with the filter focused and let `Enter` pick the first match (or pass `--search-auto-select`).
-- Use `max_untracked_diffs: 0` to hide untracked diffs; `max_diff_chars: 0` disables truncation.
-- Run `lazyworktree --show-syntax-themes` to print the default delta `--syntax-theme` values for each UI theme.
-- Use `lazyworktree --theme <name>` to pick a UI theme directly; the supported names match the ones listed above.
-- `delta_args` sets arguments passed to `delta` (defaults follow the UI theme: Dracula → `Dracula`, Narna → `OneHalfDark`, Clean-Light → `GitHub`, Solarized Dark → `Solarized (dark)`, Solarized Light → `Solarized (light)`, Gruvbox Dark → `Gruvbox Dark`, Gruvbox Light → `Gruvbox Light`, Nord → `Nord`, Monokai → `Monokai Extended`, Catppuccin Mocha → `Catppuccin Mocha`).
-- `delta_path` sets path to delta executable (default: `delta`). Set to empty string to disable delta and use plain git diff output.
-- `pager` sets the pager for `show_output` commands (default: `$PAGER`, fallback `less --use-color --wordwrap -qcR -P 'Press q to exit..'`, then `more`, then `cat`). When the pager is `less`, lazyworktree sets `LESS=` and `LESSHISTFILE=-` to ignore user defaults.
-- `merge_method` controls how the "Absorb worktree" action integrates changes into main: `rebase` (default) rebases the feature branch onto main then fast-forwards, `merge` creates a merge commit.
-- `branch_name_script` runs a script to generate branch name suggestions when creating worktrees from changes. The script receives the git diff on stdin and should output a branch name. See [AI-powered branch names](#ai-powered-branch-names) below.
+- Set `auto_fetch_prs` to `true` to fetch PR data upon startup.
+- Set `search_auto_select` to `true` to commence with the filter focused and allow `Enter` to select the first match (alternatively, pass `--search-auto-select`).
+- Use `max_untracked_diffs: 0` to conceal untracked diffs; `max_diff_chars: 0` disables truncation.
+- Execute `lazyworktree --show-syntax-themes` to display the default delta `--syntax-theme` values for each UI theme.
+- Use `lazyworktree --theme <name>` to select a UI theme directly; the supported names correspond to those listed above.
+- `delta_args` configures arguments passed to `delta` (defaults follow the UI theme: Dracula → `Dracula`, Narna → `OneHalfDark`, Clean-Light → `GitHub`, Solarized Dark → `Solarized (dark)`, Solarized Light → `Solarized (light)`, Gruvbox Dark → `Gruvbox Dark`, Gruvbox Light → `Gruvbox Light`, Nord → `Nord`, Monokai → `Monokai Extended`, Catppuccin Mocha → `Catppuccin Mocha`).
+- `delta_path` specifies the path to the delta executable (default: `delta`). Set to an empty string to disable delta and use plain git diff output.
+- `pager` designates the pager for `show_output` commands (default: `$PAGER`, fallback `less --use-color --wordwrap -qcR -P 'Press q to exit..'`, then `more`, then `cat`). When the pager is `less`, lazyworktree configures `LESS=` and `LESSHISTFILE=-` to disregard user defaults.
+- `merge_method` controls how the "Absorb worktree" action integrates changes into main: `rebase` (default) rebases the feature branch onto main then fast-forwards; `merge` creates a merge commit.
+- `branch_name_script` executes a script to generate branch name suggestions when creating worktrees from changes. The script receives the git diff on stdin and should output a branch name. Refer to [AI-powered branch names](#ai-powered-branch-names) below.
 
 ## Themes
 
@@ -388,7 +380,7 @@ lazyworktree includes built-in themes:
 | **monokai** | Olive black (#272822) | Monokai bright neon accents |
 | **catppuccin-mocha** | Mocha (#1E1E2E) | Catppuccin Mocha pastels |
 
-Select a theme in your config file:
+To select a theme, configure it in your configuration file:
 
 ```yaml
 theme: dracula  # or any listed above
@@ -396,7 +388,7 @@ theme: dracula  # or any listed above
 
 ## CI Status Display
 
-When viewing a worktree with an associated PR/MR, lazyworktree automatically fetches and displays CI check statuses in the info pane:
+When viewing a worktree with an associated PR/MR, lazyworktree automatically retrieves and displays CI check statuses in the information pane:
 
 - `✓` **Green** - Passed
 - `✗` **Red** - Failed
@@ -404,13 +396,13 @@ When viewing a worktree with an associated PR/MR, lazyworktree automatically fet
 - `○` **Grey** - Skipped
 - `⊘` **Grey** - Cancelled
 
-CI status is fetched lazily (only for the selected worktree) and cached for 30 seconds to keep the UI snappy. Press `p` to force a refresh of CI status.
+CI status is retrieved lazily (only for the selected worktree) and cached for 30 seconds to maintain UI responsiveness. Press `p` to force a refresh of CI status.
 
 ## AI-Powered Branch Names
 
-When creating a worktree from changes (via the command palette), you can configure an external script to suggest branch names. The script receives the git diff on stdin and should output a single branch name.
+When creating a worktree from changes (via the command palette), you may configure an external script to suggest branch names. The script receives the git diff on stdin and should output a single branch name.
 
-This is useful for integrating AI tools like `aichat`, `claude`, or any other CLI tool that can generate meaningful branch names from code changes.
+This proves useful for integrating AI tools such as `aichat`, `claude`, or any other command-line tool capable of generating meaningful branch names from code changes.
 
 ### Configuration
 
@@ -423,29 +415,29 @@ branch_name_script: "aichat -m gemini:gemini-2.5-flash-lite 'Generate a short gi
 
 ### How It Works
 
-1. When you select "Create from changes" in the command palette
-2. If `branch_name_script` is configured, the current diff is piped to the script
-3. The script's output (first line only) is used as the suggested branch name
-4. You can edit the suggestion before confirming
+1. Upon selecting "Create from changes" in the command palette
+2. Should `branch_name_script` be configured, the current diff is piped to the script
+3. The script's output (first line only) serves as the suggested branch name
+4. You may edit the suggestion prior to confirmation
 
 ### Script Requirements
 
 - The script receives the git diff on stdin
-- It should output just the branch name (first line is used)
-- If the script fails or returns empty, the default name (`{current-branch}-changes`) is used
-- The script has a 30-second timeout to prevent hanging
+- It should output only the branch name (first line is used)
+- Should the script fail or return empty output, the default name (`{current-branch}-changes`) is employed
+- The script operates under a 30-second timeout to prevent hanging
 
-## Speed performance
+## Performance Optimisation
 
-`lazyworktree` is designed to be super snappy:
+`lazyworktree` is designed for optimal responsiveness:
 
-- **Caching**: It caches worktree metadata in `.worktree-cache.json` under `<worktree_dir>/<repo_key>/`; `repo_key` is the remote `owner/repo` when available, otherwise a local `local-<hash>` key derived from the repo path.
-- **Background Updates**: As soon as the UI is visible, a background task refreshes the data from Git and updates the cache automatically.
-- **Welcome Screen**: If no worktrees are detected (e.g., during first-time use or in an unconfigured directory), a welcome screen guides you through the setup.
+- **Caching**: Worktree metadata is cached in `.worktree-cache.json` under `<worktree_dir>/<repo_key>/`; `repo_key` represents the remote `owner/repo` when available, otherwise a local `local-<hash>` key derived from the repository path.
+- **Background Updates**: Upon the UI becoming visible, a background task retrieves data from Git and updates the cache automatically.
+- **Welcome Screen**: Should no worktrees be detected (for instance, during initial use or in an unconfigured directory), a welcome screen provides guidance through the setup process.
 
 ## Trivia
 
-This used to be a python textual application, but the startup-time was too slow and I have decided to move it to a go [charmbracelet bubble](https://github.com/charmbracelet/bubbles) based TUI. You can still see or try if you want the old python interface here <https://github.com/chmouel/lazyworktree/tree/python>
+Previously, this was a Python textual application; however, the startup time proved excessive, prompting a migration to a Go-based [charmbracelet bubble](https://github.com/charmbracelet/bubbles) Terminal User Interface. The original Python implementation remains available for review or testing at <https://github.com/chmouel/lazyworktree/tree/python>
 
 ## Copyright
 
