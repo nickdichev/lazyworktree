@@ -430,7 +430,10 @@ CI status is retrieved lazily (only for the selected worktree) and cached for 30
 
 When creating a worktree from changes (via the command palette), you may configure an external script to suggest branch names. The script receives the git diff on stdin and should output a single branch name.
 
-This proves useful for integrating AI tools such as `aichat`, `claude`, or any other command-line tool capable of generating meaningful branch names from code changes.
+This proves useful for integrating AI tools such as [aichat](https://github.com/sigoden/aichat/), [claude code](https://claude.com/product/claude-code), or any other command-line tool capable of generating meaningful branch names from code changes.
+
+> [!NOTE]
+> There’s no need for a large or cutting-edge model for branch generation. Smaller models are usually cheaper and much faster. Google’s `gemini-2.5-flash-lite` is currently the fastest and most reliable choice.
 
 ### Configuration
 
@@ -439,6 +442,8 @@ Add `branch_name_script` to your `~/.config/lazyworktree/config.yaml`:
 ```yaml
 # Using aichat with Gemini
 branch_name_script: "aichat -m gemini:gemini-2.5-flash-lite 'Generate a short git branch name (no spaces, use hyphens) for this diff. Output only the branch name, nothing else.'"
+# Using gemini with Gemini cli
+branch_name_script: "gemini --model gemini-2.5-flash-lite -p "Generate a short git branch name (no spaces, use hyphens) for this diff. Output only the branch name, nothing else."
 ```
 
 ### How It Works
