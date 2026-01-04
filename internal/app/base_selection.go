@@ -43,7 +43,8 @@ func (m *Model) showBaseSelection(defaultBase string) tea.Cmd {
 				"No branches found.",
 				defaultBase,
 				func(branch string) tea.Cmd {
-					return m.showBranchNameInput(branch, branch)
+					suggestedName := stripRemotePrefix(branch)
+					return m.showBranchNameInput(branch, suggestedName)
 				},
 			)
 		case "commit-list":
@@ -87,6 +88,13 @@ func (m *Model) showBranchSelection(title, placeholder, noResults, preferred str
 	}
 	m.currentScreen = screenListSelect
 	return textinput.Blink
+}
+
+func stripRemotePrefix(branch string) string {
+	if idx := strings.Index(branch, "/"); idx > 0 {
+		return branch[idx+1:]
+	}
+	return branch
 }
 
 func (m *Model) showCommitSelection(baseBranch string) tea.Cmd {
@@ -292,9 +300,15 @@ func (m *Model) createWorktreeFromBase(newBranch, targetPath, baseRef string) te
 		return func() tea.Msg { return errMsg{err: fmt.Errorf("failed to create worktree directory: %w", err)} }
 	}
 
+	args := []string{"git", "worktree", "add", "-b", newBranch}
+	if strings.Contains(baseRef, "/") {
+		args = append(args, "--track")
+	}
+	args = append(args, targetPath, baseRef)
+
 	ok := m.git.RunCommandChecked(
 		m.ctx,
-		[]string{"git", "worktree", "add", "-b", newBranch, targetPath, baseRef},
+		args,
 		"",
 		fmt.Sprintf("Failed to create worktree %s", newBranch),
 	)

@@ -163,3 +163,45 @@ func TestBaseRefExists(t *testing.T) {
 		t.Fatal("expected ref to not exist")
 	}
 }
+
+func TestStripRemotePrefix(t *testing.T) {
+	tests := []struct {
+		name     string
+		branch   string
+		expected string
+	}{
+		{
+			name:     "remote branch with origin",
+			branch:   "origin/main",
+			expected: "main",
+		},
+		{
+			name:     "remote branch with other remote",
+			branch:   "upstream/feature",
+			expected: "feature",
+		},
+		{
+			name:     "local branch",
+			branch:   "main",
+			expected: "main",
+		},
+		{
+			name:     "branch with multiple slashes",
+			branch:   "origin/feature/test",
+			expected: "feature/test",
+		},
+		{
+			name:     "empty string",
+			branch:   "",
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := stripRemotePrefix(tt.branch); got != tt.expected {
+				t.Fatalf("expected %q, got %q", tt.expected, got)
+			}
+		})
+	}
+}
