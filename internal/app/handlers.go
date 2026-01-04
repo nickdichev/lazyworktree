@@ -153,12 +153,16 @@ func (m *Model) handleBuiltInKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "p":
 		m.ciCache = make(map[string]*ciCacheEntry)
-		if !m.prDataLoaded {
-			m.loading = true
-			m.statusContent = "Fetching PR data..."
-			return m, m.fetchPRData()
-		}
-		return m, m.maybeFetchCIStatus()
+		m.prDataLoaded = false
+		// Must update rows before columns to avoid index out of range panic
+		// because SetColumns triggers a viewport render with existing rows
+		m.updateTable()
+		m.updateTableColumns(m.worktreeTable.Width())
+		m.loading = true
+		m.statusContent = "Fetching PR data..."
+		m.loadingScreen = NewLoadingScreen("Fetching PR data...", m.theme)
+		m.currentScreen = screenLoading
+		return m, m.fetchPRData()
 
 	case "R":
 		m.loading = true

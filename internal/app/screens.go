@@ -29,6 +29,7 @@ const (
 	screenDiff
 	screenPRSelect
 	screenListSelect
+	screenLoading
 
 	// Key constants (keyEnter and keyEsc are defined in app.go)
 	keyCtrlD = "ctrl+d"
@@ -172,6 +173,27 @@ type DiffScreen struct {
 	thm      *theme.Theme
 }
 
+// LoadingScreen displays a modal with a pulsing border and braille spinner.
+type LoadingScreen struct {
+	message         string
+	borderColorIdx  int
+	spinnerFrameIdx int
+	thm             *theme.Theme
+}
+
+// brailleSpinnerFrames are the frames for the braille dots animation.
+var brailleSpinnerFrames = []string{"⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷"}
+
+// loadingBorderColors returns the color cycle for the pulsing border.
+func (s *LoadingScreen) loadingBorderColors() []lipgloss.Color {
+	return []lipgloss.Color{
+		s.thm.Accent,
+		s.thm.SuccessFg,
+		s.thm.WarnFg,
+		s.thm.Accent,
+	}
+}
+
 // NewConfirmScreen creates a confirm screen preloaded with a message.
 func NewConfirmScreen(message string, thm *theme.Theme) *ConfirmScreen {
 	return &ConfirmScreen{
@@ -188,6 +210,16 @@ func NewInfoScreen(message string, thm *theme.Theme) *InfoScreen {
 		message: message,
 		result:  make(chan bool, 1),
 		thm:     thm,
+	}
+}
+
+// NewLoadingScreen creates a loading modal with the given message.
+func NewLoadingScreen(message string, thm *theme.Theme) *LoadingScreen {
+	return &LoadingScreen{
+		message:         message,
+		borderColorIdx:  0,
+		spinnerFrameIdx: 0,
+		thm:             thm,
 	}
 }
 
@@ -346,6 +378,50 @@ func (s *InfoScreen) View() string {
 	)
 
 	return boxStyle.Render(content)
+}
+
+// Tick advances the loading animation (spinner frame and border color).
+func (s *LoadingScreen) Tick() {
+	s.spinnerFrameIdx = (s.spinnerFrameIdx + 1) % len(brailleSpinnerFrames)
+	colors := s.loadingBorderColors()
+	s.borderColorIdx = (s.borderColorIdx + 1) % len(colors)
+}
+
+// View renders the loading modal with animated border and braille spinner.
+func (s *LoadingScreen) View() string {
+	width := 50
+	height := 7
+
+	colors := s.loadingBorderColors()
+	borderColor := colors[s.borderColorIdx%len(colors)]
+
+	boxStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(borderColor).
+		Padding(1, 2).
+		Width(width).
+		Height(height)
+
+	spinnerFrame := brailleSpinnerFrames[s.spinnerFrameIdx%len(brailleSpinnerFrames)]
+	spinnerStyle := lipgloss.NewStyle().
+		Foreground(s.thm.Accent).
+		Bold(true)
+
+	messageStyle := lipgloss.NewStyle().
+		Foreground(s.thm.TextFg)
+
+	contentLine := fmt.Sprintf("%s %s",
+		spinnerStyle.Render(spinnerFrame),
+		messageStyle.Render(s.message),
+	)
+
+	centeredContent := lipgloss.NewStyle().
+		Width(width-4).
+		Height(height-2).
+		Align(lipgloss.Center, lipgloss.Center).
+		Render(contentLine)
+
+	return boxStyle.Render(centeredContent)
 }
 
 // NewInputScreen builds an input modal with prompt, placeholder, and initial value.

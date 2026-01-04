@@ -53,6 +53,8 @@ func (m *Model) handleWorktreesLoaded(msg worktreesLoadedMsg) (tea.Model, tea.Cm
 	}
 	if m.config.AutoFetchPRs && !m.prDataLoaded {
 		m.loading = true
+		m.loadingScreen = NewLoadingScreen("Fetching PR data...", m.theme)
+		m.currentScreen = screenLoading
 		return m, m.fetchPRData()
 	}
 	return m, m.updateDetailsView()
@@ -117,6 +119,10 @@ func (m *Model) handlePRMessages(msg tea.Msg) (tea.Model, tea.Cmd) {
 // handlePRDataLoaded processes PR data loaded message.
 func (m *Model) handlePRDataLoaded(msg prDataLoadedMsg) (tea.Model, tea.Cmd) {
 	m.loading = false
+	if m.currentScreen == screenLoading {
+		m.currentScreen = screenNone
+		m.loadingScreen = nil
+	}
 	if msg.err == nil {
 		for _, wt := range m.worktrees {
 			// First try matching by local branch name from the prMap

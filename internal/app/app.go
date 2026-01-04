@@ -217,6 +217,7 @@ type Model struct {
 	confirmAction func() tea.Cmd
 	infoScreen    *InfoScreen
 	infoAction    tea.Cmd
+	loadingScreen *LoadingScreen
 
 	// Trust / repo commands
 	repoConfig      *config.RepoConfig
@@ -432,6 +433,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case spinner.TickMsg:
 		m.spinner, cmd = m.spinner.Update(msg)
+		if m.loadingScreen != nil && m.currentScreen == screenLoading {
+			m.loadingScreen.Tick()
+		}
 		return m, cmd
 
 	case tea.KeyMsg:
@@ -618,6 +622,10 @@ func (m *Model) View() string {
 	case screenInput:
 		if m.inputScreen != nil {
 			return m.overlayPopup(baseView, m.inputScreen.View(), 5)
+		}
+	case screenLoading:
+		if m.loadingScreen != nil {
+			return m.overlayPopup(baseView, m.loadingScreen.View(), 5)
 		}
 	}
 
