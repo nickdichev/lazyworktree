@@ -280,7 +280,7 @@ func TestShowBranchNameInputValidation(t *testing.T) {
 	}
 
 	pathBranch := "path-branch"
-	if err := os.MkdirAll(filepath.Join(m.getWorktreeDir(), pathBranch), 0o750); err != nil {
+	if err := os.MkdirAll(filepath.Join(m.getRepoWorktreeDir(), pathBranch), 0o750); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
 	if _, ok := m.inputSubmit(pathBranch); ok {

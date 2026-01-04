@@ -75,7 +75,7 @@ func TestIntegrationCreateFromPRValidationErrors(t *testing.T) {
 	}
 
 	existsBranch := "exists"
-	if err := os.MkdirAll(filepath.Join(m.getWorktreeDir(), existsBranch), 0o750); err != nil {
+	if err := os.MkdirAll(filepath.Join(m.getRepoWorktreeDir(), existsBranch), 0o750); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
 	m.worktrees = nil

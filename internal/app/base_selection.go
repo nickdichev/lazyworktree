@@ -190,7 +190,7 @@ func (m *Model) showBranchNameInput(baseRef, defaultName string) tea.Cmd {
 			}
 		}
 
-		targetPath := filepath.Join(m.getWorktreeDir(), newBranch)
+		targetPath := filepath.Join(m.getRepoWorktreeDir(), newBranch)
 		if _, err := os.Stat(targetPath); err == nil {
 			m.inputScreen.errorMsg = fmt.Sprintf("Path already exists: %s", targetPath)
 			return nil, false
@@ -296,7 +296,7 @@ func sanitizeBranchNameFromTitle(title, fallback string) string {
 }
 
 func (m *Model) createWorktreeFromBase(newBranch, targetPath, baseRef string) tea.Cmd {
-	if err := os.MkdirAll(m.getWorktreeDir(), defaultDirPerms); err != nil {
+	if err := os.MkdirAll(m.getRepoWorktreeDir(), defaultDirPerms); err != nil {
 		return func() tea.Msg { return errMsg{err: fmt.Errorf("failed to create worktree directory: %w", err)} }
 	}
 

@@ -2335,7 +2335,7 @@ func (m *Model) renderScreen() string {
 	case screenWelcome:
 		if m.welcomeScreen == nil {
 			cwd, _ := os.Getwd()
-			m.welcomeScreen = NewWelcomeScreen(cwd, m.getWorktreeDir(), m.theme)
+			m.welcomeScreen = NewWelcomeScreen(cwd, m.getRepoWorktreeDir(), m.theme)
 		}
 		return m.welcomeScreen.View()
 	case screenPalette:
@@ -2539,6 +2539,10 @@ func (m *Model) getWorktreeDir() string {
 	}
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, ".local", "share", "worktrees")
+}
+
+func (m *Model) getRepoWorktreeDir() string {
+	return filepath.Join(m.getWorktreeDir(), m.getRepoKey())
 }
 
 func (m *Model) pagerCommand() string {

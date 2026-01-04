@@ -43,7 +43,7 @@ func (m *Model) handleWorktreesLoaded(msg worktreesLoadedMsg) (tea.Model, tea.Cm
 	m.saveCache()
 	if len(m.worktrees) == 0 {
 		cwd, _ := os.Getwd()
-		m.welcomeScreen = NewWelcomeScreen(cwd, m.getWorktreeDir(), m.theme)
+		m.welcomeScreen = NewWelcomeScreen(cwd, m.getRepoWorktreeDir(), m.theme)
 		m.currentScreen = screenWelcome
 		return m, nil
 	}
@@ -201,7 +201,7 @@ func (m *Model) handleOpenPRsLoaded(msg openPRsLoadedMsg) tea.Cmd {
 				}
 			}
 
-			targetPath := filepath.Join(m.getWorktreeDir(), newBranch)
+			targetPath := filepath.Join(m.getRepoWorktreeDir(), newBranch)
 			if _, err := os.Stat(targetPath); err == nil {
 				m.inputScreen.errorMsg = fmt.Sprintf("Path already exists: %s", targetPath)
 				return nil, false
@@ -214,7 +214,7 @@ func (m *Model) handleOpenPRsLoaded(msg openPRsLoadedMsg) tea.Cmd {
 			}
 
 			m.inputScreen.errorMsg = ""
-			if err := os.MkdirAll(m.getWorktreeDir(), defaultDirPerms); err != nil {
+			if err := os.MkdirAll(m.getRepoWorktreeDir(), defaultDirPerms); err != nil {
 				return func() tea.Msg { return errMsg{err: fmt.Errorf("failed to create worktree directory: %w", err)} }, true
 			}
 
