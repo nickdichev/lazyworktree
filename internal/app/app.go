@@ -155,7 +155,6 @@ const (
 
 	// Merge methods for absorb worktree
 	mergeMethodRebase = "rebase"
-	mergeMethodMerge  = "merge"
 
 	// Sort modes for worktree list
 	sortModePath         = 0 // Sort by path (alphabetical)
@@ -688,18 +687,12 @@ func (m *Model) overlayPopup(base, popup string, marginTop int) string {
 	popupWidth := lipgloss.Width(popupLines[0]) // Assume box is rectangular
 
 	// Calculate left padding to center
-	leftPad := (baseWidth - popupWidth) / 2
-	if leftPad < 0 {
-		leftPad = 0
-	}
+	leftPad := max((baseWidth-popupWidth)/2, 0)
 
 	// "Clear" styling for the background band
 	// We use the default terminal background color (reset)
 	leftSpace := strings.Repeat(" ", leftPad)
-	rightPad := baseWidth - popupWidth - leftPad
-	if rightPad < 0 {
-		rightPad = 0
-	}
+	rightPad := max(baseWidth-popupWidth-leftPad, 0)
 	rightSpace := strings.Repeat(" ", rightPad)
 
 	for i, line := range popupLines {
@@ -831,10 +824,7 @@ func (m *Model) updateTable() {
 		m.selectedIndex = len(m.filteredWts) - 1
 	}
 	if len(m.filteredWts) > 0 {
-		cursor := m.worktreeTable.Cursor()
-		if cursor < 0 {
-			cursor = 0
-		}
+		cursor := max(m.worktreeTable.Cursor(), 0)
 		if cursor >= len(m.filteredWts) {
 			cursor = len(m.filteredWts) - 1
 		}
@@ -1420,11 +1410,8 @@ func (m *Model) showPruneMerged() tea.Cmd {
 
 	// Build confirmation message (truncate if long)
 	lines := []string{}
-	limit := len(merged)
-	if limit > 10 {
-		limit = 10
-	}
-	for i := 0; i < limit; i++ {
+	limit := min(len(merged), 10)
+	for i := range limit {
 		lines = append(lines, fmt.Sprintf("- %s (%s)", merged[i].Path, merged[i].Branch))
 	}
 	if len(merged) > limit {
@@ -2731,8 +2718,8 @@ func (m *Model) pagerEnv(pager string) string {
 }
 
 func pagerIsLess(pager string) bool {
-	fields := strings.Fields(pager)
-	for _, field := range fields {
+	fields := strings.FieldsSeq(pager)
+	for field := range fields {
 		if strings.Contains(field, "=") && !strings.HasPrefix(field, "-") && !strings.Contains(field, "/") {
 			continue
 		}
@@ -3147,10 +3134,7 @@ func (m *Model) computeLayout() layoutDims {
 	gapX := 1
 	gapY := 1
 
-	bodyHeight := height - headerHeight - footerHeight - filterHeight
-	if bodyHeight < 8 {
-		bodyHeight = 8
-	}
+	bodyHeight := max(height-headerHeight-footerHeight-filterHeight, 8)
 
 	leftRatio := 0.55
 	switch m.focusedPane {
@@ -3191,10 +3175,7 @@ func (m *Model) computeLayout() layoutDims {
 		topRatio = 0.30
 	}
 
-	rightTopHeight := int(float64(bodyHeight-gapY) * topRatio)
-	if rightTopHeight < 6 {
-		rightTopHeight = 6
-	}
+	rightTopHeight := max(int(float64(bodyHeight-gapY)*topRatio), 6)
 	rightBottomHeight := bodyHeight - rightTopHeight - gapY
 	if rightBottomHeight < 4 {
 		rightBottomHeight = 4
@@ -3315,10 +3296,7 @@ func (m *Model) renderRightTopPane(layout layoutDims) string {
 	infoBox := m.renderInnerBox("Info", m.infoContent, layout.rightInnerWidth, 0)
 
 	innerBoxStyle := m.baseInnerBoxStyle()
-	statusBoxHeight := layout.rightTopInnerHeight - lipgloss.Height(title) - lipgloss.Height(infoBox) - 2
-	if statusBoxHeight < 3 {
-		statusBoxHeight = 3
-	}
+	statusBoxHeight := max(layout.rightTopInnerHeight-lipgloss.Height(title)-lipgloss.Height(infoBox)-2, 3)
 	statusViewportWidth := maxInt(1, layout.rightInnerWidth-innerBoxStyle.GetHorizontalFrameSize())
 	statusViewportHeight := maxInt(1, statusBoxHeight-innerBoxStyle.GetVerticalFrameSize())
 	m.statusViewport.Width = statusViewportWidth
@@ -3429,10 +3407,7 @@ func (m *Model) renderFooter(layout layoutDims) string {
 	}
 	spinnerView := m.spinner.View()
 	gap := "  "
-	available := layout.width - lipgloss.Width(spinnerView) - lipgloss.Width(gap)
-	if available < 0 {
-		available = 0
-	}
+	available := max(layout.width-lipgloss.Width(spinnerView)-lipgloss.Width(gap), 0)
 	footer := footerStyle.Width(available).Render(footerContent)
 	return lipgloss.JoinHorizontal(lipgloss.Left, footer, gap, spinnerView)
 }

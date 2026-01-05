@@ -226,7 +226,7 @@ func (m *Model) suggestBranchName(baseName string) string {
 		true,
 		false,
 	)
-	for _, line := range strings.Split(strings.TrimSpace(raw), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(raw), "\n") {
 		branch := strings.TrimSpace(line)
 		if branch == "" {
 			continue
