@@ -19,6 +19,7 @@ var (
 	version = "dev"
 	commit  = "none"
 	date    = "unknown"
+	builtBy = "unknown"
 )
 
 func main() {
@@ -40,7 +41,7 @@ func main() {
 	flag.Parse()
 
 	if showVersion {
-		fmt.Printf("lazyworktree version %s\ncommit: %s\nbuilt at: %s\n", version, commit, date)
+		fmt.Printf("lazyworktree version %s\ncommit: %s\nbuilt at: %s\nbuilt by: %s\n", version, commit, date, builtBy)
 		return
 	}
 	if showSyntaxThemes {

@@ -18,6 +18,7 @@ builds:
       - -X main.version={{.Version}}
       - -X main.commit={{.Commit}}
       - -X main.date={{.Date}}
+      - -X main.builtBy=goreleaser
 archives:
   - name_template: >-
       {{- .ProjectName }}_
@@ -41,6 +42,12 @@ homebrew_casks:
     directory: Casks
     homepage: "https://github.com/chmouel/lazyworktree"
     description: "lazyworktree - A TUI tool to manage git worktrees"
+    dependencies:
+      - formula: git
+      - formula: git-delta
+      - formula: lazygit
+      - formula: less
+      - formula: tmux
 snapshot:
   version_template: "{{ .Tag }}-next"
 
@@ -61,9 +68,37 @@ nfpms:
       - deb
       - rpm
     bindir: /usr/bin
+    dependencies:
+      - git
+      - git-delta
+      - lazygit
+      - less
+      - tmux
     contents:
       - src: config.example.yaml
         dst: /usr/share/doc/lazyworktree/config.example.yaml
+    overrides:
+      deb:
+        dependencies:
+          - git
+          - git-delta
+          - lazygit
+          - less
+          - tmux
+      rpm:
+        dependencies:
+          - git
+          - git-delta
+          - lazygit
+          - less
+          - tmux
+      apk:
+        dependencies:
+          - git
+          - delta
+          - lazygit
+          - less
+          - tmux
 changelog:
   sort: asc
   use: github
@@ -93,6 +128,12 @@ aurs:
     license: Apache 2.0
     private_key: "{{ .Env.AUR_PRIVATE_KEY }}"
     git_url: ssh://aur@aur.archlinux.org/lazyworktree-bin.git
+    depends:
+      - git
+      - delta
+      - lazygit
+      - less
+      - tmux
     package: |-
       # bin
       install -Dm755 "./lazyworktree" "${pkgdir}/usr/bin/lazyworktree"
