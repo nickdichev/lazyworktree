@@ -29,6 +29,7 @@ func (m *Model) showBaseSelection(defaultBase string) tea.Cmd {
 	items := []selectionItem{
 		{id: "branch-list", label: "Pick a base branch", description: "Local and remote branches"},
 		{id: "commit-list", label: "Pick a base commit", description: "Choose a branch, then a commit"},
+		{id: "from-pr", label: "Create from PR/MR", description: "Create from a pull/merge request"},
 		{id: "freeform", label: "Enter base ref manually", description: "Type a branch or commit"},
 	}
 	title := "Select base for new worktree"
@@ -51,6 +52,8 @@ func (m *Model) showBaseSelection(defaultBase string) tea.Cmd {
 			return m.showCommitSelection(defaultBase)
 		case "freeform":
 			return m.showFreeformBaseInput(defaultBase)
+		case "from-pr":
+			return m.showCreateFromPR()
 		default:
 			return nil
 		}

@@ -649,7 +649,7 @@ func NewHelpScreen(maxWidth, maxHeight int, customCommands map[string]*config.Cu
 - C: Cherry-pick commit to another worktree
 
 **Actions**
-- c: Create new worktree
+- c: Create new worktree (from branch, commit, or PR/MR)
 - d: Full-screen diff viewer
 - D: Delete selected worktree
 - A: Absorb worktree into main (merge + delete)

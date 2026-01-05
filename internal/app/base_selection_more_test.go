@@ -110,6 +110,42 @@ func TestShowBaseSelection(t *testing.T) {
 	}
 }
 
+func TestShowBaseSelectionFromPROption(t *testing.T) {
+	cfg := &config.AppConfig{WorktreeDir: t.TempDir()}
+	m := NewModel(cfg, "")
+	m.windowWidth = 120
+	m.windowHeight = 40
+
+	cmd := m.showBaseSelection(mainWorktreeName)
+	if cmd == nil {
+		t.Fatal("expected command to be returned")
+	}
+	if m.listScreen == nil || m.currentScreen != screenListSelect {
+		t.Fatal("expected list screen to be active")
+	}
+
+	// Verify the from-pr option exists
+	found := false
+	for _, item := range m.listScreen.items {
+		if item.id == "from-pr" {
+			found = true
+			if item.label != "Create from PR/MR" {
+				t.Fatalf("expected label 'Create from PR/MR', got %q", item.label)
+			}
+			break
+		}
+	}
+	if !found {
+		t.Fatal("expected 'from-pr' option in base selection")
+	}
+
+	// Verify selecting from-pr returns a command (the async PR fetch)
+	resultCmd := m.listSubmit(selectionItem{id: "from-pr"})
+	if resultCmd == nil {
+		t.Fatal("expected command from from-pr selection")
+	}
+}
+
 func TestShowFreeformBaseInputValidation(t *testing.T) {
 	repo := initTestRepo(t)
 	withCwd(t, repo.dir)

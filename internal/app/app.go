@@ -1567,8 +1567,7 @@ func (m *Model) showAbsorbWorktree() tea.Cmd {
 func (m *Model) showCommandPalette() tea.Cmd {
 	m.debugf("open palette")
 	items := []paletteItem{
-		{id: "create", label: "Create worktree (c)", description: "Add a new worktree from base branch"},
-		{id: "create-from-pr", label: "Create from PR/MR", description: "Create a worktree from a pull/merge request"},
+		{id: "create", label: "Create worktree (c)", description: "Add a new worktree from base branch or PR/MR"},
 		{id: "create-from-changes", label: "Create from changes", description: "Create a new worktree from current uncommitted changes"},
 		{id: "delete", label: "Delete worktree (D)", description: "Remove worktree and branch"},
 		{id: "rename", label: "Rename worktree (m)", description: "Rename worktree and branch"},
@@ -1590,8 +1589,6 @@ func (m *Model) showCommandPalette() tea.Cmd {
 		switch action {
 		case "create":
 			return m.showCreateWorktree()
-		case "create-from-pr":
-			return m.showCreateFromPR()
 		case "create-from-changes":
 			return m.showCreateWorktreeFromChanges()
 		case "delete":

@@ -296,7 +296,7 @@ custom_commands:
 | Key | Action |
 | --- | --- |
 | `Enter` | Jump to worktree (exit and cd) |
-| `c` | Create new worktree |
+| `c` | Create new worktree (from branch, commit, or PR/MR) |
 | `m` | Rename selected worktree |
 | `D` | Delete selected worktree |
 | `d` | View diff in pager (respects pager config) |
@@ -349,7 +349,6 @@ When running arbitrary commands with `!`, command history is persisted per repos
 
 **Command Palette Actions:**
 
-- **Create from PR/MR**: Select an open PR/MR to establish a worktree. A name is auto-generated (`pr{number}-{sanitized-title}`) which you may edit.
 - **Create from changes**: Establish a new worktree from current uncommitted changes in the selected worktree. This stashes all changes (including untracked files), creates a new worktree, and applies the stashed changes to it. Requires a worktree to be selected with uncommitted changes present.
 
 ### Mouse Controls
