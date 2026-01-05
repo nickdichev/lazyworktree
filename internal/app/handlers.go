@@ -220,7 +220,7 @@ func (m *Model) handleBuiltInKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.updateTable()
 		return m, nil
 
-	case "ctrl+p", "P":
+	case "ctrl+p", ":":
 		return m, m.showCommandPalette()
 
 	case "?":

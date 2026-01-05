@@ -305,7 +305,7 @@ custom_commands:
 | `!` | Run arbitrary command in selected worktree (with command history) |
 | `p` | Fetch PR/MR status (also refreshes CI checks) |
 | `o` | Open PR/MR in browser |
-| `ctrl+p`, `P` | Command palette |
+| `ctrl+p`, `:` | Command palette |
 | `g` | Open LazyGit |
 | `r` | Refresh list |
 | `R` | Fetch all remotes |
