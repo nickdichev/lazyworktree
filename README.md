@@ -75,6 +75,16 @@ brew tap chmouel/lazyworktree https://github.com/chmouel/lazyworktree
 brew install lazyworktree --cask
 ```
 
+For shell integration with the "jump" functionality, source the helper functions from the Homebrew installation:
+
+```bash
+# Add to .zshrc
+source $(brew --prefix)/opt/lazyworktree/share/lazyworktree/functions.shell
+
+# Create an alias for a specific repository
+jt() { worktree_jump ~/path/to/your/main/repo "$@"; }
+```
+
 ## [Arch](https://aur.archlinux.org/packages/lazyworktree-bin)
 
 ```shell
@@ -94,17 +104,17 @@ source /path/to/lazyworktree/shell/functions.shell
 # Create an alias for a specific repository
 # worktree storage key is derived from the origin remote (e.g. github.com:owner/repo)
 # and falls back to the directory basename when no remote is set.
-pm() { worktree_jump ~/path/to/your/main/repo "$@"; }
+jt() { worktree_jump ~/path/to/your/main/repo "$@"; }
 ```
 
-You can now run `pm` to open the Terminal User Interface, select a worktree, and upon pressing `Enter`, your shell will change directory to that location.
+You can now run `jt` to open the Terminal User Interface, select a worktree, and upon pressing `Enter`, your shell will change directory to that location.
 
 To jump directly to a worktree by name with shell completion enabled, use the following:
 
 ```bash
-pm() { worktree_jump ~/path/to/your/main/repo "$@"; }
-_pm() { _worktree_jump ~/path/to/your/main/repo; }
-compdef _pm pm
+jt() { worktree_jump ~/path/to/your/main/repo "$@"; }
+_jt() { _worktree_jump ~/path/to/your/main/repo; }
+compdef _jt jt
 ```
 
 Should you require a shortcut to the last-selected worktree, use the built-in `worktree_go_last` helper, which reads the `.last-selected` file:
