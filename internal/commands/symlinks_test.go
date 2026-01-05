@@ -323,4 +323,36 @@ func TestLinkTopSymlinks(t *testing.T) {
 		_, err = os.Readlink(filepath.Join(worktreeDir, "modified.txt"))
 		require.Error(t, err) // Should not exist
 	})
+
+	t.Run("skip nested untracked files", func(t *testing.T) {
+		mainDir := t.TempDir()
+		worktreeDir := t.TempDir()
+
+		// Create nested untracked directory
+		nestedDir := filepath.Join(mainDir, "docs", "resources")
+		err := os.MkdirAll(nestedDir, 0o750)
+		require.NoError(t, err)
+
+		// Create top-level untracked directory
+		topDir := filepath.Join(mainDir, "bin")
+		err = os.MkdirAll(topDir, 0o750)
+		require.NoError(t, err)
+
+		statusFunc := func(_ context.Context, _ string) string {
+			return "?? bin\n?? docs/resources"
+		}
+
+		err = LinkTopSymlinks(context.Background(), mainDir, worktreeDir, statusFunc)
+		require.NoError(t, err)
+
+		// Top-level should be symlinked
+		link := filepath.Join(worktreeDir, "bin")
+		_, err = os.Readlink(link)
+		require.NoError(t, err, "top-level 'bin' should be symlinked")
+
+		// Nested should NOT be symlinked
+		nestedLink := filepath.Join(worktreeDir, "docs", "resources")
+		_, err = os.Stat(nestedLink)
+		require.Error(t, err, "nested 'docs/resources' should not be symlinked")
+	})
 }

@@ -34,6 +34,10 @@ func LinkTopSymlinks(ctx context.Context, mainPath, worktreePath string, statusF
 		if rel == "" {
 			continue
 		}
+		// Only symlink top-level items, skip nested paths
+		if strings.Contains(rel, "/") {
+			continue
+		}
 		if err := symlinkPath(mainPath, worktreePath, rel); err != nil {
 			return fmt.Errorf("failed to symlink %s: %w", rel, err)
 		}
