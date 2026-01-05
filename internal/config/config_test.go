@@ -13,7 +13,7 @@ func TestDefaultConfig(t *testing.T) {
 	cfg := DefaultConfig()
 
 	assert.NotNil(t, cfg)
-	assert.True(t, cfg.SortByActive)
+	assert.Equal(t, "switched", cfg.SortMode)
 	assert.False(t, cfg.AutoFetchPRs)
 	assert.False(t, cfg.SearchAutoSelect)
 	assert.Equal(t, 10, cfg.MaxUntrackedDiffs)
@@ -410,7 +410,7 @@ func TestParseConfig(t *testing.T) {
 			name: "empty config uses defaults",
 			data: map[string]interface{}{},
 			validate: func(t *testing.T, cfg *AppConfig) {
-				assert.True(t, cfg.SortByActive)
+				assert.Equal(t, "switched", cfg.SortMode)
 				assert.False(t, cfg.AutoFetchPRs)
 				assert.False(t, cfg.SearchAutoSelect)
 				assert.Equal(t, 10, cfg.MaxUntrackedDiffs)
@@ -470,7 +470,7 @@ func TestParseConfig(t *testing.T) {
 				"sort_by_active": false,
 			},
 			validate: func(t *testing.T, cfg *AppConfig) {
-				assert.False(t, cfg.SortByActive)
+				assert.Equal(t, "path", cfg.SortMode)
 			},
 		},
 		{
@@ -873,7 +873,7 @@ func TestLoadConfig(t *testing.T) {
 		cfg, err := LoadConfig(configPath)
 		require.NoError(t, err)
 		assert.NotNil(t, cfg)
-		assert.Equal(t, DefaultConfig().SortByActive, cfg.SortByActive)
+		assert.Equal(t, DefaultConfig().SortMode, cfg.SortMode)
 		assert.Equal(t, DefaultConfig().MaxUntrackedDiffs, cfg.MaxUntrackedDiffs)
 		assert.Equal(t, DefaultConfig().DeltaArgs, cfg.DeltaArgs)
 	})
@@ -906,7 +906,7 @@ terminate_commands:
 		require.NoError(t, err)
 		assert.NotNil(t, cfg)
 		assert.Equal(t, "/custom/worktrees", cfg.WorktreeDir)
-		assert.False(t, cfg.SortByActive)
+		assert.Equal(t, "path", cfg.SortMode)
 		assert.True(t, cfg.AutoFetchPRs)
 		assert.Equal(t, 20, cfg.MaxUntrackedDiffs)
 		assert.Equal(t, 100000, cfg.MaxDiffChars)
@@ -929,7 +929,7 @@ terminate_commands:
 		cfg, err := LoadConfig(configPath)
 		require.NoError(t, err)
 		assert.NotNil(t, cfg)
-		assert.Equal(t, DefaultConfig().SortByActive, cfg.SortByActive)
+		assert.Equal(t, DefaultConfig().SortMode, cfg.SortMode)
 	})
 }
 
@@ -1360,8 +1360,8 @@ func TestParseConfig_CustomCommands(t *testing.T) {
 		{
 			name: "custom commands in full config",
 			input: map[string]interface{}{
-				"worktree_dir":   "/tmp/worktrees",
-				"sort_by_active": true,
+				"worktree_dir": "/tmp/worktrees",
+				"sort_mode":    "switched",
 				"custom_commands": map[string]interface{}{
 					"e": map[string]interface{}{
 						"command":     "nvim",
@@ -1373,7 +1373,7 @@ func TestParseConfig_CustomCommands(t *testing.T) {
 			},
 			validate: func(t *testing.T, cfg *AppConfig) {
 				assert.Equal(t, "/tmp/worktrees", cfg.WorktreeDir)
-				assert.True(t, cfg.SortByActive)
+				assert.Equal(t, "switched", cfg.SortMode)
 				require.Len(t, cfg.CustomCommands, 2)
 				assert.Equal(t, "nvim", cfg.CustomCommands["e"].Command)
 				assert.Equal(t, "Open editor", cfg.CustomCommands["e"].Description)
@@ -1418,7 +1418,7 @@ func TestLoadConfigRejectsOutsideConfigDir(t *testing.T) {
 	cfg, err := LoadConfig(outside)
 	require.Error(t, err)
 	assert.NotNil(t, cfg)
-	assert.Equal(t, DefaultConfig().SortByActive, cfg.SortByActive)
+	assert.Equal(t, DefaultConfig().SortMode, cfg.SortMode)
 }
 
 func TestIsPathWithin(t *testing.T) {

@@ -62,8 +62,8 @@ func TestHandleEnterKeySelectsWorktree(t *testing.T) {
 
 func TestFilterEnterSelectsHighlightedMatch(t *testing.T) {
 	cfg := &config.AppConfig{
-		WorktreeDir:  t.TempDir(),
-		SortByActive: false,
+		WorktreeDir: t.TempDir(),
+		SortMode:    "path",
 	}
 	m := NewModel(cfg, "")
 	m.focusedPane = 0
@@ -103,8 +103,8 @@ func TestFilterEnterSelectsHighlightedMatch(t *testing.T) {
 
 func TestFilterAltNPMovesSelectionAndFills(t *testing.T) {
 	cfg := &config.AppConfig{
-		WorktreeDir:  t.TempDir(),
-		SortByActive: false,
+		WorktreeDir: t.TempDir(),
+		SortMode:    "path",
 	}
 	m := NewModel(cfg, "")
 
@@ -153,8 +153,8 @@ func TestFilterAltNPMovesSelectionAndFills(t *testing.T) {
 
 func TestFilterArrowKeysNavigateWithoutFilling(t *testing.T) {
 	cfg := &config.AppConfig{
-		WorktreeDir:  t.TempDir(),
-		SortByActive: false,
+		WorktreeDir: t.TempDir(),
+		SortMode:    "path",
 	}
 	m := NewModel(cfg, "")
 
@@ -197,8 +197,8 @@ func TestFilterArrowKeysNavigateWithoutFilling(t *testing.T) {
 
 func TestFilterEmptyEnterSelectsCurrent(t *testing.T) {
 	cfg := &config.AppConfig{
-		WorktreeDir:  t.TempDir(),
-		SortByActive: false,
+		WorktreeDir: t.TempDir(),
+		SortMode:    "path",
 	}
 	m := NewModel(cfg, "")
 
@@ -233,8 +233,8 @@ func TestFilterEmptyEnterSelectsCurrent(t *testing.T) {
 
 func TestFilterCtrlCExitsFilter(t *testing.T) {
 	cfg := &config.AppConfig{
-		WorktreeDir:  t.TempDir(),
-		SortByActive: false,
+		WorktreeDir: t.TempDir(),
+		SortMode:    "path",
 	}
 	m := NewModel(cfg, "")
 
@@ -407,7 +407,7 @@ func TestHandleCIStatusLoadedUpdatesCache(t *testing.T) {
 func TestFilterEnterSelectsHighlightedItem(t *testing.T) {
 	cfg := &config.AppConfig{
 		WorktreeDir:      t.TempDir(),
-		SortByActive:     false,
+		SortMode:         "path",
 		SearchAutoSelect: false,
 	}
 	m := NewModel(cfg, "")
@@ -455,8 +455,8 @@ func TestFilterEnterSelectsHighlightedItem(t *testing.T) {
 
 func TestFilterNavigationThroughMultipleFilteredItems(t *testing.T) {
 	cfg := &config.AppConfig{
-		WorktreeDir:  t.TempDir(),
-		SortByActive: false,
+		WorktreeDir: t.TempDir(),
+		SortMode:    "path",
 	}
 	m := NewModel(cfg, "")
 

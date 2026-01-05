@@ -216,7 +216,8 @@ func (m *Model) handleBuiltInKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, textinput.Blink
 
 	case "s":
-		m.sortByActive = !m.sortByActive
+		// Cycle through sort modes: path -> active -> switched -> path
+		m.sortMode = (m.sortMode + 1) % 3
 		m.updateTable()
 		return m, nil
 
@@ -331,11 +332,16 @@ func (m *Model) handleFilterNavigation(keyStr string, fillInput bool) (tea.Model
 		// Alt+n/Alt+p: navigate through all worktrees (sorted)
 		workList = make([]*models.WorktreeInfo, len(m.worktrees))
 		copy(workList, m.worktrees)
-		if m.sortByActive {
+		switch m.sortMode {
+		case sortModeLastActive:
 			sort.Slice(workList, func(i, j int) bool {
 				return workList[i].LastActiveTS > workList[j].LastActiveTS
 			})
-		} else {
+		case sortModeLastSwitched:
+			sort.Slice(workList, func(i, j int) bool {
+				return workList[i].LastSwitchedTS > workList[j].LastSwitchedTS
+			})
+		default: // sortModePath
 			sort.Slice(workList, func(i, j int) bool {
 				return workList[i].Path < workList[j].Path
 			})

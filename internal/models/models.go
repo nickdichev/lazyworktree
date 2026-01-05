@@ -29,6 +29,7 @@ type WorktreeInfo struct {
 	UpstreamBranch string // The upstream branch name (e.g., "origin/main" or "chmouel/feature-branch")
 	LastActive     string
 	LastActiveTS   int64
+	LastSwitchedTS int64 // Unix timestamp of last UI access/switch
 	PR             *PRInfo
 	Untracked      int
 	Modified       int
@@ -43,4 +44,6 @@ const (
 	CacheFilename = ".worktree-cache.json"
 	// CommandHistoryFilename stores the command history for the ! command.
 	CommandHistoryFilename = ".command-history.json"
+	// AccessHistoryFilename stores worktree access timestamps for sorting.
+	AccessHistoryFilename = ".worktree-access.json"
 )

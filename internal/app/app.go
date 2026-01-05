@@ -156,6 +156,11 @@ const (
 	// Merge methods for absorb worktree
 	mergeMethodRebase = "rebase"
 	mergeMethodMerge  = "merge"
+
+	// Sort modes for worktree list
+	sortModePath         = 0 // Sort by path (alphabetical)
+	sortModeLastActive   = 1 // Sort by last commit date
+	sortModeLastSwitched = 2 // Sort by last UI access time
 )
 
 // Model represents the main application model
@@ -176,8 +181,9 @@ type Model struct {
 	filteredWts       []*models.WorktreeInfo
 	selectedIndex     int
 	filterQuery       string
-	sortByActive      bool
+	sortMode          int // sortModePath, sortModeLastActive, or sortModeLastSwitched
 	prDataLoaded      bool
+	accessHistory     map[string]int64 // worktree path -> last access timestamp
 	repoKey           string
 	repoKeyOnce       sync.Once
 	currentScreen     screenType
@@ -367,6 +373,17 @@ func NewModel(cfg *config.AppConfig, initialFilter string) *Model {
 	sp.Spinner = spinner.Pulse
 	sp.Style = lipgloss.NewStyle().Foreground(thm.Accent)
 
+	// Convert config sort mode string to int constant
+	sortMode := sortModeLastSwitched // default
+	switch cfg.SortMode {
+	case "path":
+		sortMode = sortModePath
+	case "active":
+		sortMode = sortModeLastActive
+	case "switched":
+		sortMode = sortModeLastSwitched
+	}
+
 	m := &Model{
 		config:          cfg,
 		git:             gitService,
@@ -377,13 +394,14 @@ func NewModel(cfg *config.AppConfig, initialFilter string) *Model {
 		filterInput:     filterInput,
 		worktrees:       []*models.WorktreeInfo{},
 		filteredWts:     []*models.WorktreeInfo{},
-		sortByActive:    cfg.SortByActive,
+		sortMode:        sortMode,
 		filterQuery:     initialFilter,
 		cache:           make(map[string]any),
 		divergenceCache: make(map[string]string),
 		notifiedErrors:  make(map[string]bool),
 		ciCache:         make(map[string]*ciCacheEntry),
 		detailsCache:    make(map[string]*detailsCacheEntry),
+		accessHistory:   make(map[string]int64),
 		trustManager:    trustManager,
 		ctx:             ctx,
 		cancel:          cancel,
@@ -418,6 +436,7 @@ func NewModel(cfg *config.AppConfig, initialFilter string) *Model {
 // Init satisfies the tea.Model interface and starts with no command.
 func (m *Model) Init() tea.Cmd {
 	m.loadCommandHistory()
+	m.loadAccessHistory()
 	cmds := []tea.Cmd{
 		m.loadCache(),
 		m.refreshWorktrees(),
@@ -726,12 +745,17 @@ func (m *Model) updateTable() {
 		}
 	}
 
-	// Sort
-	if m.sortByActive {
+	// Sort based on current sort mode
+	switch m.sortMode {
+	case sortModeLastActive:
 		sort.Slice(m.filteredWts, func(i, j int) bool {
 			return m.filteredWts[i].LastActiveTS > m.filteredWts[j].LastActiveTS
 		})
-	} else {
+	case sortModeLastSwitched:
+		sort.Slice(m.filteredWts, func(i, j int) bool {
+			return m.filteredWts[i].LastSwitchedTS > m.filteredWts[j].LastSwitchedTS
+		})
+	default: // sortModePath
 		sort.Slice(m.filteredWts, func(i, j int) bool {
 			return m.filteredWts[i].Path < m.filteredWts[j].Path
 		})
@@ -2588,6 +2612,43 @@ func (m *Model) addToCommandHistory(cmd string) {
 	m.saveCommandHistory()
 }
 
+func (m *Model) loadAccessHistory() {
+	repoKey := m.getRepoKey()
+	historyPath := filepath.Join(m.getWorktreeDir(), repoKey, models.AccessHistoryFilename)
+	// #nosec G304 -- path is constructed from known safe components
+	data, err := os.ReadFile(historyPath)
+	if err != nil {
+		return
+	}
+	var history map[string]int64
+	if err := json.Unmarshal(data, &history); err != nil {
+		m.debugf("failed to parse access history: %v", err)
+		return
+	}
+	m.accessHistory = history
+}
+
+func (m *Model) saveAccessHistory() {
+	repoKey := m.getRepoKey()
+	historyPath := filepath.Join(m.getWorktreeDir(), repoKey, models.AccessHistoryFilename)
+	if err := os.MkdirAll(filepath.Dir(historyPath), defaultDirPerms); err != nil {
+		m.debugf("failed to create access history dir: %v", err)
+		return
+	}
+	data, _ := json.Marshal(m.accessHistory)
+	if err := os.WriteFile(historyPath, data, defaultFilePerms); err != nil {
+		m.debugf("failed to write access history: %v", err)
+	}
+}
+
+func (m *Model) recordAccess(path string) {
+	if path == "" {
+		return
+	}
+	m.accessHistory[path] = time.Now().Unix()
+	m.saveAccessHistory()
+}
+
 func (m *Model) getRepoKey() string {
 	if m.repoKey != "" {
 		return m.repoKey
@@ -2731,6 +2792,7 @@ func (m *Model) persistLastSelected(path string) {
 		return
 	}
 	_ = os.WriteFile(lastSelectedPath, []byte(path+"\n"), defaultFilePerms)
+	m.recordAccess(path)
 }
 
 // Close releases background resources including canceling contexts and timers.
@@ -3335,9 +3397,17 @@ func (m *Model) renderFooter(layout layoutDims) string {
 		)
 
 	default: // Worktree table (pane 0)
+		sortName := "Path"
+		switch m.sortMode {
+		case sortModeLastActive:
+			sortName = "Active"
+		case sortModeLastSwitched:
+			sortName = "Switched"
+		}
 		hints = []string{
 			m.renderKeyHint("1-3", "Pane"),
 			m.renderKeyHint("/", "Filter"),
+			m.renderKeyHint("s", sortName),
 			m.renderKeyHint("d", "Diff"),
 			m.renderKeyHint("D", "Delete"),
 			m.renderKeyHint("p", "PR Info"),
@@ -3450,6 +3520,11 @@ func (m *Model) buildInfoContent(wt *models.WorktreeInfo) string {
 	infoLines := []string{
 		fmt.Sprintf("%s %s", labelStyle.Render("Path:"), valueStyle.Render(wt.Path)),
 		fmt.Sprintf("%s %s", labelStyle.Render("Branch:"), valueStyle.Render(wt.Branch)),
+	}
+	if wt.LastSwitchedTS > 0 {
+		accessTime := time.Unix(wt.LastSwitchedTS, 0)
+		relTime := formatRelativeTime(accessTime)
+		infoLines = append(infoLines, fmt.Sprintf("%s %s", labelStyle.Render("Last Accessed:"), valueStyle.Render(relTime)))
 	}
 	if wt.Divergence != "" {
 		// Colorize arrows to match Python: cyan ↑, red ↓

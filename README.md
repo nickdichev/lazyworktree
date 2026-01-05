@@ -312,7 +312,7 @@ custom_commands:
 | `f`, `/` | Filter worktrees |
 | `alt+n`, `alt+p` | Move selection and fill filter input |
 | `↑`, `↓` | Move selection (filter active, no fill) |
-| `s` | Toggle sort (Name/Last Active) |
+| `s` | Cycle sort mode (Path / Last Active / Last Switched) |
 | `?` | Show help |
 
 **Log Pane** (when focused on commit log):
@@ -370,7 +370,7 @@ lazyworktree reads `~/.config/lazyworktree/config.yaml` (or `.yml`) for default 
 
 ```yaml
 worktree_dir: ~/.local/share/worktrees
-sort_by_active: true
+sort_mode: switched  # Options: "path", "active" (commit date), "switched" (last accessed)
 auto_fetch_prs: false
 search_auto_select: false
 fuzzy_finder_input: false
@@ -403,7 +403,7 @@ Notes:
 - `--worktree-dir` overrides the `worktree_dir` setting.
 - `theme` selects the colour theme. Available themes: `dracula`, `narna`, `clean-light`, `solarized-dark`, `solarized-light`, `gruvbox-dark`, `gruvbox-light`, `nord`, `monokai`, `catppuccin-mocha`. Default: `dracula`.
 - `init_commands` and `terminate_commands` execute prior to any repository-specific `.wt` commands (if present).
-- Set `sort_by_active` to `false` to sort by path.
+- `sort_mode` controls the default sort order: `"switched"` (last accessed, default), `"active"` (last commit date), or `"path"` (alphabetical). The old `sort_by_active` option is still supported for backwards compatibility.
 - Set `auto_fetch_prs` to `true` to fetch PR data upon startup.
 - Set `search_auto_select` to `true` to commence with the filter focused and allow `Enter` to select the first match (alternatively, pass `--search-auto-select`).
 - Set `fuzzy_finder_input` to `true` to enable fuzzy finder suggestions in input dialogs. When enabled, typing in text input fields displays fuzzy-filtered suggestions from available options. Use arrow keys to navigate suggestions and Enter to select.

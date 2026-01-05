@@ -41,6 +41,12 @@ func (m *Model) handleWorktreesLoaded(msg worktreesLoadedMsg) (tea.Model, tea.Cm
 		return m, nil
 	}
 	m.worktrees = msg.worktrees
+	// Populate LastSwitchedTS from access history
+	for _, wt := range m.worktrees {
+		if ts, ok := m.accessHistory[wt.Path]; ok {
+			wt.LastSwitchedTS = ts
+		}
+	}
 	m.detailsCache = make(map[string]*detailsCacheEntry)
 	m.ensureRepoConfig()
 	m.updateTable()
@@ -70,6 +76,12 @@ func (m *Model) handleCachedWorktrees(msg cachedWorktreesMsg) (tea.Model, tea.Cm
 		return m, nil
 	}
 	m.worktrees = msg.worktrees
+	// Populate LastSwitchedTS from access history
+	for _, wt := range m.worktrees {
+		if ts, ok := m.accessHistory[wt.Path]; ok {
+			wt.LastSwitchedTS = ts
+		}
+	}
 	m.updateTable()
 	if m.selectedIndex >= 0 && m.selectedIndex < len(m.filteredWts) {
 		m.infoContent = m.buildInfoContent(m.filteredWts[m.selectedIndex])

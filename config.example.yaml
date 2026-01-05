@@ -1,5 +1,6 @@
 worktree_dir: ~/.local/share/worktrees
-sort_by_active: true
+# Sort mode: "path" (alphabetical), "active" (last commit date), "switched" (last accessed)
+sort_mode: switched
 auto_fetch_prs: false
 # Start with the filter focused and select the first match on Enter.
 search_auto_select: false

@@ -29,8 +29,17 @@ func TestModelInitialization(t *testing.T) {
 		t.Errorf("Expected focusedPane to be 0, got %d", m.focusedPane)
 	}
 
-	if m.sortByActive != cfg.SortByActive {
-		t.Error("sortByActive not initialized from config")
+	// sortMode is now an int: 0=path, 1=active, 2=switched
+	// Default is switched (2) when config.SortMode is "switched"
+	expectedSortMode := sortModeLastSwitched
+	switch cfg.SortMode {
+	case "path":
+		expectedSortMode = sortModePath
+	case "active":
+		expectedSortMode = sortModeLastActive
+	}
+	if m.sortMode != expectedSortMode {
+		t.Errorf("sortMode not initialized from config: got %d, expected %d", m.sortMode, expectedSortMode)
 	}
 }
 
@@ -139,11 +148,11 @@ func TestSearchAutoSelectStartsFocused(t *testing.T) {
 	}
 }
 
-// TestSortToggle tests the sort toggle functionality
-func TestSortToggle(t *testing.T) {
+// TestSortCycle tests the sort cycle functionality
+func TestSortCycle(t *testing.T) {
 	cfg := &config.AppConfig{
-		WorktreeDir:  t.TempDir(),
-		SortByActive: true,
+		WorktreeDir: t.TempDir(),
+		SortMode:    "switched",
 	}
 	tm := teatest.NewTestModel(
 		t,
@@ -153,11 +162,14 @@ func TestSortToggle(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond)
 
-	// Press 's' to toggle sort
+	// Press 's' three times to cycle through all modes and back to original
+	// switched (2) -> path (0) -> active (1) -> switched (2)
 	tm.Send(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("s")})
 	time.Sleep(50 * time.Millisecond)
 
-	// Press 's' again to toggle back
+	tm.Send(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("s")})
+	time.Sleep(50 * time.Millisecond)
+
 	tm.Send(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("s")})
 	time.Sleep(50 * time.Millisecond)
 
@@ -172,9 +184,9 @@ func TestSortToggle(t *testing.T) {
 		t.Fatal("Final model is not *Model type")
 	}
 
-	// Should be back to original state after two toggles
-	if m.sortByActive != cfg.SortByActive {
-		t.Errorf("Expected sortByActive to be %v after two toggles, got %v", cfg.SortByActive, m.sortByActive)
+	// Should be back to original state after three cycles
+	if m.sortMode != sortModeLastSwitched {
+		t.Errorf("Expected sortMode to be %d after three cycles, got %d", sortModeLastSwitched, m.sortMode)
 	}
 }
 

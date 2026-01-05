@@ -659,7 +659,7 @@ func NewHelpScreen(maxWidth, maxHeight int, customCommands map[string]*config.Cu
 - R: Fetch all remotes
 - p: Fetch PR status from GitHub
 - r: Refresh list
-- s: Sort (toggle Name/Last Active)
+- s: Sort (cycle: Path / Last Active / Last Switched)
 - f, /: Filter worktrees
 - Alt+N / Alt+P: Move selection and fill filter input
 - ↑ / ↓ / Ctrl+J / Ctrl+K: Move selection (filter active, no fill)

@@ -42,7 +42,7 @@ type AppConfig struct {
 	WorktreeDir       string
 	InitCommands      []string
 	TerminateCommands []string
-	SortByActive      bool
+	SortMode          string // Sort mode: "path", "active" (commit date), "switched" (last accessed)
 	AutoFetchPRs      bool
 	SearchAutoSelect  bool // Start with filter focused and select first match on Enter.
 	MaxUntrackedDiffs int
@@ -70,7 +70,7 @@ type RepoConfig struct {
 // DefaultConfig returns the default configuration values.
 func DefaultConfig() *AppConfig {
 	return &AppConfig{
-		SortByActive:      true,
+		SortMode:          "switched",
 		AutoFetchPRs:      false,
 		SearchAutoSelect:  false,
 		MaxUntrackedDiffs: 10,
@@ -319,7 +319,23 @@ func parseConfig(data map[string]any) *AppConfig {
 
 	cfg.InitCommands = normalizeCommandList(data["init_commands"])
 	cfg.TerminateCommands = normalizeCommandList(data["terminate_commands"])
-	cfg.SortByActive = coerceBool(data["sort_by_active"], true)
+
+	// Handle sort_mode with backwards compatibility for sort_by_active
+	if sortMode, ok := data["sort_mode"].(string); ok {
+		sortMode = strings.ToLower(strings.TrimSpace(sortMode))
+		switch sortMode {
+		case "path", "active", "switched":
+			cfg.SortMode = sortMode
+		}
+	} else if _, hasOld := data["sort_by_active"]; hasOld {
+		// Backwards compatibility: sort_by_active: true -> "active", false -> "path"
+		if coerceBool(data["sort_by_active"], true) {
+			cfg.SortMode = "active"
+		} else {
+			cfg.SortMode = "path"
+		}
+	}
+
 	cfg.AutoFetchPRs = coerceBool(data["auto_fetch_prs"], false)
 	cfg.SearchAutoSelect = coerceBool(data["search_auto_select"], false)
 	cfg.FuzzyFinderInput = coerceBool(data["fuzzy_finder_input"], false)
