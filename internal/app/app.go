@@ -138,6 +138,15 @@ type StatusFile struct {
 	IsUntracked bool
 }
 
+// StatusTreeNode represents a node in the status file tree (directory or file).
+type StatusTreeNode struct {
+	Path        string            // Full path (e.g., "internal/app" or "internal/app/app.go")
+	File        *StatusFile       // nil for directories
+	Children    []*StatusTreeNode // nil for files
+	Compression int               // Number of compressed path segments (e.g., "a/b" = 1)
+	depth       int               // Cached depth for rendering
+}
+
 type commitMeta struct {
 	sha     string
 	author  string
@@ -235,9 +244,15 @@ type Model struct {
 	windowHeight        int
 	infoContent         string
 	statusContent       string
-	statusFiles         []StatusFile // parsed list of files from git status
+	statusFiles         []StatusFile // parsed list of files from git status (kept for compatibility)
 	statusFilesAll      []StatusFile // full list of files from git status
 	statusFileIndex     int          // currently selected file index in status pane
+
+	// Status tree view
+	statusTree          *StatusTreeNode   // Root of the file tree
+	statusTreeFlat      []*StatusTreeNode // Visible nodes after applying collapse state
+	statusCollapsedDirs map[string]bool   // Collapsed directory paths
+	statusTreeIndex     int               // Current selection in flattened tree
 
 	// Cache
 	cache           map[string]any
@@ -3839,6 +3854,137 @@ func parseStatusFiles(statusRaw string) []StatusFile {
 	return parsedFiles
 }
 
+// buildStatusTree builds a tree structure from a flat list of files.
+// Files are grouped by directory, with directories sorted before files.
+func buildStatusTree(files []StatusFile) *StatusTreeNode {
+	if len(files) == 0 {
+		return &StatusTreeNode{Path: "", Children: nil}
+	}
+
+	root := &StatusTreeNode{Path: "", Children: make([]*StatusTreeNode, 0)}
+	childrenByPath := make(map[string]*StatusTreeNode)
+
+	for i := range files {
+		file := &files[i]
+		parts := strings.Split(file.Filename, "/")
+
+		current := root
+		for j := 0; j < len(parts); j++ {
+			isFile := j == len(parts)-1
+			pathSoFar := strings.Join(parts[:j+1], "/")
+
+			if existing, ok := childrenByPath[pathSoFar]; ok {
+				current = existing
+				continue
+			}
+
+			var newNode *StatusTreeNode
+			if isFile {
+				newNode = &StatusTreeNode{
+					Path: pathSoFar,
+					File: file,
+				}
+			} else {
+				newNode = &StatusTreeNode{
+					Path:     pathSoFar,
+					Children: make([]*StatusTreeNode, 0),
+				}
+			}
+			current.Children = append(current.Children, newNode)
+			childrenByPath[pathSoFar] = newNode
+			current = newNode
+		}
+	}
+
+	sortStatusTree(root)
+	compressStatusTree(root)
+	return root
+}
+
+// sortStatusTree sorts tree nodes: directories first, then alphabetically.
+func sortStatusTree(node *StatusTreeNode) {
+	if node == nil || node.Children == nil {
+		return
+	}
+
+	sort.Slice(node.Children, func(i, j int) bool {
+		iIsDir := node.Children[i].File == nil
+		jIsDir := node.Children[j].File == nil
+		if iIsDir != jIsDir {
+			return iIsDir // directories first
+		}
+		return node.Children[i].Path < node.Children[j].Path
+	})
+
+	for _, child := range node.Children {
+		sortStatusTree(child)
+	}
+}
+
+// compressStatusTree squashes single-child directory chains (e.g., a/b/c becomes one node).
+func compressStatusTree(node *StatusTreeNode) {
+	if node == nil {
+		return
+	}
+
+	for _, child := range node.Children {
+		compressStatusTree(child)
+	}
+
+	// Compress children that are single-child directories
+	for i, child := range node.Children {
+		for child.File == nil && len(child.Children) == 1 && child.Children[0].File == nil {
+			grandchild := child.Children[0]
+			grandchild.Compression = child.Compression + 1
+			node.Children[i] = grandchild
+			child = grandchild
+		}
+	}
+}
+
+// flattenStatusTree returns visible nodes respecting collapsed state.
+func flattenStatusTree(node *StatusTreeNode, collapsed map[string]bool, depth int) []*StatusTreeNode {
+	if node == nil {
+		return nil
+	}
+
+	result := make([]*StatusTreeNode, 0)
+
+	// Skip root node itself but process its children
+	if node.Path != "" {
+		nodeCopy := *node
+		nodeCopy.depth = depth
+		result = append(result, &nodeCopy)
+
+		// If collapsed, don't include children
+		if collapsed[node.Path] {
+			return result
+		}
+	}
+
+	if node.Children != nil {
+		childDepth := depth
+		if node.Path != "" {
+			childDepth = depth + 1
+		}
+		for _, child := range node.Children {
+			result = append(result, flattenStatusTree(child, collapsed, childDepth)...)
+		}
+	}
+
+	return result
+}
+
+// IsDir returns true if this node is a directory.
+func (n *StatusTreeNode) IsDir() bool {
+	return n.File == nil
+}
+
+// Name returns the display name for this node.
+func (n *StatusTreeNode) Name() string {
+	return filepath.Base(n.Path)
+}
+
 func (m *Model) buildStatusContent(statusRaw string) string {
 	m.setStatusFiles(parseStatusFiles(statusRaw))
 	return m.statusContent
@@ -3846,6 +3992,12 @@ func (m *Model) buildStatusContent(statusRaw string) string {
 
 func (m *Model) setStatusFiles(files []StatusFile) {
 	m.statusFilesAll = files
+
+	// Initialize collapsed dirs map if needed
+	if m.statusCollapsedDirs == nil {
+		m.statusCollapsedDirs = make(map[string]bool)
+	}
+
 	m.applyStatusFilter()
 }
 
@@ -3861,37 +4013,52 @@ func (m *Model) applyStatusFilter() {
 		}
 	}
 
-	selectedName := ""
-	if m.statusFileIndex >= 0 && m.statusFileIndex < len(m.statusFiles) {
-		selectedName = m.statusFiles[m.statusFileIndex].Filename
+	// Remember current selection (by path)
+	selectedPath := ""
+	if m.statusTreeIndex >= 0 && m.statusTreeIndex < len(m.statusTreeFlat) {
+		selectedPath = m.statusTreeFlat[m.statusTreeIndex].Path
 	}
 
+	// Keep statusFiles for compatibility
 	m.statusFiles = filtered
-	if selectedName != "" {
-		found := false
-		for i, sf := range m.statusFiles {
-			if sf.Filename == selectedName {
-				m.statusFileIndex = i
-				found = true
+
+	// Build tree from filtered files
+	m.statusTree = buildStatusTree(filtered)
+	m.rebuildStatusTreeFlat()
+
+	// Try to restore selection
+	if selectedPath != "" {
+		for i, node := range m.statusTreeFlat {
+			if node.Path == selectedPath {
+				m.statusTreeIndex = i
 				break
 			}
 		}
-		if !found {
-			m.statusFileIndex = 0
-		}
 	}
 
-	if m.statusFileIndex < 0 {
-		m.statusFileIndex = 0
+	// Clamp tree index
+	if m.statusTreeIndex < 0 {
+		m.statusTreeIndex = 0
 	}
-	if len(m.statusFiles) > 0 && m.statusFileIndex >= len(m.statusFiles) {
-		m.statusFileIndex = len(m.statusFiles) - 1
+	if len(m.statusTreeFlat) > 0 && m.statusTreeIndex >= len(m.statusTreeFlat) {
+		m.statusTreeIndex = len(m.statusTreeFlat) - 1
 	}
-	if len(m.statusFiles) == 0 {
-		m.statusFileIndex = 0
+	if len(m.statusTreeFlat) == 0 {
+		m.statusTreeIndex = 0
 	}
+
+	// Keep old statusFileIndex in sync for compatibility
+	m.statusFileIndex = m.statusTreeIndex
 
 	m.rebuildStatusContentWithHighlight()
+}
+
+// rebuildStatusTreeFlat rebuilds the flattened tree view from the tree structure.
+func (m *Model) rebuildStatusTreeFlat() {
+	if m.statusCollapsedDirs == nil {
+		m.statusCollapsedDirs = make(map[string]bool)
+	}
+	m.statusTreeFlat = flattenStatusTree(m.statusTree, m.statusCollapsedDirs, 0)
 }
 
 func formatCommitMessage(message string) string {
@@ -4022,8 +4189,8 @@ func (m *Model) findStatusMatchIndex(query string, start int, forward bool) int 
 	if lowerQuery == "" {
 		return -1
 	}
-	return findMatchIndex(len(m.statusFiles), start, forward, func(i int) bool {
-		return strings.Contains(strings.ToLower(m.statusFiles[i].Filename), lowerQuery)
+	return findMatchIndex(len(m.statusTreeFlat), start, forward, func(i int) bool {
+		return strings.Contains(strings.ToLower(m.statusTreeFlat[i].Path), lowerQuery)
 	})
 }
 
@@ -4041,7 +4208,7 @@ func (m *Model) applySearchQuery(query string) tea.Cmd {
 	switch m.searchTarget {
 	case searchTargetStatus:
 		if idx := m.findStatusMatchIndex(query, 0, true); idx >= 0 {
-			m.statusFileIndex = idx
+			m.statusTreeIndex = idx
 			m.rebuildStatusContentWithHighlight()
 		}
 	case searchTargetLog:
@@ -4065,14 +4232,14 @@ func (m *Model) advanceSearchMatch(forward bool) tea.Cmd {
 	}
 	switch m.searchTarget {
 	case searchTargetStatus:
-		start := m.statusFileIndex
+		start := m.statusTreeIndex
 		if forward {
 			start++
 		} else {
 			start--
 		}
 		if idx := m.findStatusMatchIndex(query, start, forward); idx >= 0 {
-			m.statusFileIndex = idx
+			m.statusTreeIndex = idx
 			m.rebuildStatusContentWithHighlight()
 		}
 	case searchTargetLog:
@@ -4103,7 +4270,7 @@ func (m *Model) advanceSearchMatch(forward bool) tea.Cmd {
 
 // renderStatusFiles renders the status file list with current selection highlighted.
 func (m *Model) renderStatusFiles() string {
-	if len(m.statusFiles) == 0 {
+	if len(m.statusTreeFlat) == 0 {
 		if len(m.statusFilesAll) == 0 {
 			return lipgloss.NewStyle().Foreground(m.theme.SuccessFg).Render("Clean working tree")
 		}
@@ -4119,53 +4286,65 @@ func (m *Model) renderStatusFiles() string {
 	addedStyle := lipgloss.NewStyle().Foreground(m.theme.SuccessFg)
 	deletedStyle := lipgloss.NewStyle().Foreground(m.theme.ErrorFg)
 	untrackedStyle := lipgloss.NewStyle().Foreground(m.theme.Yellow)
-	// Use theme colors matching the table's selected style
+	dirStyle := lipgloss.NewStyle().Foreground(m.theme.MutedFg)
 	selectedStyle := lipgloss.NewStyle().
 		Foreground(m.theme.TextFg).
 		Background(m.theme.Accent).
 		Bold(true)
 
-	// Get viewport width for full-line highlighting
 	viewportWidth := m.statusViewport.Width
 
-	lines := make([]string, 0, len(m.statusFiles))
-	for i, sf := range m.statusFiles {
-		status := sf.Status
+	lines := make([]string, 0, len(m.statusTreeFlat))
+	for i, node := range m.statusTreeFlat {
+		indent := strings.Repeat("  ", node.depth)
 
-		// Determine style based on status code
-		var style lipgloss.Style
-		x := status[0]
-		y := status[1]
-		switch {
-		case status == " ?":
-			style = untrackedStyle
-		case x == 'D' || y == 'D':
-			style = deletedStyle
-		case x == 'A' || y == 'A':
-			style = addedStyle
-		case x == 'M' || y == 'M' || x == '.' || y == '.':
-			style = modifiedStyle
-		case x == 'R' || y == 'R':
-			style = modifiedStyle
-		default:
-			style = lipgloss.NewStyle()
+		var lineContent string
+		if node.IsDir() {
+			// Directory line: "  ▼ dirname" or "  ▶ dirname"
+			expandIcon := "▼"
+			if m.statusCollapsedDirs[node.Path] {
+				expandIcon = "▶"
+			}
+			lineContent = fmt.Sprintf("%s%s %s", indent, expandIcon, node.Path)
+		} else {
+			// File line: "    M  filename"
+			status := node.File.Status
+			displayStatus := strings.ReplaceAll(status, ".", " ")
+			lineContent = fmt.Sprintf("%s  %s %s", indent, displayStatus, node.Name())
 		}
 
-		// Convert porcelain dots to spaces for display (. means "unchanged")
-		displayStatus := strings.ReplaceAll(status, ".", " ")
-
-		// Build the line content: "XY filename"
-		lineContent := fmt.Sprintf("%s %s", displayStatus, sf.Filename)
-
-		// Highlight selected file when info pane is focused
-		if m.focusedPane == 1 && i == m.statusFileIndex {
-			// Pad the line to fill the viewport width for full-line highlight
+		// Apply styling based on selection and node type
+		switch {
+		case m.focusedPane == 1 && i == m.statusTreeIndex:
 			if viewportWidth > 0 && len(lineContent) < viewportWidth {
 				lineContent += strings.Repeat(" ", viewportWidth-len(lineContent))
 			}
 			lines = append(lines, selectedStyle.Render(lineContent))
-		} else {
-			// Render status characters with color
+		case node.IsDir():
+			lines = append(lines, dirStyle.Render(lineContent))
+		default:
+			// Color based on file status
+			status := node.File.Status
+			var style lipgloss.Style
+			x := status[0]
+			y := status[1]
+			switch {
+			case status == " ?":
+				style = untrackedStyle
+			case x == 'D' || y == 'D':
+				style = deletedStyle
+			case x == 'A' || y == 'A':
+				style = addedStyle
+			case x == 'M' || y == 'M' || x == '.' || y == '.':
+				style = modifiedStyle
+			case x == 'R' || y == 'R':
+				style = modifiedStyle
+			default:
+				style = lipgloss.NewStyle()
+			}
+
+			// Render with colored status
+			displayStatus := strings.ReplaceAll(status, ".", " ")
 			var statusRendered strings.Builder
 			for _, char := range displayStatus {
 				if char == ' ' {
@@ -4174,7 +4353,7 @@ func (m *Model) renderStatusFiles() string {
 					statusRendered.WriteString(style.Render(string(char)))
 				}
 			}
-			formatted := fmt.Sprintf("%s %s", statusRendered.String(), sf.Filename)
+			formatted := fmt.Sprintf("%s  %s %s", indent, statusRendered.String(), node.Name())
 			lines = append(lines, formatted)
 		}
 	}
@@ -4186,18 +4365,18 @@ func (m *Model) rebuildStatusContentWithHighlight() {
 	m.statusContent = m.renderStatusFiles()
 	m.statusViewport.SetContent(m.statusContent)
 
-	if len(m.statusFiles) == 0 {
+	if len(m.statusTreeFlat) == 0 {
 		return
 	}
 
-	// Auto-scroll to keep selected file visible
+	// Auto-scroll to keep selected item visible
 	viewportHeight := m.statusViewport.Height
-	if viewportHeight > 0 && m.statusFileIndex >= 0 {
+	if viewportHeight > 0 && m.statusTreeIndex >= 0 {
 		currentOffset := m.statusViewport.YOffset
-		if m.statusFileIndex < currentOffset {
-			m.statusViewport.SetYOffset(m.statusFileIndex)
-		} else if m.statusFileIndex >= currentOffset+viewportHeight {
-			m.statusViewport.SetYOffset(m.statusFileIndex - viewportHeight + 1)
+		if m.statusTreeIndex < currentOffset {
+			m.statusViewport.SetYOffset(m.statusTreeIndex)
+		} else if m.statusTreeIndex >= currentOffset+viewportHeight {
+			m.statusViewport.SetYOffset(m.statusTreeIndex - viewportHeight + 1)
 		}
 	}
 }

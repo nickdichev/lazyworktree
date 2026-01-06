@@ -329,13 +329,15 @@ custom_commands:
 
 **Status Pane** (when focused on status):
 
+The status pane displays changed files in a collapsible tree view, grouped by directory (similar to lazygit). Directories can be expanded/collapsed, and files are sorted alphabetically within each directory level.
+
 | Key | Action |
 | --- | --- |
-| `j/k` | Navigate between changed files |
-| `Enter` | Show diff for selected file in pager |
+| `j/k` | Navigate between files and directories |
+| `Enter` | Toggle directory expand/collapse, or show diff for files |
 | `e` | Open selected file in editor |
 | `d` | Show full diff of all files in pager |
-| `/` | Search file names (incremental) |
+| `/` | Search file/directory names (incremental) |
 
 **Filter Mode:**
 

@@ -15,9 +15,10 @@ import (
 )
 
 const (
-	testFeat = "feat"
-	testWt1  = "wt1"
-	testWt2  = "wt2"
+	testFeat   = "feat"
+	testWt1    = "wt1"
+	testWt2    = "wt2"
+	testReadme = "README.md"
 )
 
 func TestHandlePageDownUpOnStatusPane(t *testing.T) {
@@ -321,8 +322,8 @@ func TestFilterStatusNarrowsList(t *testing.T) {
 	if len(m.statusFiles) != 1 {
 		t.Fatalf("expected 1 filtered status file, got %d", len(m.statusFiles))
 	}
-	if m.statusFiles[0].Filename != "README.md" {
-		t.Fatalf("expected README.md, got %q", m.statusFiles[0].Filename)
+	if m.statusFiles[0].Filename != testReadme {
+		t.Fatalf("expected %s, got %q", testReadme, m.statusFiles[0].Filename)
 	}
 }
 
@@ -610,7 +611,7 @@ func TestFilterNavigationThroughMultipleFilteredItems(t *testing.T) {
 	}
 }
 
-// TestStatusFileNavigation tests j/k navigation through status files in pane 1.
+// TestStatusFileNavigation tests j/k navigation through status tree items in pane 1.
 func TestStatusFileNavigation(t *testing.T) {
 	cfg := &config.AppConfig{
 		WorktreeDir: t.TempDir(),
@@ -619,48 +620,48 @@ func TestStatusFileNavigation(t *testing.T) {
 	m.focusedPane = 1
 	m.statusViewport = viewport.New(40, 10)
 
-	// Set up status files
-	m.statusFiles = []StatusFile{
+	// Set up status files using setStatusFiles to build tree
+	m.setStatusFiles([]StatusFile{
 		{Filename: "file1.go", Status: ".M", IsUntracked: false},
 		{Filename: "file2.go", Status: "M.", IsUntracked: false},
 		{Filename: "file3.go", Status: " ?", IsUntracked: true},
-	}
-	m.statusFileIndex = 0
+	})
+	m.statusTreeIndex = 0
 
 	// Test navigation down with j
 	_, _ = m.handleNavigationDown(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
-	if m.statusFileIndex != 1 {
-		t.Fatalf("expected statusFileIndex 1 after j, got %d", m.statusFileIndex)
+	if m.statusTreeIndex != 1 {
+		t.Fatalf("expected statusTreeIndex 1 after j, got %d", m.statusTreeIndex)
 	}
 
 	// Test navigation down again
 	_, _ = m.handleNavigationDown(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
-	if m.statusFileIndex != 2 {
-		t.Fatalf("expected statusFileIndex 2 after second j, got %d", m.statusFileIndex)
+	if m.statusTreeIndex != 2 {
+		t.Fatalf("expected statusTreeIndex 2 after second j, got %d", m.statusTreeIndex)
 	}
 
 	// Test boundary - should not go past last item
 	_, _ = m.handleNavigationDown(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
-	if m.statusFileIndex != 2 {
-		t.Fatalf("expected statusFileIndex to stay at 2, got %d", m.statusFileIndex)
+	if m.statusTreeIndex != 2 {
+		t.Fatalf("expected statusTreeIndex to stay at 2, got %d", m.statusTreeIndex)
 	}
 
 	// Test navigation up with k
 	_, _ = m.handleNavigationUp(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
-	if m.statusFileIndex != 1 {
-		t.Fatalf("expected statusFileIndex 1 after k, got %d", m.statusFileIndex)
+	if m.statusTreeIndex != 1 {
+		t.Fatalf("expected statusTreeIndex 1 after k, got %d", m.statusTreeIndex)
 	}
 
 	// Navigate to first item
 	_, _ = m.handleNavigationUp(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
-	if m.statusFileIndex != 0 {
-		t.Fatalf("expected statusFileIndex 0 after second k, got %d", m.statusFileIndex)
+	if m.statusTreeIndex != 0 {
+		t.Fatalf("expected statusTreeIndex 0 after second k, got %d", m.statusTreeIndex)
 	}
 
 	// Test boundary - should not go below 0
 	_, _ = m.handleNavigationUp(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
-	if m.statusFileIndex != 0 {
-		t.Fatalf("expected statusFileIndex to stay at 0, got %d", m.statusFileIndex)
+	if m.statusTreeIndex != 0 {
+		t.Fatalf("expected statusTreeIndex to stay at 0, got %d", m.statusTreeIndex)
 	}
 }
 
@@ -788,18 +789,18 @@ func TestStatusFileNavigationEmptyList(t *testing.T) {
 	m := NewModel(cfg, "")
 	m.focusedPane = 1
 	m.statusViewport = viewport.New(40, 10)
-	m.statusFiles = nil
-	m.statusFileIndex = 0
+	m.setStatusFiles(nil)
+	m.statusTreeIndex = 0
 
 	// Should not panic with empty list
 	_, _ = m.handleNavigationDown(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
-	if m.statusFileIndex != 0 {
-		t.Fatalf("expected statusFileIndex to stay at 0, got %d", m.statusFileIndex)
+	if m.statusTreeIndex != 0 {
+		t.Fatalf("expected statusTreeIndex to stay at 0, got %d", m.statusTreeIndex)
 	}
 
 	_, _ = m.handleNavigationUp(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
-	if m.statusFileIndex != 0 {
-		t.Fatalf("expected statusFileIndex to stay at 0, got %d", m.statusFileIndex)
+	if m.statusTreeIndex != 0 {
+		t.Fatalf("expected statusTreeIndex to stay at 0, got %d", m.statusTreeIndex)
 	}
 }
 
@@ -817,11 +818,11 @@ func TestStatusFileEnterShowsDiff(t *testing.T) {
 		{Path: filepath.Join(cfg.WorktreeDir, "wt1"), Branch: "feature"},
 	}
 	m.selectedIndex = 0
-	m.statusFiles = []StatusFile{
+	m.setStatusFiles([]StatusFile{
 		{Filename: "file1.go", Status: ".M", IsUntracked: false},
 		{Filename: "file2.go", Status: "M.", IsUntracked: false},
-	}
-	m.statusFileIndex = 1
+	})
+	m.statusTreeIndex = 1
 
 	// Mock execProcess to capture the command
 	var capturedCmd bool
@@ -865,10 +866,10 @@ func TestStatusFileEditOpensEditor(t *testing.T) {
 		{Path: wtPath, Branch: "feature"},
 	}
 	m.selectedIndex = 0
-	m.statusFiles = []StatusFile{
+	m.setStatusFiles([]StatusFile{
 		{Filename: filename, Status: ".M", IsUntracked: false},
-	}
-	m.statusFileIndex = 0
+	})
+	m.statusTreeIndex = 0
 
 	var gotCmd *exec.Cmd
 	m.execProcess = func(cmd *exec.Cmd, cb tea.ExecCallback) tea.Cmd {
@@ -984,10 +985,11 @@ func TestSearchStatusSelectsMatch(t *testing.T) {
 	m := NewModel(cfg, "")
 	m.focusedPane = 1
 	m.statusViewport = viewport.New(40, 10)
-	m.statusFiles = []StatusFile{
+	// Note: tree sorts alphabetically, so README.md (R) comes before app.go (a)
+	m.setStatusFiles([]StatusFile{
 		{Filename: "app.go", Status: ".M"},
 		{Filename: "README.md", Status: ".M"},
-	}
+	})
 	m.rebuildStatusContentWithHighlight()
 
 	updated, _ := m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
@@ -997,13 +999,13 @@ func TestSearchStatusSelectsMatch(t *testing.T) {
 	}
 	m = updatedModel
 
-	_, _ = m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}})
-	_, _ = m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'e'}})
+	// Search for "app" to find app.go which is at index 1 after sorting
 	_, _ = m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
-	_, _ = m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	_, _ = m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'p'}})
+	_, _ = m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'p'}})
 
-	if m.statusFileIndex != 1 {
-		t.Fatalf("expected statusFileIndex 1, got %d", m.statusFileIndex)
+	if m.statusTreeIndex != 1 {
+		t.Fatalf("expected statusTreeIndex 1, got %d", m.statusTreeIndex)
 	}
 }
 
@@ -1015,11 +1017,11 @@ func TestRenderStatusFilesHighlighting(t *testing.T) {
 	m := NewModel(cfg, "")
 	m.focusedPane = 1
 	m.statusViewport = viewport.New(40, 10)
-	m.statusFiles = []StatusFile{
+	m.setStatusFiles([]StatusFile{
 		{Filename: "file1.go", Status: ".M", IsUntracked: false},
 		{Filename: "file2.go", Status: ".M", IsUntracked: false},
-	}
-	m.statusFileIndex = 1
+	})
+	m.statusTreeIndex = 1
 
 	result := m.renderStatusFiles()
 
@@ -1038,8 +1040,8 @@ func TestRenderStatusFilesHighlighting(t *testing.T) {
 	}
 }
 
-// TestStatusFileIndexClamping tests that statusFileIndex is clamped to valid range.
-func TestStatusFileIndexClamping(t *testing.T) {
+// TestStatusTreeIndexClamping tests that statusTreeIndex is clamped to valid range.
+func TestStatusTreeIndexClamping(t *testing.T) {
 	cfg := &config.AppConfig{
 		WorktreeDir: t.TempDir(),
 	}
@@ -1048,7 +1050,7 @@ func TestStatusFileIndexClamping(t *testing.T) {
 	m.statusViewport = viewport.New(40, 10)
 
 	// Set index out of range before parsing
-	m.statusFileIndex = 100
+	m.statusTreeIndex = 100
 
 	statusRaw := `1 .M N... 100644 100644 100644 abc123 abc123 file1.go
 1 .M N... 100644 100644 100644 abc123 abc123 file2.go`
@@ -1056,20 +1058,20 @@ func TestStatusFileIndexClamping(t *testing.T) {
 	_ = m.buildStatusContent(statusRaw)
 
 	// Index should be clamped to last valid index
-	if m.statusFileIndex != 1 {
-		t.Fatalf("expected statusFileIndex clamped to 1, got %d", m.statusFileIndex)
+	if m.statusTreeIndex != 1 {
+		t.Fatalf("expected statusTreeIndex clamped to 1, got %d", m.statusTreeIndex)
 	}
 
 	// Test negative index
-	m.statusFileIndex = -5
+	m.statusTreeIndex = -5
 	_ = m.buildStatusContent(statusRaw)
 
-	if m.statusFileIndex != 0 {
-		t.Fatalf("expected statusFileIndex clamped to 0, got %d", m.statusFileIndex)
+	if m.statusTreeIndex != 0 {
+		t.Fatalf("expected statusTreeIndex clamped to 0, got %d", m.statusTreeIndex)
 	}
 }
 
-// TestMouseScrollNavigatesFiles tests that mouse scroll navigates files in pane 1.
+// TestMouseScrollNavigatesFiles tests that mouse scroll navigates tree items in pane 1.
 func TestMouseScrollNavigatesFiles(t *testing.T) {
 	cfg := &config.AppConfig{
 		WorktreeDir: t.TempDir(),
@@ -1080,12 +1082,12 @@ func TestMouseScrollNavigatesFiles(t *testing.T) {
 	m.windowWidth = 100
 	m.windowHeight = 30
 
-	m.statusFiles = []StatusFile{
+	m.setStatusFiles([]StatusFile{
 		{Filename: "file1.go", Status: ".M", IsUntracked: false},
 		{Filename: "file2.go", Status: ".M", IsUntracked: false},
 		{Filename: "file3.go", Status: ".M", IsUntracked: false},
-	}
-	m.statusFileIndex = 0
+	})
+	m.statusTreeIndex = 0
 
 	// Scroll down should increment index
 	msg := tea.MouseMsg{
@@ -1096,14 +1098,258 @@ func TestMouseScrollNavigatesFiles(t *testing.T) {
 	}
 
 	_, _ = m.handleMouse(msg)
-	if m.statusFileIndex != 1 {
-		t.Fatalf("expected statusFileIndex 1 after scroll down, got %d", m.statusFileIndex)
+	if m.statusTreeIndex != 1 {
+		t.Fatalf("expected statusTreeIndex 1 after scroll down, got %d", m.statusTreeIndex)
 	}
 
 	// Scroll up should decrement index
 	msg.Button = tea.MouseButtonWheelUp
 	_, _ = m.handleMouse(msg)
-	if m.statusFileIndex != 0 {
-		t.Fatalf("expected statusFileIndex 0 after scroll up, got %d", m.statusFileIndex)
+	if m.statusTreeIndex != 0 {
+		t.Fatalf("expected statusTreeIndex 0 after scroll up, got %d", m.statusTreeIndex)
+	}
+}
+
+// TestBuildStatusTreeEmpty tests building tree from empty file list.
+func TestBuildStatusTreeEmpty(t *testing.T) {
+	tree := buildStatusTree([]StatusFile{})
+	if tree == nil {
+		t.Fatal("expected non-nil tree root")
+	}
+	if tree.Path != "" {
+		t.Errorf("expected empty root path, got %q", tree.Path)
+	}
+	if len(tree.Children) != 0 {
+		t.Errorf("expected no children for empty input, got %d", len(tree.Children))
+	}
+}
+
+// TestBuildStatusTreeFlatFiles tests tree with files at root level.
+func TestBuildStatusTreeFlatFiles(t *testing.T) {
+	files := []StatusFile{
+		{Filename: "README.md", Status: ".M"},
+		{Filename: "main.go", Status: "M."},
+	}
+	tree := buildStatusTree(files)
+
+	if len(tree.Children) != 2 {
+		t.Fatalf("expected 2 children, got %d", len(tree.Children))
+	}
+
+	// Should be sorted alphabetically
+	if tree.Children[0].Path != "README.md" {
+		t.Errorf("expected first child README.md, got %q", tree.Children[0].Path)
+	}
+	if tree.Children[1].Path != "main.go" {
+		t.Errorf("expected second child main.go, got %q", tree.Children[1].Path)
+	}
+
+	// Both should be files, not directories
+	for _, child := range tree.Children {
+		if child.IsDir() {
+			t.Errorf("expected %q to be a file, not directory", child.Path)
+		}
+		if child.File == nil {
+			t.Errorf("expected %q to have File pointer", child.Path)
+		}
+	}
+}
+
+// TestBuildStatusTreeNestedDirs tests tree with nested directory structure.
+func TestBuildStatusTreeNestedDirs(t *testing.T) {
+	files := []StatusFile{
+		{Filename: "internal/app/app.go", Status: ".M"},
+		{Filename: "internal/app/handlers.go", Status: ".M"},
+		{Filename: "internal/git/git.go", Status: "M."},
+		{Filename: "README.md", Status: ".M"},
+	}
+	tree := buildStatusTree(files)
+
+	// Root should have 2 children: internal (dir) and README.md (file)
+	// After compression, internal/app and internal/git are separate
+	if len(tree.Children) != 2 {
+		t.Fatalf("expected 2 root children, got %d", len(tree.Children))
+	}
+
+	// Directories should come before files
+	if tree.Children[0].Path != "internal" && !strings.HasPrefix(tree.Children[0].Path, "internal") {
+		t.Errorf("expected first child to be internal dir, got %q", tree.Children[0].Path)
+	}
+	if tree.Children[1].Path != "README.md" {
+		t.Errorf("expected second child to be README.md, got %q", tree.Children[1].Path)
+	}
+}
+
+// TestBuildStatusTreeDirsSortedBeforeFiles tests that directories appear before files.
+func TestBuildStatusTreeDirsSortedBeforeFiles(t *testing.T) {
+	files := []StatusFile{
+		{Filename: "zebra.txt", Status: ".M"},
+		{Filename: "aaa/file.go", Status: ".M"},
+		{Filename: "alpha.txt", Status: ".M"},
+	}
+	tree := buildStatusTree(files)
+
+	if len(tree.Children) != 3 {
+		t.Fatalf("expected 3 children, got %d", len(tree.Children))
+	}
+
+	// First should be the directory (aaa), then files alphabetically
+	if !tree.Children[0].IsDir() {
+		t.Error("expected first child to be a directory")
+	}
+	if tree.Children[0].Path != "aaa" {
+		t.Errorf("expected first child aaa, got %q", tree.Children[0].Path)
+	}
+	if tree.Children[1].IsDir() {
+		t.Error("expected second child to be a file")
+	}
+	if tree.Children[2].IsDir() {
+		t.Error("expected third child to be a file")
+	}
+}
+
+// TestCompressStatusTreeSingleChild tests compression of single-child directory chains.
+func TestCompressStatusTreeSingleChild(t *testing.T) {
+	files := []StatusFile{
+		{Filename: "a/b/c/file.go", Status: ".M"},
+	}
+	tree := buildStatusTree(files)
+
+	// After compression, a/b/c should be one node, not three nested nodes
+	flat := flattenStatusTree(tree, map[string]bool{}, 0)
+
+	// Should have: a/b/c (dir) + file.go (file) = 2 nodes
+	if len(flat) != 2 {
+		t.Fatalf("expected 2 flattened nodes after compression, got %d", len(flat))
+	}
+
+	if flat[0].Path != "a/b/c" {
+		t.Errorf("expected compressed path a/b/c, got %q", flat[0].Path)
+	}
+	if !flat[0].IsDir() {
+		t.Error("expected first node to be a directory")
+	}
+	if flat[1].Path != "a/b/c/file.go" {
+		t.Errorf("expected file path a/b/c/file.go, got %q", flat[1].Path)
+	}
+}
+
+// TestFlattenStatusTreeCollapsed tests that collapsed directories hide children.
+func TestFlattenStatusTreeCollapsed(t *testing.T) {
+	files := []StatusFile{
+		{Filename: "dir/file1.go", Status: ".M"},
+		{Filename: "dir/file2.go", Status: ".M"},
+		{Filename: "root.go", Status: ".M"},
+	}
+	tree := buildStatusTree(files)
+
+	// Without collapse: should see dir + 2 files + root.go = 4 nodes
+	flatOpen := flattenStatusTree(tree, map[string]bool{}, 0)
+	if len(flatOpen) != 4 {
+		t.Fatalf("expected 4 nodes when expanded, got %d", len(flatOpen))
+	}
+
+	// With dir collapsed: should see dir + root.go = 2 nodes
+	collapsed := map[string]bool{"dir": true}
+	flatClosed := flattenStatusTree(tree, collapsed, 0)
+	if len(flatClosed) != 2 {
+		t.Fatalf("expected 2 nodes when collapsed, got %d", len(flatClosed))
+	}
+
+	if flatClosed[0].Path != "dir" {
+		t.Errorf("expected first node to be dir, got %q", flatClosed[0].Path)
+	}
+	if flatClosed[1].Path != "root.go" {
+		t.Errorf("expected second node to be root.go, got %q", flatClosed[1].Path)
+	}
+}
+
+// TestStatusTreeNodeHelpers tests IsDir and Name helper methods.
+func TestStatusTreeNodeHelpers(t *testing.T) {
+	fileNode := &StatusTreeNode{
+		Path: "internal/app/app.go",
+		File: &StatusFile{Filename: "internal/app/app.go", Status: ".M"},
+	}
+	dirNode := &StatusTreeNode{
+		Path:     "internal/app",
+		Children: []*StatusTreeNode{},
+	}
+
+	if fileNode.IsDir() {
+		t.Error("file node should not be a directory")
+	}
+	if !dirNode.IsDir() {
+		t.Error("dir node should be a directory")
+	}
+
+	if fileNode.Name() != "app.go" {
+		t.Errorf("expected file name app.go, got %q", fileNode.Name())
+	}
+	if dirNode.Name() != "app" {
+		t.Errorf("expected dir name app, got %q", dirNode.Name())
+	}
+}
+
+// TestFlattenStatusTreeDepth tests that depth is correctly calculated.
+func TestFlattenStatusTreeDepth(t *testing.T) {
+	files := []StatusFile{
+		{Filename: "dir/subdir/file.go", Status: ".M"},
+		{Filename: "root.go", Status: ".M"},
+	}
+	tree := buildStatusTree(files)
+	flat := flattenStatusTree(tree, map[string]bool{}, 0)
+
+	// After compression: dir/subdir (depth 0), file.go (depth 1), root.go (depth 0)
+	if len(flat) != 3 {
+		t.Fatalf("expected 3 nodes, got %d", len(flat))
+	}
+
+	// Root level nodes should have depth 0
+	if flat[0].depth != 0 {
+		t.Errorf("expected dir/subdir depth 0, got %d", flat[0].depth)
+	}
+	// File inside dir should have depth 1
+	if flat[1].depth != 1 {
+		t.Errorf("expected file.go depth 1, got %d", flat[1].depth)
+	}
+	// Root file should have depth 0
+	if flat[2].depth != 0 {
+		t.Errorf("expected root.go depth 0, got %d", flat[2].depth)
+	}
+}
+
+// TestDirectoryToggleUpdatesFlat tests that toggling directory collapse updates flattened list.
+func TestDirectoryToggleUpdatesFlat(t *testing.T) {
+	cfg := &config.AppConfig{WorktreeDir: t.TempDir()}
+	m := NewModel(cfg, "")
+	m.focusedPane = 1
+	m.statusViewport = viewport.New(40, 10)
+	m.windowWidth = 100
+	m.windowHeight = 30
+
+	m.setStatusFiles([]StatusFile{
+		{Filename: "dir/file1.go", Status: ".M"},
+		{Filename: "dir/file2.go", Status: ".M"},
+	})
+
+	initialCount := len(m.statusTreeFlat)
+	if initialCount != 3 { // dir + 2 files
+		t.Fatalf("expected 3 nodes initially, got %d", initialCount)
+	}
+
+	// Collapse the directory
+	m.statusCollapsedDirs["dir"] = true
+	m.rebuildStatusTreeFlat()
+
+	if len(m.statusTreeFlat) != 1 { // just the dir
+		t.Fatalf("expected 1 node after collapse, got %d", len(m.statusTreeFlat))
+	}
+
+	// Expand again
+	m.statusCollapsedDirs["dir"] = false
+	m.rebuildStatusTreeFlat()
+
+	if len(m.statusTreeFlat) != 3 {
+		t.Fatalf("expected 3 nodes after expand, got %d", len(m.statusTreeFlat))
 	}
 }

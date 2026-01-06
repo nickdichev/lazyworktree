@@ -208,12 +208,16 @@ func (m *Model) handleBuiltInKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleNavigationUp(msg)
 
 	case keyCtrlJ:
-		if m.focusedPane == 1 && len(m.statusFiles) > 0 {
-			if m.statusFileIndex < len(m.statusFiles)-1 {
-				m.statusFileIndex++
+		if m.focusedPane == 1 && len(m.statusTreeFlat) > 0 {
+			if m.statusTreeIndex < len(m.statusTreeFlat)-1 {
+				m.statusTreeIndex++
 			}
 			m.rebuildStatusContentWithHighlight()
-			return m, m.showFileDiff(m.statusFiles[m.statusFileIndex])
+			node := m.statusTreeFlat[m.statusTreeIndex]
+			if !node.IsDir() {
+				return m, m.showFileDiff(*node.File)
+			}
+			return m, nil
 		}
 		if m.focusedPane == 2 {
 			prevCursor := m.logTable.Cursor()
@@ -226,12 +230,16 @@ func (m *Model) handleBuiltInKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case keyCtrlK:
-		if m.focusedPane == 1 && len(m.statusFiles) > 0 {
-			if m.statusFileIndex > 0 {
-				m.statusFileIndex--
+		if m.focusedPane == 1 && len(m.statusTreeFlat) > 0 {
+			if m.statusTreeIndex > 0 {
+				m.statusTreeIndex--
 			}
 			m.rebuildStatusContentWithHighlight()
-			return m, m.showFileDiff(m.statusFiles[m.statusFileIndex])
+			node := m.statusTreeFlat[m.statusTreeIndex]
+			if !node.IsDir() {
+				return m, m.showFileDiff(*node.File)
+			}
+			return m, nil
 		}
 		return m, nil
 
@@ -273,8 +281,11 @@ func (m *Model) handleBuiltInKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, m.showDiff()
 
 	case "e":
-		if m.focusedPane == 1 && len(m.statusFiles) > 0 && m.statusFileIndex >= 0 && m.statusFileIndex < len(m.statusFiles) {
-			return m, m.openStatusFileInEditor(m.statusFiles[m.statusFileIndex])
+		if m.focusedPane == 1 && len(m.statusTreeFlat) > 0 && m.statusTreeIndex >= 0 && m.statusTreeIndex < len(m.statusTreeFlat) {
+			node := m.statusTreeFlat[m.statusTreeIndex]
+			if !node.IsDir() {
+				return m, m.openStatusFileInEditor(*node.File)
+			}
 		}
 		return m, nil
 
@@ -388,10 +399,10 @@ func (m *Model) handleNavigationDown(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, cmd)
 		cmds = append(cmds, m.debouncedUpdateDetailsView())
 	case 1:
-		// Navigate through status files instead of scrolling
-		if len(m.statusFiles) > 0 {
-			if m.statusFileIndex < len(m.statusFiles)-1 {
-				m.statusFileIndex++
+		// Navigate through status tree items
+		if len(m.statusTreeFlat) > 0 {
+			if m.statusTreeIndex < len(m.statusTreeFlat)-1 {
+				m.statusTreeIndex++
 			}
 			m.rebuildStatusContentWithHighlight()
 		}
@@ -413,10 +424,10 @@ func (m *Model) handleNavigationUp(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, cmd)
 		cmds = append(cmds, m.debouncedUpdateDetailsView())
 	case 1:
-		// Navigate through status files instead of scrolling
-		if len(m.statusFiles) > 0 {
-			if m.statusFileIndex > 0 {
-				m.statusFileIndex--
+		// Navigate through status tree items
+		if len(m.statusTreeFlat) > 0 {
+			if m.statusTreeIndex > 0 {
+				m.statusTreeIndex--
 			}
 			m.rebuildStatusContentWithHighlight()
 		}
@@ -587,9 +598,18 @@ func (m *Model) handleEnterKey() (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 	case 1:
-		// Show diff for selected file in pager
-		if len(m.statusFiles) > 0 && m.statusFileIndex >= 0 && m.statusFileIndex < len(m.statusFiles) {
-			return m, m.showFileDiff(m.statusFiles[m.statusFileIndex])
+		// Handle Enter on status tree items
+		if len(m.statusTreeFlat) > 0 && m.statusTreeIndex >= 0 && m.statusTreeIndex < len(m.statusTreeFlat) {
+			node := m.statusTreeFlat[m.statusTreeIndex]
+			if node.IsDir() {
+				// Toggle collapse state for directories
+				m.statusCollapsedDirs[node.Path] = !m.statusCollapsedDirs[node.Path]
+				m.rebuildStatusTreeFlat()
+				m.rebuildStatusContentWithHighlight()
+				return m, nil
+			}
+			// Show diff for files
+			return m, m.showFileDiff(*node.File)
 		}
 	case 2:
 		// Open commit view
@@ -702,9 +722,9 @@ func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			m.worktreeTable, _ = m.worktreeTable.Update(tea.KeyMsg{Type: tea.KeyUp})
 			cmds = append(cmds, m.debouncedUpdateDetailsView())
 		case 1:
-			// Navigate up through files
-			if len(m.statusFiles) > 0 && m.statusFileIndex > 0 {
-				m.statusFileIndex--
+			// Navigate up through tree items
+			if len(m.statusTreeFlat) > 0 && m.statusTreeIndex > 0 {
+				m.statusTreeIndex--
 				m.rebuildStatusContentWithHighlight()
 			}
 		case 2:
@@ -719,9 +739,9 @@ func (m *Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			m.worktreeTable, _ = m.worktreeTable.Update(tea.KeyMsg{Type: tea.KeyDown})
 			cmds = append(cmds, m.debouncedUpdateDetailsView())
 		case 1:
-			// Navigate down through files
-			if len(m.statusFiles) > 0 && m.statusFileIndex < len(m.statusFiles)-1 {
-				m.statusFileIndex++
+			// Navigate down through tree items
+			if len(m.statusTreeFlat) > 0 && m.statusTreeIndex < len(m.statusTreeFlat)-1 {
+				m.statusTreeIndex++
 				m.rebuildStatusContentWithHighlight()
 			}
 		case 2:
