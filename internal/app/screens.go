@@ -638,6 +638,7 @@ func NewHelpScreen(maxWidth, maxHeight int, customCommands map[string]*config.Cu
 - Enter: Show diff for selected file in pager
 - e: Open selected file in editor
 - d: Show full diff (all files) in pager
+- /: Search file names
 - Ctrl+D / Space: Half page down
 - Ctrl+U: Half page up
 - PageDown / PageUp: Full page up/down
@@ -649,6 +650,7 @@ func NewHelpScreen(maxWidth, maxHeight int, customCommands map[string]*config.Cu
 - Ctrl+J: Next commit and open details
 - Enter: Open commit details and diff
 - C: Cherry-pick commit to another worktree
+- /: Search commit titles
 
 **Actions**
 - c: Create new worktree (from branch, commit, or PR/MR)
@@ -662,7 +664,8 @@ func NewHelpScreen(maxWidth, maxHeight int, customCommands map[string]*config.Cu
 - p: Fetch PR status from GitHub
 - r: Refresh list
 - s: Sort (cycle: Path / Last Active / Last Switched)
-- f, /: Filter worktrees
+- f: Filter focused pane
+- /: Search focused pane (incremental)
 - Alt+N / Alt+P: Move selection and fill filter input
 - ↑ / ↓ / Ctrl+J / Ctrl+K: Move selection (filter active, no fill)
 - g: Open LazyGit (or go to top if in diff pane)
@@ -677,6 +680,12 @@ func NewHelpScreen(maxWidth, maxHeight int, customCommands map[string]*config.Cu
 **Performance Note**
 PR data is not fetched by default for speed.
 Press p to fetch PR information from GitHub.
+
+**Search Mode**
+- Type to jump to the first matching item
+- n / N: Next / previous match
+- Enter: Close search
+- Esc / Ctrl+C: Clear search
 
 **Help Navigation**
 - / to search, Enter to apply, Esc to clear

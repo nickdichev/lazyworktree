@@ -54,6 +54,9 @@ const (
 
 	// Loading messages
 	loadingRefreshWorktrees = "Refreshing worktrees..."
+
+	commitMessageMaxLength     = 80
+	filterWorktreesPlaceholder = "Filter worktrees..."
 )
 
 type (
@@ -68,9 +71,9 @@ type (
 		err         error
 	}
 	statusUpdatedMsg struct {
-		info   string
-		status string
-		log    []commitLogEntry
+		info        string
+		statusFiles []StatusFile
+		log         []commitLogEntry
 	}
 	refreshCompleteMsg      struct{}
 	fetchRemotesCompleteMsg struct{}
@@ -162,6 +165,22 @@ const (
 	sortModeLastSwitched = 2 // Sort by last UI access time
 )
 
+type searchTarget int
+
+const (
+	searchTargetWorktrees searchTarget = iota
+	searchTargetStatus
+	searchTargetLog
+)
+
+type filterTarget int
+
+const (
+	filterTargetWorktrees filterTarget = iota
+	filterTargetStatus
+	filterTargetLog
+)
+
 // Model represents the main application model
 type Model struct {
 	// Configuration
@@ -176,39 +195,48 @@ type Model struct {
 	filterInput    textinput.Model
 
 	// State
-	worktrees         []*models.WorktreeInfo
-	filteredWts       []*models.WorktreeInfo
-	selectedIndex     int
-	filterQuery       string
-	sortMode          int // sortModePath, sortModeLastActive, or sortModeLastSwitched
-	prDataLoaded      bool
-	accessHistory     map[string]int64 // worktree path -> last access timestamp
-	repoKey           string
-	repoKeyOnce       sync.Once
-	currentScreen     screenType
-	helpScreen        *HelpScreen
-	trustScreen       *TrustScreen
-	inputScreen       *InputScreen
-	inputSubmit       func(string) (tea.Cmd, bool)
-	commitScreen      *CommitScreen
-	welcomeScreen     *WelcomeScreen
-	paletteScreen     *CommandPaletteScreen
-	paletteSubmit     func(string) tea.Cmd
-	prSelectionScreen *PRSelectionScreen
-	prSelectionSubmit func(*models.PRInfo) tea.Cmd
-	listScreen        *ListSelectionScreen
-	listSubmit        func(selectionItem) tea.Cmd
-	diffScreen        *DiffScreen
-	spinner           spinner.Model
-	loading           bool
-	showingFilter     bool
-	focusedPane       int // 0=table, 1=status, 2=log
-	windowWidth       int
-	windowHeight      int
-	infoContent       string
-	statusContent     string
-	statusFiles       []StatusFile // parsed list of files from git status
-	statusFileIndex   int          // currently selected file index in status pane
+	worktrees           []*models.WorktreeInfo
+	filteredWts         []*models.WorktreeInfo
+	selectedIndex       int
+	filterQuery         string
+	statusFilterQuery   string
+	logFilterQuery      string
+	worktreeSearchQuery string
+	statusSearchQuery   string
+	logSearchQuery      string
+	sortMode            int // sortModePath, sortModeLastActive, or sortModeLastSwitched
+	prDataLoaded        bool
+	accessHistory       map[string]int64 // worktree path -> last access timestamp
+	repoKey             string
+	repoKeyOnce         sync.Once
+	currentScreen       screenType
+	helpScreen          *HelpScreen
+	trustScreen         *TrustScreen
+	inputScreen         *InputScreen
+	inputSubmit         func(string) (tea.Cmd, bool)
+	commitScreen        *CommitScreen
+	welcomeScreen       *WelcomeScreen
+	paletteScreen       *CommandPaletteScreen
+	paletteSubmit       func(string) tea.Cmd
+	prSelectionScreen   *PRSelectionScreen
+	prSelectionSubmit   func(*models.PRInfo) tea.Cmd
+	listScreen          *ListSelectionScreen
+	listSubmit          func(selectionItem) tea.Cmd
+	diffScreen          *DiffScreen
+	spinner             spinner.Model
+	loading             bool
+	showingFilter       bool
+	filterTarget        filterTarget
+	showingSearch       bool
+	searchTarget        searchTarget
+	focusedPane         int // 0=table, 1=status, 2=log
+	windowWidth         int
+	windowHeight        int
+	infoContent         string
+	statusContent       string
+	statusFiles         []StatusFile // parsed list of files from git status
+	statusFilesAll      []StatusFile // full list of files from git status
+	statusFileIndex     int          // currently selected file index in status pane
 
 	// Cache
 	cache           map[string]any
@@ -246,7 +274,8 @@ type Model struct {
 	pendingTrust    string
 
 	// Log cache for commit detail viewer
-	logEntries []commitLogEntry
+	logEntries    []commitLogEntry
+	logEntriesAll []commitLogEntry
 
 	// Command history for ! command
 	commandHistory []string
@@ -363,7 +392,7 @@ func NewModel(cfg *config.AppConfig, initialFilter string) *Model {
 	logT.SetStyles(logStyles)
 
 	filterInput := textinput.New()
-	filterInput.Placeholder = "Filter worktrees..."
+	filterInput.Placeholder = filterWorktreesPlaceholder
 	filterInput.Width = 50
 	filterInput.PromptStyle = lipgloss.NewStyle().Foreground(thm.Accent)
 	filterInput.TextStyle = lipgloss.NewStyle().Foreground(thm.TextFg)
@@ -395,6 +424,8 @@ func NewModel(cfg *config.AppConfig, initialFilter string) *Model {
 		filteredWts:     []*models.WorktreeInfo{},
 		sortMode:        sortMode,
 		filterQuery:     initialFilter,
+		filterTarget:    filterTargetWorktrees,
+		searchTarget:    searchTargetWorktrees,
 		cache:           make(map[string]any),
 		divergenceCache: make(map[string]string),
 		notifiedErrors:  make(map[string]bool),
@@ -420,12 +451,12 @@ func NewModel(cfg *config.AppConfig, initialFilter string) *Model {
 
 	if initialFilter != "" {
 		m.showingFilter = true
-		m.filterInput.SetValue(initialFilter)
 	}
 	if cfg.SearchAutoSelect && !m.showingFilter {
 		m.showingFilter = true
 	}
 	if m.showingFilter {
+		m.setFilterTarget(filterTargetWorktrees)
 		m.filterInput.Focus()
 	}
 
@@ -491,14 +522,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.info != "" {
 			m.infoContent = msg.info
 		}
-		m.statusContent = msg.status
+		m.setStatusFiles(msg.statusFiles)
 		if msg.log != nil {
-			rows := make([]table.Row, 0, len(msg.log))
-			for _, entry := range msg.log {
-				rows = append(rows, table.Row{entry.sha, entry.message})
-			}
-			m.logTable.SetRows(rows)
-			m.logEntries = msg.log
+			m.setLogEntries(msg.log)
 		}
 		// Trigger CI fetch if worktree has a PR and cache is stale
 		return m, m.maybeFetchCIStatus()
@@ -711,6 +737,131 @@ func (m *Model) overlayPopup(base, popup string, marginTop int) string {
 
 // Helper methods
 
+func (m *Model) inputLabel() string {
+	if m.showingSearch {
+		return m.searchLabel()
+	}
+	return m.filterLabel()
+}
+
+func (m *Model) searchLabel() string {
+	switch m.searchTarget {
+	case searchTargetStatus:
+		return "🔍 Search Files"
+	case searchTargetLog:
+		return "🔍 Search Commits"
+	default:
+		return "🔍 Search Worktrees"
+	}
+}
+
+func (m *Model) filterLabel() string {
+	switch m.filterTarget {
+	case filterTargetStatus:
+		return "🔍 Filter Files"
+	case filterTargetLog:
+		return "🔍 Filter Commits"
+	default:
+		return "🔍 Filter Worktrees"
+	}
+}
+
+func (m *Model) filterPlaceholder(target filterTarget) string {
+	switch target {
+	case filterTargetStatus:
+		return "Filter files..."
+	case filterTargetLog:
+		return "Filter commits..."
+	default:
+		return filterWorktreesPlaceholder
+	}
+}
+
+func (m *Model) filterQueryForTarget(target filterTarget) string {
+	switch target {
+	case filterTargetStatus:
+		return m.statusFilterQuery
+	case filterTargetLog:
+		return m.logFilterQuery
+	default:
+		return m.filterQuery
+	}
+}
+
+func (m *Model) setFilterQuery(target filterTarget, query string) {
+	switch target {
+	case filterTargetStatus:
+		m.statusFilterQuery = query
+	case filterTargetLog:
+		m.logFilterQuery = query
+	default:
+		m.filterQuery = query
+	}
+}
+
+func (m *Model) setFilterTarget(target filterTarget) {
+	m.filterTarget = target
+	m.filterInput.Placeholder = m.filterPlaceholder(target)
+	m.filterInput.SetValue(m.filterQueryForTarget(target))
+	m.filterInput.CursorEnd()
+}
+
+func (m *Model) searchPlaceholder(target searchTarget) string {
+	switch target {
+	case searchTargetStatus:
+		return "Search files..."
+	case searchTargetLog:
+		return "Search commit titles..."
+	default:
+		return "Search worktrees..."
+	}
+}
+
+func (m *Model) searchQueryForTarget(target searchTarget) string {
+	switch target {
+	case searchTargetStatus:
+		return m.statusSearchQuery
+	case searchTargetLog:
+		return m.logSearchQuery
+	default:
+		return m.worktreeSearchQuery
+	}
+}
+
+func (m *Model) setSearchQuery(target searchTarget, query string) {
+	switch target {
+	case searchTargetStatus:
+		m.statusSearchQuery = query
+	case searchTargetLog:
+		m.logSearchQuery = query
+	default:
+		m.worktreeSearchQuery = query
+	}
+}
+
+func (m *Model) setSearchTarget(target searchTarget) {
+	m.searchTarget = target
+	m.filterInput.Placeholder = m.searchPlaceholder(target)
+	m.filterInput.SetValue(m.searchQueryForTarget(target))
+	m.filterInput.CursorEnd()
+}
+
+func (m *Model) startSearch(target searchTarget) tea.Cmd {
+	m.showingSearch = true
+	m.showingFilter = false
+	m.setSearchTarget(target)
+	m.filterInput.Focus()
+	return textinput.Blink
+}
+
+func (m *Model) startFilter(target filterTarget) tea.Cmd {
+	m.showingFilter = true
+	m.showingSearch = false
+	m.setFilterTarget(target)
+	m.filterInput.Focus()
+	return textinput.Blink
+}
+
 func (m *Model) updateTable() {
 	// Filter worktrees
 	query := strings.ToLower(strings.TrimSpace(m.filterQuery))
@@ -855,23 +1006,16 @@ func (m *Model) updateDetailsView() tea.Cmd {
 		for line := range strings.SplitSeq(logRaw, "\n") {
 			parts := strings.SplitN(line, "\t", 2)
 			if len(parts) == 2 {
-				message := parts[1]
-				// Truncate long commit messages to 80 characters
-				if len(message) > 80 {
-					message = message[:80] + "…"
-				}
 				logEntries = append(logEntries, commitLogEntry{
 					sha:     parts[0],
-					message: message,
+					message: parts[1],
 				})
 			}
 		}
-		statusContent := m.buildStatusContent(statusRaw)
-
 		return statusUpdatedMsg{
-			info:   m.buildInfoContent(wt),
-			status: statusContent,
-			log:    logEntries,
+			info:        m.buildInfoContent(wt),
+			statusFiles: parseStatusFiles(statusRaw),
+			log:         logEntries,
 		}
 	}
 }
@@ -2005,7 +2149,7 @@ func (m *Model) showCherryPick() tea.Cmd {
 
 	// Show worktree selection screen
 	title := fmt.Sprintf("Cherry-pick %s to worktree", selectedCommit.sha)
-	m.listScreen = NewListSelectionScreen(items, title, "Filter worktrees...", "No worktrees found.", m.windowWidth, m.windowHeight, "", m.theme)
+	m.listScreen = NewListSelectionScreen(items, title, filterWorktreesPlaceholder, "No worktrees found.", m.windowWidth, m.windowHeight, "", m.theme)
 	m.listSubmit = func(item selectionItem) tea.Cmd {
 		// Find target worktree by path
 		var targetWorktree *models.WorktreeInfo
@@ -3184,7 +3328,7 @@ func (m *Model) computeLayout() layoutDims {
 	headerHeight := 1
 	footerHeight := 1
 	filterHeight := 0
-	if m.showingFilter {
+	if m.showingFilter || m.showingSearch {
 		filterHeight = 1
 	}
 	gapX := 1
@@ -3317,7 +3461,7 @@ func (m *Model) renderFilter(layout layoutDims) string {
 	filterStyle := lipgloss.NewStyle().
 		Foreground(m.theme.TextFg).
 		Padding(0, 1)
-	line := fmt.Sprintf("%s %s", labelStyle.Render("🔍 Filter"), m.filterInput.View())
+	line := fmt.Sprintf("%s %s", labelStyle.Render(m.inputLabel()), m.filterInput.View())
 	return filterStyle.Width(layout.width).Render(line)
 }
 
@@ -3400,6 +3544,8 @@ func (m *Model) renderFooter(layout layoutDims) string {
 				m.renderKeyHint("Enter", "View Commit"),
 				m.renderKeyHint("C", "Cherry-pick"),
 				m.renderKeyHint("j/k", "Navigate"),
+				m.renderKeyHint("f", "Filter"),
+				m.renderKeyHint("/", "Search"),
 				m.renderKeyHint("r", "Refresh"),
 				m.renderKeyHint("Tab", "Switch Pane"),
 				m.renderKeyHint("q", "Quit"),
@@ -3407,6 +3553,8 @@ func (m *Model) renderFooter(layout layoutDims) string {
 			}
 		} else {
 			hints = []string{
+				m.renderKeyHint("f", "Filter"),
+				m.renderKeyHint("/", "Search"),
 				m.renderKeyHint("Tab", "Switch Pane"),
 				m.renderKeyHint("q", "Quit"),
 				m.renderKeyHint("?", "Help"),
@@ -3424,6 +3572,8 @@ func (m *Model) renderFooter(layout layoutDims) string {
 			)
 		}
 		hints = append(hints,
+			m.renderKeyHint("f", "Filter"),
+			m.renderKeyHint("/", "Search"),
 			m.renderKeyHint("Tab", "Switch Pane"),
 			m.renderKeyHint("r", "Refresh"),
 			m.renderKeyHint("q", "Quit"),
@@ -3440,7 +3590,8 @@ func (m *Model) renderFooter(layout layoutDims) string {
 		}
 		hints = []string{
 			m.renderKeyHint("1-3", "Pane"),
-			m.renderKeyHint("/", "Filter"),
+			m.renderKeyHint("f", "Filter"),
+			m.renderKeyHint("/", "Search"),
 			m.renderKeyHint("s", sortName),
 			m.renderKeyHint("d", "Diff"),
 			m.renderKeyHint("D", "Delete"),
@@ -3624,12 +3775,10 @@ func (m *Model) buildInfoContent(wt *models.WorktreeInfo) string {
 	return strings.Join(infoLines, "\n")
 }
 
-func (m *Model) buildStatusContent(statusRaw string) string {
+func parseStatusFiles(statusRaw string) []StatusFile {
 	statusRaw = strings.TrimRight(statusRaw, "\n")
 	if strings.TrimSpace(statusRaw) == "" {
-		m.statusFiles = nil
-		m.statusFileIndex = 0
-		return lipgloss.NewStyle().Foreground(m.theme.SuccessFg).Render("Clean working tree")
+		return nil
 	}
 
 	// Parse all files into statusFiles
@@ -3677,22 +3826,263 @@ func (m *Model) buildStatusContent(statusRaw string) string {
 		})
 	}
 
-	m.statusFiles = parsedFiles
-	// Clamp statusFileIndex to valid range
+	return parsedFiles
+}
+
+func (m *Model) buildStatusContent(statusRaw string) string {
+	m.setStatusFiles(parseStatusFiles(statusRaw))
+	return m.statusContent
+}
+
+func (m *Model) setStatusFiles(files []StatusFile) {
+	m.statusFilesAll = files
+	m.applyStatusFilter()
+}
+
+func (m *Model) applyStatusFilter() {
+	query := strings.ToLower(strings.TrimSpace(m.statusFilterQuery))
+	filtered := m.statusFilesAll
+	if query != "" {
+		filtered = make([]StatusFile, 0, len(m.statusFilesAll))
+		for _, sf := range m.statusFilesAll {
+			if strings.Contains(strings.ToLower(sf.Filename), query) {
+				filtered = append(filtered, sf)
+			}
+		}
+	}
+
+	selectedName := ""
+	if m.statusFileIndex >= 0 && m.statusFileIndex < len(m.statusFiles) {
+		selectedName = m.statusFiles[m.statusFileIndex].Filename
+	}
+
+	m.statusFiles = filtered
+	if selectedName != "" {
+		found := false
+		for i, sf := range m.statusFiles {
+			if sf.Filename == selectedName {
+				m.statusFileIndex = i
+				found = true
+				break
+			}
+		}
+		if !found {
+			m.statusFileIndex = 0
+		}
+	}
+
 	if m.statusFileIndex < 0 {
 		m.statusFileIndex = 0
 	}
 	if len(m.statusFiles) > 0 && m.statusFileIndex >= len(m.statusFiles) {
 		m.statusFileIndex = len(m.statusFiles) - 1
 	}
+	if len(m.statusFiles) == 0 {
+		m.statusFileIndex = 0
+	}
 
-	return m.renderStatusFiles()
+	m.rebuildStatusContentWithHighlight()
+}
+
+func formatCommitMessage(message string) string {
+	if len(message) <= commitMessageMaxLength {
+		return message
+	}
+	return message[:commitMessageMaxLength] + "…"
+}
+
+func (m *Model) setLogEntries(entries []commitLogEntry) {
+	m.logEntriesAll = entries
+	m.applyLogFilter()
+}
+
+func (m *Model) applyLogFilter() {
+	query := strings.ToLower(strings.TrimSpace(m.logFilterQuery))
+	filtered := m.logEntriesAll
+	if query != "" {
+		filtered = make([]commitLogEntry, 0, len(m.logEntriesAll))
+		for _, entry := range m.logEntriesAll {
+			if strings.Contains(strings.ToLower(entry.message), query) {
+				filtered = append(filtered, entry)
+			}
+		}
+	}
+
+	selectedSHA := ""
+	cursor := m.logTable.Cursor()
+	if cursor >= 0 && cursor < len(m.logEntries) {
+		selectedSHA = m.logEntries[cursor].sha
+	}
+
+	m.logEntries = filtered
+	rows := make([]table.Row, 0, len(filtered))
+	for _, entry := range filtered {
+		rows = append(rows, table.Row{entry.sha, formatCommitMessage(entry.message)})
+	}
+	m.logTable.SetRows(rows)
+
+	if selectedSHA != "" {
+		for i, entry := range m.logEntries {
+			if entry.sha == selectedSHA {
+				m.logTable.SetCursor(i)
+				return
+			}
+		}
+	}
+	if len(m.logEntries) > 0 {
+		if m.logTable.Cursor() < 0 || m.logTable.Cursor() >= len(m.logEntries) {
+			m.logTable.SetCursor(0)
+		}
+	} else {
+		m.logTable.SetCursor(0)
+	}
+}
+
+func findMatchIndex(count, start int, forward bool, matches func(int) bool) int {
+	if count == 0 {
+		return -1
+	}
+	if start < 0 {
+		if forward {
+			start = 0
+		} else {
+			start = count - 1
+		}
+	} else if count > 0 {
+		start %= count
+	}
+	for i := 0; i < count; i++ {
+		var idx int
+		if forward {
+			idx = (start + i) % count
+		} else {
+			idx = (start - i + count) % count
+		}
+		if matches(idx) {
+			return idx
+		}
+	}
+	return -1
+}
+
+func (m *Model) findWorktreeMatchIndex(query string, start int, forward bool) int {
+	lowerQuery := strings.ToLower(strings.TrimSpace(query))
+	if lowerQuery == "" {
+		return -1
+	}
+	hasPathSep := strings.Contains(lowerQuery, "/")
+	return findMatchIndex(len(m.filteredWts), start, forward, func(i int) bool {
+		wt := m.filteredWts[i]
+		name := filepath.Base(wt.Path)
+		if wt.IsMain {
+			name = mainWorktreeName
+		}
+		if strings.Contains(strings.ToLower(name), lowerQuery) {
+			return true
+		}
+		if strings.Contains(strings.ToLower(wt.Branch), lowerQuery) {
+			return true
+		}
+		return hasPathSep && strings.Contains(strings.ToLower(wt.Path), lowerQuery)
+	})
+}
+
+func (m *Model) findStatusMatchIndex(query string, start int, forward bool) int {
+	lowerQuery := strings.ToLower(strings.TrimSpace(query))
+	if lowerQuery == "" {
+		return -1
+	}
+	return findMatchIndex(len(m.statusFiles), start, forward, func(i int) bool {
+		return strings.Contains(strings.ToLower(m.statusFiles[i].Filename), lowerQuery)
+	})
+}
+
+func (m *Model) findLogMatchIndex(query string, start int, forward bool) int {
+	lowerQuery := strings.ToLower(strings.TrimSpace(query))
+	if lowerQuery == "" {
+		return -1
+	}
+	return findMatchIndex(len(m.logEntries), start, forward, func(i int) bool {
+		return strings.Contains(strings.ToLower(m.logEntries[i].message), lowerQuery)
+	})
+}
+
+func (m *Model) applySearchQuery(query string) tea.Cmd {
+	switch m.searchTarget {
+	case searchTargetStatus:
+		if idx := m.findStatusMatchIndex(query, 0, true); idx >= 0 {
+			m.statusFileIndex = idx
+			m.rebuildStatusContentWithHighlight()
+		}
+	case searchTargetLog:
+		if idx := m.findLogMatchIndex(query, 0, true); idx >= 0 {
+			m.logTable.SetCursor(idx)
+		}
+	default:
+		if idx := m.findWorktreeMatchIndex(query, 0, true); idx >= 0 {
+			m.worktreeTable.SetCursor(idx)
+			m.selectedIndex = idx
+			return m.debouncedUpdateDetailsView()
+		}
+	}
+	return nil
+}
+
+func (m *Model) advanceSearchMatch(forward bool) tea.Cmd {
+	query := strings.TrimSpace(m.searchQueryForTarget(m.searchTarget))
+	if query == "" {
+		return nil
+	}
+	switch m.searchTarget {
+	case searchTargetStatus:
+		start := m.statusFileIndex
+		if forward {
+			start++
+		} else {
+			start--
+		}
+		if idx := m.findStatusMatchIndex(query, start, forward); idx >= 0 {
+			m.statusFileIndex = idx
+			m.rebuildStatusContentWithHighlight()
+		}
+	case searchTargetLog:
+		start := m.logTable.Cursor()
+		if forward {
+			start++
+		} else {
+			start--
+		}
+		if idx := m.findLogMatchIndex(query, start, forward); idx >= 0 {
+			m.logTable.SetCursor(idx)
+		}
+	default:
+		start := m.worktreeTable.Cursor()
+		if forward {
+			start++
+		} else {
+			start--
+		}
+		if idx := m.findWorktreeMatchIndex(query, start, forward); idx >= 0 {
+			m.worktreeTable.SetCursor(idx)
+			m.selectedIndex = idx
+			return m.debouncedUpdateDetailsView()
+		}
+	}
+	return nil
 }
 
 // renderStatusFiles renders the status file list with current selection highlighted.
 func (m *Model) renderStatusFiles() string {
 	if len(m.statusFiles) == 0 {
-		return lipgloss.NewStyle().Foreground(m.theme.SuccessFg).Render("Clean working tree")
+		if len(m.statusFilesAll) == 0 {
+			return lipgloss.NewStyle().Foreground(m.theme.SuccessFg).Render("Clean working tree")
+		}
+		if strings.TrimSpace(m.statusFilterQuery) != "" {
+			return lipgloss.NewStyle().Foreground(m.theme.MutedFg).Render(
+				fmt.Sprintf("No files match %q", strings.TrimSpace(m.statusFilterQuery)),
+			)
+		}
+		return lipgloss.NewStyle().Foreground(m.theme.MutedFg).Render("No files to display")
 	}
 
 	modifiedStyle := lipgloss.NewStyle().Foreground(m.theme.WarnFg)
@@ -3763,12 +4153,12 @@ func (m *Model) renderStatusFiles() string {
 
 // rebuildStatusContentWithHighlight re-renders the status content with current selection highlighted.
 func (m *Model) rebuildStatusContentWithHighlight() {
+	m.statusContent = m.renderStatusFiles()
+	m.statusViewport.SetContent(m.statusContent)
+
 	if len(m.statusFiles) == 0 {
 		return
 	}
-
-	m.statusContent = m.renderStatusFiles()
-	m.statusViewport.SetContent(m.statusContent)
 
 	// Auto-scroll to keep selected file visible
 	viewportHeight := m.statusViewport.Height

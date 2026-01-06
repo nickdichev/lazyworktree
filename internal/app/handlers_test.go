@@ -62,7 +62,7 @@ func TestHandleEnterKeySelectsWorktree(t *testing.T) {
 	}
 }
 
-func TestFilterEnterSelectsHighlightedMatch(t *testing.T) {
+func TestFilterEnterClosesWithoutSelecting(t *testing.T) {
 	cfg := &config.AppConfig{
 		WorktreeDir: t.TempDir(),
 		SortMode:    "path",
@@ -89,17 +89,14 @@ func TestFilterEnterSelectsHighlightedMatch(t *testing.T) {
 	}
 	m = updatedModel
 
-	if cmd == nil {
-		t.Fatal("expected quit command to be returned")
+	if cmd != nil {
+		t.Fatal("expected no command to be returned")
 	}
-	msg := cmd()
-	if _, ok := msg.(tea.QuitMsg); !ok {
-		t.Fatalf("expected quit message, got %T", msg)
+	if m.showingFilter {
+		t.Fatal("expected filter to be closed")
 	}
-	// Should select the item at cursor position 1 (b-worktree)
-	expected := filepath.Join(cfg.WorktreeDir, "b-worktree")
-	if m.selectedPath != expected {
-		t.Fatalf("expected selected path %q, got %q", expected, m.selectedPath)
+	if m.selectedPath != "" {
+		t.Fatalf("expected selected path to remain empty, got %q", m.selectedPath)
 	}
 }
 
@@ -265,6 +262,70 @@ func TestFilterCtrlCExitsFilter(t *testing.T) {
 	}
 }
 
+func TestSearchWorktreeSelectsMatch(t *testing.T) {
+	cfg := &config.AppConfig{
+		WorktreeDir: t.TempDir(),
+		SortMode:    "path",
+	}
+	m := NewModel(cfg, "")
+	m.focusedPane = 0
+
+	wt1Path := filepath.Join(cfg.WorktreeDir, "alpha")
+	wt2Path := filepath.Join(cfg.WorktreeDir, "beta")
+	m.worktrees = []*models.WorktreeInfo{
+		{Path: wt1Path, Branch: "feat-one"},
+		{Path: wt2Path, Branch: "feat-two"},
+	}
+	m.updateTable()
+	m.worktreeTable.SetCursor(0)
+	m.selectedIndex = 0
+
+	updated, _ := m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	updatedModel, ok := updated.(*Model)
+	if !ok {
+		t.Fatalf("expected updated model, got %T", updated)
+	}
+	m = updatedModel
+
+	_, _ = m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'b'}})
+
+	if m.worktreeTable.Cursor() != 1 {
+		t.Fatalf("expected cursor to move to match, got %d", m.worktreeTable.Cursor())
+	}
+}
+
+func TestFilterStatusNarrowsList(t *testing.T) {
+	cfg := &config.AppConfig{
+		WorktreeDir: t.TempDir(),
+	}
+	m := NewModel(cfg, "")
+	m.focusedPane = 1
+	m.statusViewport = viewport.New(40, 10)
+	m.setStatusFiles([]StatusFile{
+		{Filename: "app.go", Status: ".M"},
+		{Filename: "README.md", Status: ".M"},
+	})
+
+	updated, _ := m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}})
+	updatedModel, ok := updated.(*Model)
+	if !ok {
+		t.Fatalf("expected updated model, got %T", updated)
+	}
+	m = updatedModel
+
+	_, _ = m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}})
+	_, _ = m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'e'}})
+	_, _ = m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
+	_, _ = m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+
+	if len(m.statusFiles) != 1 {
+		t.Fatalf("expected 1 filtered status file, got %d", len(m.statusFiles))
+	}
+	if m.statusFiles[0].Filename != "README.md" {
+		t.Fatalf("expected README.md, got %q", m.statusFiles[0].Filename)
+	}
+}
+
 func TestHandleCachedWorktreesUpdatesState(t *testing.T) {
 	cfg := &config.AppConfig{
 		WorktreeDir: t.TempDir(),
@@ -406,7 +467,7 @@ func TestHandleCIStatusLoadedUpdatesCache(t *testing.T) {
 	}
 }
 
-func TestFilterEnterSelectsHighlightedItem(t *testing.T) {
+func TestFilterEnterClosesWithoutSelectingItem(t *testing.T) {
 	cfg := &config.AppConfig{
 		WorktreeDir:      t.TempDir(),
 		SortMode:         "path",
@@ -435,7 +496,7 @@ func TestFilterEnterSelectsHighlightedItem(t *testing.T) {
 	m.worktreeTable.SetCursor(1)
 	m.selectedIndex = 1
 
-	// Press Enter - should select the highlighted item (srv-auth)
+	// Press Enter - should exit filter without selecting
 	updated, cmd := m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyEnter})
 	updatedModel, ok := updated.(*Model)
 	if !ok {
@@ -443,15 +504,14 @@ func TestFilterEnterSelectsHighlightedItem(t *testing.T) {
 	}
 	m = updatedModel
 
-	if cmd == nil {
-		t.Fatal("expected quit command to be returned")
+	if cmd != nil {
+		t.Fatal("expected no command to be returned")
 	}
-	msg := cmd()
-	if _, ok := msg.(tea.QuitMsg); !ok {
-		t.Fatalf("expected quit message, got %T", msg)
+	if m.showingFilter {
+		t.Fatal("expected filter to be closed")
 	}
-	if m.selectedPath != wt2Path {
-		t.Fatalf("expected selected path %q, got %q", wt2Path, m.selectedPath)
+	if m.selectedPath != "" {
+		t.Fatalf("expected selected path to remain empty, got %q", m.selectedPath)
 	}
 }
 
@@ -652,6 +712,74 @@ func TestLogPaneCtrlJMovesNextCommit(t *testing.T) {
 	}
 }
 
+func TestSearchLogSelectsNextMatch(t *testing.T) {
+	cfg := &config.AppConfig{
+		WorktreeDir: t.TempDir(),
+	}
+	m := NewModel(cfg, "")
+	m.focusedPane = 2
+	m.logEntries = []commitLogEntry{
+		{sha: "abc123", message: "Fix bug in parser"},
+		{sha: "def456", message: "Add new feature"},
+		{sha: "ghi789", message: "Fix tests"},
+	}
+	m.logTable.SetRows([]table.Row{
+		{"abc123", formatCommitMessage("Fix bug in parser")},
+		{"def456", formatCommitMessage("Add new feature")},
+		{"ghi789", formatCommitMessage("Fix tests")},
+	})
+
+	updated, _ := m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	updatedModel, ok := updated.(*Model)
+	if !ok {
+		t.Fatalf("expected updated model, got %T", updated)
+	}
+	m = updatedModel
+
+	_, _ = m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}})
+	_, _ = m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'i'}})
+	_, _ = m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
+
+	if m.logTable.Cursor() != 0 {
+		t.Fatalf("expected first match at cursor 0, got %d", m.logTable.Cursor())
+	}
+
+	_, _ = m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
+	if m.logTable.Cursor() != 2 {
+		t.Fatalf("expected next match at cursor 2, got %d", m.logTable.Cursor())
+	}
+}
+
+func TestFilterLogNarrowsList(t *testing.T) {
+	cfg := &config.AppConfig{
+		WorktreeDir: t.TempDir(),
+	}
+	m := NewModel(cfg, "")
+	m.focusedPane = 2
+	m.setLogEntries([]commitLogEntry{
+		{sha: "abc123", message: "Fix bug in parser"},
+		{sha: "def456", message: "Add new feature"},
+	})
+
+	updated, _ := m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}})
+	updatedModel, ok := updated.(*Model)
+	if !ok {
+		t.Fatalf("expected updated model, got %T", updated)
+	}
+	m = updatedModel
+
+	_, _ = m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}})
+	_, _ = m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'i'}})
+	_, _ = m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
+
+	if len(m.logEntries) != 1 {
+		t.Fatalf("expected 1 filtered commit, got %d", len(m.logEntries))
+	}
+	if m.logEntries[0].sha != "abc123" {
+		t.Fatalf("expected commit abc123, got %q", m.logEntries[0].sha)
+	}
+}
+
 // TestStatusFileNavigationEmptyList tests navigation with no status files.
 func TestStatusFileNavigationEmptyList(t *testing.T) {
 	cfg := &config.AppConfig{
@@ -846,6 +974,36 @@ func TestBuildStatusContentCleanTree(t *testing.T) {
 	}
 	if !strings.Contains(result, "Clean working tree") {
 		t.Fatalf("expected 'Clean working tree' in result, got %q", result)
+	}
+}
+
+func TestSearchStatusSelectsMatch(t *testing.T) {
+	cfg := &config.AppConfig{
+		WorktreeDir: t.TempDir(),
+	}
+	m := NewModel(cfg, "")
+	m.focusedPane = 1
+	m.statusViewport = viewport.New(40, 10)
+	m.statusFiles = []StatusFile{
+		{Filename: "app.go", Status: ".M"},
+		{Filename: "README.md", Status: ".M"},
+	}
+	m.rebuildStatusContentWithHighlight()
+
+	updated, _ := m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}})
+	updatedModel, ok := updated.(*Model)
+	if !ok {
+		t.Fatalf("expected updated model, got %T", updated)
+	}
+	m = updatedModel
+
+	_, _ = m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}})
+	_, _ = m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'e'}})
+	_, _ = m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
+	_, _ = m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+
+	if m.statusFileIndex != 1 {
+		t.Fatalf("expected statusFileIndex 1, got %d", m.statusFileIndex)
 	}
 }
 

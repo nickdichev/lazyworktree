@@ -36,7 +36,7 @@ func main() {
 	flag.StringVar(&debugLog, "debug-log", "", "Path to debug log file")
 	flag.StringVar(&outputSelection, "output-selection", "", "Write selected worktree path to a file")
 	flag.StringVar(&themeName, "theme", "", "Override the UI theme (supported: dracula, narna, clean-light, solarized-dark, solarized-light, gruvbox-dark, gruvbox-light, nord, monokai, catppuccin-mocha)")
-	flag.BoolVar(&searchAutoSelect, "search-auto-select", false, "Start with filter focused and select first match on Enter")
+	flag.BoolVar(&searchAutoSelect, "search-auto-select", false, "Start with filter focused")
 	flag.BoolVar(&showVersion, "version", false, "Print version information")
 	flag.BoolVar(&showSyntaxThemes, "show-syntax-themes", false, "List available delta syntax themes")
 	flag.Parse()

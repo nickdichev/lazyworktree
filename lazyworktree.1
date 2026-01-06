@@ -39,7 +39,7 @@ Select a UI theme (dracula, narna, clean-light, solarized-dark, solarized-light,
 Display the default delta syntax-theme values for each UI theme
 .TP
 .B \-\-search\-auto\-select
-Start with filter focused and allow Enter to select the first match
+Start with filter focused
 .TP
 .B \-\-output\-selection \fIFILE\fR
 Write the selected worktree path to FILE on exit (for shell integration)
@@ -90,8 +90,14 @@ Refresh list
 .B R
 Fetch all remotes
 .TP
-.B f, /
-Filter worktrees
+.B f
+Filter focused pane (worktrees, files, commits)
+.TP
+.B /
+Search focused pane (incremental)
+.TP
+.B n, N
+Next or previous search match
 .TP
 .B s
 Cycle sort mode (Path / Last Active / Last Switched)

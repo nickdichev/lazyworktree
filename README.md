@@ -309,7 +309,8 @@ custom_commands:
 | `g` | Open LazyGit |
 | `r` | Refresh list |
 | `R` | Fetch all remotes |
-| `f`, `/` | Filter worktrees |
+| `f` | Filter focused pane (worktrees, files, commits) |
+| `/` | Search focused pane (incremental) |
 | `alt+n`, `alt+p` | Move selection and fill filter input |
 | `↑`, `↓` | Move selection (filter active, no fill) |
 | `s` | Cycle sort mode (Path / Last Active / Last Switched) |
@@ -323,6 +324,7 @@ custom_commands:
 | `C` | Cherry-pick commit to another worktree |
 | `j/k` | Navigate commits |
 | `ctrl+j` | Next commit and open details |
+| `/` | Search commit titles (incremental) |
 
 **Status Pane** (when focused on status):
 
@@ -332,13 +334,23 @@ custom_commands:
 | `Enter` | Show diff for selected file in pager |
 | `e` | Open selected file in editor |
 | `d` | Show full diff of all files in pager |
+| `/` | Search file names (incremental) |
 
 **Filter Mode:**
 
+Filter mode applies to the focused pane (worktrees, file names, commit titles).
+
 - `alt+n`, `alt+p`: Navigate and update filter input with selected item
 - `↑`, `↓`, `ctrl+j`, `ctrl+k`: Navigate list without changing filter input
-- `Enter`: With empty filter, select highlighted item; with text, apply filter
+- `Enter`: Exit filter mode
 - `Esc`, `Ctrl+C`: Exit filter mode
+
+**Search Mode:**
+
+- Type to jump to the first matching item
+- `n`, `N`: Next / previous match
+- `Enter`: Close search
+- `Esc`, `Ctrl+C`: Clear search
 
 **Command History (! command):**
 
@@ -407,7 +419,7 @@ Notes:
 - `init_commands` and `terminate_commands` execute prior to any repository-specific `.wt` commands (if present).
 - `sort_mode` controls the default sort order: `"switched"` (last accessed, default), `"active"` (last commit date), or `"path"` (alphabetical). The old `sort_by_active` option is still supported for backwards compatibility.
 - Set `auto_fetch_prs` to `true` to fetch PR data upon startup.
-- Set `search_auto_select` to `true` to commence with the filter focused and allow `Enter` to select the first match (alternatively, pass `--search-auto-select`).
+- Set `search_auto_select` to `true` to commence with the filter focused (alternatively, pass `--search-auto-select`).
 - Set `fuzzy_finder_input` to `true` to enable fuzzy finder suggestions in input dialogs. When enabled, typing in text input fields displays fuzzy-filtered suggestions from available options. Use arrow keys to navigate suggestions and Enter to select.
 - Use `max_untracked_diffs: 0` to conceal untracked diffs; `max_diff_chars: 0` disables truncation.
 - Execute `lazyworktree --show-syntax-themes` to display the default delta `--syntax-theme` values for each UI theme.

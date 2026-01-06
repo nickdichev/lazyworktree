@@ -4,7 +4,6 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/chmouel/lazyworktree/internal/models"
 )
@@ -13,49 +12,72 @@ import (
 func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
+	if m.showingSearch {
+		return m.handleSearchInput(msg)
+	}
+
 	// Handle filter input first - when filtering, only escape/enter should exit
 	if m.showingFilter {
 		keyStr := msg.String()
-		if keyStr == keyEnter {
-			// If there are filtered items, select the currently highlighted one
-			if len(m.filteredWts) > 0 {
+		switch m.filterTarget {
+		case filterTargetWorktrees:
+			if keyStr == keyEnter {
+				m.showingFilter = false
+				m.filterInput.Blur()
+				m.restoreFocusAfterFilter()
+				return m, nil
+			}
+			if isEscKey(keyStr) || keyStr == keyCtrlC {
 				m.showingFilter = false
 				m.filterInput.Blur()
 				m.worktreeTable.Focus()
-
-				// Always select the currently highlighted item
-				cursor := m.worktreeTable.Cursor()
-				if cursor >= 0 && cursor < len(m.filteredWts) {
-					m.selectedIndex = cursor
-				} else {
-					// If cursor is invalid, default to first item
-					m.selectedIndex = 0
-					m.worktreeTable.SetCursor(0)
-				}
-				return m.handleEnterKey()
+				return m, nil
 			}
-			// No filtered items - just close the filter
-			m.showingFilter = false
-			m.filterInput.Blur()
-			m.worktreeTable.Focus()
-			return m, nil
+			if keyStr == "alt+n" || keyStr == "alt+p" {
+				return m.handleFilterNavigation(keyStr, true)
+			}
+			if keyStr == keyUp || keyStr == keyDown || keyStr == keyCtrlK || keyStr == keyCtrlJ {
+				return m.handleFilterNavigation(keyStr, false)
+			}
+			m.filterInput, cmd = m.filterInput.Update(msg)
+			m.setFilterQuery(filterTargetWorktrees, m.filterInput.Value())
+			m.updateTable()
+			return m, cmd
+		case filterTargetStatus:
+			if keyStr == keyEnter {
+				m.showingFilter = false
+				m.filterInput.Blur()
+				m.restoreFocusAfterFilter()
+				return m, nil
+			}
+			if isEscKey(keyStr) || keyStr == keyCtrlC {
+				m.showingFilter = false
+				m.filterInput.Blur()
+				m.restoreFocusAfterFilter()
+				return m, nil
+			}
+			m.filterInput, cmd = m.filterInput.Update(msg)
+			m.setFilterQuery(filterTargetStatus, m.filterInput.Value())
+			m.applyStatusFilter()
+			return m, cmd
+		case filterTargetLog:
+			if keyStr == keyEnter {
+				m.showingFilter = false
+				m.filterInput.Blur()
+				m.restoreFocusAfterFilter()
+				return m, nil
+			}
+			if isEscKey(keyStr) || keyStr == keyCtrlC {
+				m.showingFilter = false
+				m.filterInput.Blur()
+				m.restoreFocusAfterFilter()
+				return m, nil
+			}
+			m.filterInput, cmd = m.filterInput.Update(msg)
+			m.setFilterQuery(filterTargetLog, m.filterInput.Value())
+			m.applyLogFilter()
+			return m, cmd
 		}
-		if isEscKey(keyStr) || keyStr == "ctrl+c" {
-			m.showingFilter = false
-			m.filterInput.Blur()
-			m.worktreeTable.Focus()
-			return m, nil
-		}
-		if keyStr == "alt+n" || keyStr == "alt+p" {
-			return m.handleFilterNavigation(keyStr, true)
-		}
-		if keyStr == keyUp || keyStr == keyDown || keyStr == keyCtrlK || keyStr == keyCtrlJ {
-			return m.handleFilterNavigation(keyStr, false)
-		}
-		m.filterInput, cmd = m.filterInput.Update(msg)
-		m.filterQuery = m.filterInput.Value()
-		m.updateTable()
-		return m, cmd
 	}
 
 	// Check for custom commands first - allows users to override built-in keys
@@ -66,10 +88,62 @@ func (m *Model) handleKeyMsg(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m.handleBuiltInKey(msg)
 }
 
+func (m *Model) handleSearchInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	keyStr := msg.String()
+	switch keyStr {
+	case keyEnter:
+		m.showingSearch = false
+		m.filterInput.Blur()
+		m.restoreFocusAfterSearch()
+		return m, nil
+	case "n":
+		return m, m.advanceSearchMatch(true)
+	case "N":
+		return m, m.advanceSearchMatch(false)
+	}
+	if isEscKey(keyStr) || keyStr == keyCtrlC {
+		m.clearSearchQuery()
+		m.showingSearch = false
+		m.filterInput.Blur()
+		m.restoreFocusAfterSearch()
+		return m, nil
+	}
+
+	var cmd tea.Cmd
+	m.filterInput, cmd = m.filterInput.Update(msg)
+	query := m.filterInput.Value()
+	m.setSearchQuery(m.searchTarget, query)
+	return m, tea.Batch(cmd, m.applySearchQuery(query))
+}
+
+func (m *Model) clearSearchQuery() {
+	m.setSearchQuery(m.searchTarget, "")
+	m.filterInput.SetValue("")
+	m.filterInput.CursorEnd()
+}
+
+func (m *Model) restoreFocusAfterSearch() {
+	switch m.searchTarget {
+	case searchTargetWorktrees:
+		m.worktreeTable.Focus()
+	case searchTargetLog:
+		m.logTable.Focus()
+	}
+}
+
+func (m *Model) restoreFocusAfterFilter() {
+	switch m.filterTarget {
+	case filterTargetWorktrees:
+		m.worktreeTable.Focus()
+	case filterTargetLog:
+		m.logTable.Focus()
+	}
+}
+
 // handleBuiltInKey processes built-in keyboard shortcuts.
 func (m *Model) handleBuiltInKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "ctrl+c", keyQ:
+	case keyCtrlC, keyQ:
 		if m.selectedPath != "" {
 			return m, tea.Quit
 		}
@@ -224,10 +298,25 @@ func (m *Model) handleBuiltInKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.currentScreen = screenLoading
 		return m, m.fetchRemotes()
 
-	case "f", "/":
-		m.showingFilter = true
-		m.filterInput.Focus()
-		return m, textinput.Blink
+	case "f":
+		target := filterTargetWorktrees
+		switch m.focusedPane {
+		case 1:
+			target = filterTargetStatus
+		case 2:
+			target = filterTargetLog
+		}
+		return m, m.startFilter(target)
+
+	case "/":
+		target := searchTargetWorktrees
+		switch m.focusedPane {
+		case 1:
+			target = searchTargetStatus
+		case 2:
+			target = searchTargetLog
+		}
+		return m, m.startSearch(target)
 
 	case "s":
 		// Cycle through sort modes: path -> active -> switched -> path
