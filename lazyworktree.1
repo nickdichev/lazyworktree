@@ -103,7 +103,10 @@ Refresh list
 Fetch all remotes
 .TP
 .B f
-Filter focused pane (worktrees, files, commits)
+Filter focused pane (worktrees, files, commits). When a filter is active, the pane title shows a filter indicator with [Esc] Clear hint.
+.TP
+.B Esc
+Clear filter for focused pane (when filter is active)
 .TP
 .B /
 Search focused pane (incremental)
@@ -114,8 +117,20 @@ Next or previous search match
 .B s
 Cycle sort mode (Path / Last Active / Last Switched)
 .TP
+.B Home
+Go to first item in focused pane
+.TP
+.B End
+Go to last item in focused pane
+.TP
+.B ctrl+Left, ctrl+Right
+Jump to previous/next folder (Status pane only)
+.TP
 .B ?
 Show help
+.TP
+.B =
+Toggle zoom for focused pane (full screen, press again to unzoom)
 .TP
 .B ctrl+j
 Move to next commit and open commit file tree in log pane
@@ -163,31 +178,110 @@ _jt() { _worktree_jump ~/path/to/your/main/repo; }
 compdef _jt jt
 .fi
 .SH CONFIGURATION
-lazyworktree reads configuration from \fB~/.config/lazyworktree/config.yaml\fR. See the documentation for available options including:
+lazyworktree reads configuration from \fB~/.config/lazyworktree/config.yaml\fR (or \fBconfig.yml\fR). The following configuration options are available:
+.TP
+.B worktree_dir
+Default worktree root directory (default: ~/.local/share/worktrees). Can be overridden with \fB--worktree-dir\fR. Worktrees are organized under ~/.local/share/worktrees/<repo_name> by default. The application attempts to resolve repository locations via \fBgh repo view\fR or \fBglab repo view\fR. If the repository name is not detectable, lazyworktree falls back to a local \fBlocal-<hash>\fR key for cache and last-selected storage.
+.TP
+.B sort_mode
+Default sort order for worktrees. Options: \fBpath\fR (alphabetical), \fBactive\fR (last commit date), \fBswitched\fR (last accessed, default). The old \fBsort_by_active\fR option is still supported for backwards compatibility.
+.TP
+.B auto_fetch_prs
+Automatically fetch PR/MR data on startup (default: false).
+.TP
+.B show_icons
+Toggle Nerd Font v3 icons in file trees, PR views, and CI checks (default: true).
+.TP
+.B search_auto_select
+Start with filter focused and select first match on Enter (default: false). Can also be enabled with \fB--search-auto-select\fR.
+.TP
+.B fuzzy_finder_input
+Enable fuzzy finder suggestions in input dialogs. When enabled, typing in text input fields displays fuzzy-filtered suggestions from available options. Use arrow keys to navigate suggestions and Enter to select (default: false).
+.TP
+.B max_untracked_diffs
+Maximum number of untracked file diffs to show (default: 10). Set to 0 to hide untracked diffs.
+.TP
+.B max_diff_chars
+Maximum characters to display in diffs before truncation (default: 200000). Set to 0 to disable truncation.
+.TP
+.B theme
+UI color theme. Options: \fBdracula\fR (default), \fBnarna\fR, \fBclean-light\fR, \fBsolarized-dark\fR, \fBsolarized-light\fR, \fBgruvbox-dark\fR, \fBgruvbox-light\fR, \fBnord\fR, \fBmonokai\fR, \fBcatppuccin-mocha\fR. Can also be set with \fB--theme\fR.
+.TP
+.B delta_path
+Path to delta executable (default: \fBdelta\fR). Set to empty string to disable delta and use plain git diff output.
+.TP
+.B pager
+Pager command for show_output custom commands and diff viewer (default: $PAGER, fallback: less --use-color --wordwrap -qcR -P 'Press q to exit..', then more, then cat). When the pager is less, lazyworktree configures LESS= and LESSHISTFILE=- to ignore user defaults.
+.TP
+.B editor
+Editor command for Status pane file edits (default: config value, then $EDITOR, then nvim, then vi).
+.TP
+.B delta_args
+List of extra arguments passed to delta for diff rendering. If omitted, lazyworktree picks a syntax theme matching your UI theme. Default mappings: dracula → Dracula, narna → OneHalfDark, clean-light → GitHub, solarized-dark → Solarized (dark), solarized-light → Solarized (light), gruvbox-dark → Gruvbox Dark, gruvbox-light → Gruvbox Light, nord → Nord, monokai → Monokai Extended, catppuccin-mocha → Catppuccin Mocha. Use \fB--show-syntax-themes\fR to display default values.
+.TP
+.B trust_mode
+Security setting for executing commands from .wt files. Options: \fBtofu\fR (default - prompts on first use/change), \fBnever\fR (never run commands), \fBalways\fR (always run without prompting, risky).
+.TP
+.B merge_method
+Merge method for "Absorb worktree" action. Options: \fBrebase\fR (default - rebases onto main then fast-forwards), \fBmerge\fR (creates merge commit).
+.TP
+.B branch_name_script
+Script to generate branch name suggestions when creating worktrees from changes. The script receives the git diff on stdin and should output a branch name (first line is used). Useful for AI-powered branch name generation. Script operates under a 30-second timeout.
+.TP
+.B init_commands
+List of commands to execute when creating a worktree. These execute before any repository-specific .wt commands (if present). Available environment variables: WORKTREE_BRANCH, MAIN_WORKTREE_PATH, WORKTREE_PATH, WORKTREE_NAME. Special built-in command: \fBlink_topsymlinks\fR (not a shell command) symlinks untracked/ignored files from main worktree root, editor configs (.vscode, .idea, .cursor, .claude), ensures tmp/ directory exists, and runs direnv allow if .envrc is present.
+.TP
+.B terminate_commands
+List of commands to execute when removing a worktree. These execute before any repository-specific .wt commands (if present). Same environment variables as init_commands.
+.TP
+.B custom_commands
+Custom keybindings to run commands in the selected worktree. Commands execute interactively (TUI suspends, like lazygit) and appear in the command palette. Custom commands take precedence over built-in keys.
+
+Each custom command supports the following fields:
+.RS
 .IP \(bu 2
-worktree_dir
+\fBcommand\fR: The command to execute (required, unless using tmux/zellij)
 .IP \(bu 2
-sort_mode (path, active, switched)
+\fBdescription\fR: Description shown in help screen and command palette (optional)
 .IP \(bu 2
-auto_fetch_prs
+\fBshow_help\fR: Show in help screen and footer hints (default: false)
 .IP \(bu 2
-show_icons (true, false)
+\fBwait\fR: Wait for key press after command completes (default: false, useful for quick commands)
 .IP \(bu 2
-theme
+\fBshow_output\fR: Run non-interactively and show stdout/stderr in the pager (default: false, ignores wait)
 .IP \(bu 2
-delta_path
+\fBtmux\fR: Configure a tmux session instead of executing a single command (object, optional)
 .IP \(bu 2
-pager
+\fBzellij\fR: Configure a zellij session instead of executing a single command (object, optional)
+.RE
+
+Supported key formats: single keys (e, s, t), modifier combinations (ctrl+e, alt+t), special keys (enter, esc, tab, space).
+
+Environment variables available in custom commands: WORKTREE_BRANCH, MAIN_WORKTREE_PATH, WORKTREE_PATH, WORKTREE_NAME, REPO_NAME.
+
+For tmux sessions, the following fields are available:
+.RS
 .IP \(bu 2
-editor
+\fBsession_name\fR: tmux session name, supports env vars (default: ${REPO_NAME}_wt_$WORKTREE_NAME)
 .IP \(bu 2
-trust_mode (tofu, never, always)
+\fBattach\fR: If true, attach/switch immediately; if false, show info modal (default: true)
 .IP \(bu 2
-merge_method (rebase, merge)
+\fBon_exists\fR: Behavior if session exists: switch, attach, kill, new (default: switch)
 .IP \(bu 2
-custom_commands
+\fBwindows\fR: List of window definitions. Each window has: name (supports env vars), command (empty uses default shell), cwd (default: $WORKTREE_PATH). If omitted, creates a single shell window.
+.RE
+
+For zellij sessions, the following fields are available:
+.RS
 .IP \(bu 2
-zellij session_name replaces / and \\ with -
+\fBsession_name\fR: zellij session name, supports env vars (default: ${REPO_NAME}_wt_$WORKTREE_NAME). Note: zellij session names cannot include / or \\, so lazyworktree replaces them with -.
+.IP \(bu 2
+\fBattach\fR: If true, attach immediately; if false, show info modal (default: true)
+.IP \(bu 2
+\fBon_exists\fR: Behavior if session exists: switch, attach, kill, new (default: switch)
+.IP \(bu 2
+\fBwindows\fR: List of tab definitions. Each tab has: name (supports env vars), command (empty uses default shell), cwd (default: $WORKTREE_PATH). If omitted, creates a single shell tab.
+.RE
 .SH PREREQUISITES
 .IP \(bu 2
 Git 2.31+ (recommended)

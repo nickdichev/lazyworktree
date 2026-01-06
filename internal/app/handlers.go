@@ -140,6 +140,86 @@ func (m *Model) restoreFocusAfterFilter() {
 	}
 }
 
+func (m *Model) clearCurrentPaneFilter() (tea.Model, tea.Cmd) {
+	switch m.focusedPane {
+	case 0:
+		m.filterQuery = ""
+		m.filterInput.SetValue("")
+		m.updateTable()
+	case 1:
+		m.statusFilterQuery = ""
+		m.filterInput.SetValue("")
+		m.applyStatusFilter()
+	case 2:
+		m.logFilterQuery = ""
+		m.filterInput.SetValue("")
+		m.applyLogFilter()
+	}
+	return m, nil
+}
+
+func (m *Model) handleGotoTop() (tea.Model, tea.Cmd) {
+	switch m.focusedPane {
+	case 0:
+		m.worktreeTable.GotoTop()
+		return m, m.debouncedUpdateDetailsView()
+	case 1:
+		if len(m.statusTreeFlat) > 0 {
+			m.statusTreeIndex = 0
+			m.rebuildStatusContentWithHighlight()
+		}
+	case 2:
+		m.logTable.GotoTop()
+	}
+	return m, nil
+}
+
+func (m *Model) handleGotoBottom() (tea.Model, tea.Cmd) {
+	switch m.focusedPane {
+	case 0:
+		m.worktreeTable.GotoBottom()
+		return m, m.debouncedUpdateDetailsView()
+	case 1:
+		if len(m.statusTreeFlat) > 0 {
+			m.statusTreeIndex = len(m.statusTreeFlat) - 1
+			m.rebuildStatusContentWithHighlight()
+		}
+	case 2:
+		m.logTable.GotoBottom()
+	}
+	return m, nil
+}
+
+func (m *Model) handleNextFolder() (tea.Model, tea.Cmd) {
+	if len(m.statusTreeFlat) == 0 {
+		return m, nil
+	}
+	// Find next directory after current position
+	for i := m.statusTreeIndex + 1; i < len(m.statusTreeFlat); i++ {
+		if m.statusTreeFlat[i].IsDir() {
+			m.statusTreeIndex = i
+			m.rebuildStatusContentWithHighlight()
+			return m, nil
+		}
+	}
+	return m, nil
+}
+
+func (m *Model) handlePrevFolder() (tea.Model, tea.Cmd) {
+	if len(m.statusTreeFlat) == 0 {
+		return m, nil
+	}
+	// Find previous directory before current position
+	for i := m.statusTreeIndex - 1; i >= 0; i-- {
+		if m.statusTreeFlat[i].IsDir() {
+			m.statusTreeIndex = i
+			m.rebuildStatusContentWithHighlight()
+			return m, nil
+		}
+	}
+	return m, nil
+}
+
 // handleBuiltInKey processes built-in keyboard shortcuts.
 func (m *Model) handleBuiltInKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
@@ -151,6 +231,7 @@ func (m *Model) handleBuiltInKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 
 	case "1":
+		m.zoomedPane = -1 // exit zoom mode
 		wasPane1 := m.focusedPane == 1
 		m.focusedPane = 0
 		m.worktreeTable.Focus()
@@ -160,11 +241,13 @@ func (m *Model) handleBuiltInKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case "2":
+		m.zoomedPane = -1 // exit zoom mode
 		m.focusedPane = 1
 		m.rebuildStatusContentWithHighlight()
 		return m, nil
 
 	case "3":
+		m.zoomedPane = -1 // exit zoom mode
 		wasPane1 := m.focusedPane == 1
 		m.focusedPane = 2
 		m.logTable.Focus()
@@ -174,6 +257,7 @@ func (m *Model) handleBuiltInKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case "tab", "]":
+		m.zoomedPane = -1 // exit zoom mode
 		wasPane1 := m.focusedPane == 1
 		m.focusedPane = (m.focusedPane + 1) % 3
 		switch m.focusedPane {
@@ -188,6 +272,7 @@ func (m *Model) handleBuiltInKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case "[":
+		m.zoomedPane = -1 // exit zoom mode
 		wasPane1 := m.focusedPane == 1
 		m.focusedPane = (m.focusedPane - 1 + 3) % 3
 		switch m.focusedPane {
@@ -344,10 +429,6 @@ func (m *Model) handleBuiltInKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case "g":
-		if m.focusedPane == 1 {
-			m.statusViewport.GotoTop()
-			return m, nil
-		}
 		return m, m.openLazyGit()
 
 	case "o":
@@ -368,13 +449,42 @@ func (m *Model) handleBuiltInKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "C":
 		return m, m.showCherryPick()
 
+	case "=":
+		if m.zoomedPane >= 0 {
+			m.zoomedPane = -1 // unzoom
+		} else {
+			m.zoomedPane = m.focusedPane // zoom current pane
+		}
+		return m, nil
+
 	case keyEsc, keyEscRaw:
 		if m.currentScreen == screenPalette {
 			m.currentScreen = screenNone
 			m.paletteScreen = nil
 			return m, nil
 		}
+		if m.hasActiveFilterForPane(m.focusedPane) {
+			return m.clearCurrentPaneFilter()
+		}
 		return m, nil
+	}
+
+	// Handle Home/End keys for all panes
+	if msg.Type == tea.KeyHome {
+		return m.handleGotoTop()
+	}
+	if msg.Type == tea.KeyEnd {
+		return m.handleGotoBottom()
+	}
+
+	// Handle Ctrl+Left/Right for folder navigation in status pane
+	if m.focusedPane == 1 {
+		if msg.Type == tea.KeyCtrlLeft {
+			return m.handlePrevFolder()
+		}
+		if msg.Type == tea.KeyCtrlRight {
+			return m.handleNextFolder()
+		}
 	}
 
 	// Handle table input

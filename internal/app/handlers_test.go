@@ -15,10 +15,11 @@ import (
 )
 
 const (
-	testFeat   = "feat"
-	testWt1    = "wt1"
-	testWt2    = "wt2"
-	testReadme = "README.md"
+	testFeat        = "feat"
+	testWt1         = "wt1"
+	testWt2         = "wt2"
+	testReadme      = "README.md"
+	testFilterQuery = "test"
 )
 
 func TestHandlePageDownUpOnStatusPane(t *testing.T) {
@@ -1452,5 +1453,235 @@ func TestDirectoryToggleUpdatesFlat(t *testing.T) {
 
 	if len(m.statusTreeFlat) != 3 {
 		t.Fatalf("expected 3 nodes after expand, got %d", len(m.statusTreeFlat))
+	}
+}
+
+func TestEscClearsWorktreeFilter(t *testing.T) {
+	cfg := &config.AppConfig{
+		WorktreeDir: t.TempDir(),
+	}
+	m := NewModel(cfg, "")
+	m.focusedPane = 0
+	m.filterQuery = testFilterQuery
+	m.worktrees = []*models.WorktreeInfo{
+		{Path: filepath.Join(cfg.WorktreeDir, "test-wt"), Branch: testFeat},
+	}
+	m.updateTable()
+
+	updated, _ := m.handleBuiltInKey(tea.KeyMsg{Type: tea.KeyEsc})
+	updatedModel, ok := updated.(*Model)
+	if !ok {
+		t.Fatalf("expected updated model, got %T", updated)
+	}
+
+	if updatedModel.filterQuery != "" {
+		t.Fatalf("expected filter to be cleared, got %q", updatedModel.filterQuery)
+	}
+}
+
+func TestEscClearsStatusFilter(t *testing.T) {
+	cfg := &config.AppConfig{
+		WorktreeDir: t.TempDir(),
+	}
+	m := NewModel(cfg, "")
+	m.focusedPane = 1
+	m.statusFilterQuery = testFilterQuery
+
+	updated, _ := m.handleBuiltInKey(tea.KeyMsg{Type: tea.KeyEsc})
+	updatedModel, ok := updated.(*Model)
+	if !ok {
+		t.Fatalf("expected updated model, got %T", updated)
+	}
+
+	if updatedModel.statusFilterQuery != "" {
+		t.Fatalf("expected status filter to be cleared, got %q", updatedModel.statusFilterQuery)
+	}
+}
+
+func TestEscClearsLogFilter(t *testing.T) {
+	cfg := &config.AppConfig{
+		WorktreeDir: t.TempDir(),
+	}
+	m := NewModel(cfg, "")
+	m.focusedPane = 2
+	m.logFilterQuery = testFilterQuery
+
+	updated, _ := m.handleBuiltInKey(tea.KeyMsg{Type: tea.KeyEsc})
+	updatedModel, ok := updated.(*Model)
+	if !ok {
+		t.Fatalf("expected updated model, got %T", updated)
+	}
+
+	if updatedModel.logFilterQuery != "" {
+		t.Fatalf("expected log filter to be cleared, got %q", updatedModel.logFilterQuery)
+	}
+}
+
+func TestEscDoesNothingWhenNoFilter(t *testing.T) {
+	cfg := &config.AppConfig{
+		WorktreeDir: t.TempDir(),
+	}
+	m := NewModel(cfg, "")
+	m.focusedPane = 0
+	m.filterQuery = ""
+
+	updated, _ := m.handleBuiltInKey(tea.KeyMsg{Type: tea.KeyEsc})
+	updatedModel, ok := updated.(*Model)
+	if !ok {
+		t.Fatalf("expected updated model, got %T", updated)
+	}
+
+	if updatedModel.filterQuery != "" {
+		t.Fatalf("expected filter to remain empty, got %q", updatedModel.filterQuery)
+	}
+}
+
+func TestHasActiveFilterForPane(t *testing.T) {
+	cfg := &config.AppConfig{
+		WorktreeDir: t.TempDir(),
+	}
+	m := NewModel(cfg, "")
+
+	// No filters active
+	if m.hasActiveFilterForPane(0) {
+		t.Fatal("expected no active filter for pane 0")
+	}
+	if m.hasActiveFilterForPane(1) {
+		t.Fatal("expected no active filter for pane 1")
+	}
+	if m.hasActiveFilterForPane(2) {
+		t.Fatal("expected no active filter for pane 2")
+	}
+
+	// Set worktree filter
+	m.filterQuery = testFilterQuery
+	if !m.hasActiveFilterForPane(0) {
+		t.Fatal("expected active filter for pane 0")
+	}
+
+	// Set status filter
+	m.statusFilterQuery = testFilterQuery
+	if !m.hasActiveFilterForPane(1) {
+		t.Fatal("expected active filter for pane 1")
+	}
+
+	// Set log filter
+	m.logFilterQuery = testFilterQuery
+	if !m.hasActiveFilterForPane(2) {
+		t.Fatal("expected active filter for pane 2")
+	}
+
+	// Whitespace-only should not count as active
+	m.filterQuery = "   "
+	if m.hasActiveFilterForPane(0) {
+		t.Fatal("expected whitespace-only filter to not be active")
+	}
+}
+
+func TestZoomPaneToggle(t *testing.T) {
+	cfg := &config.AppConfig{
+		WorktreeDir: t.TempDir(),
+	}
+	m := NewModel(cfg, "")
+	m.focusedPane = 0
+
+	if m.zoomedPane != -1 {
+		t.Fatalf("expected zoomedPane to start at -1, got %d", m.zoomedPane)
+	}
+
+	// Press = to zoom pane 0
+	updated, _ := m.handleBuiltInKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'='}})
+	updatedModel, ok := updated.(*Model)
+	if !ok {
+		t.Fatalf("expected updated model, got %T", updated)
+	}
+	m = updatedModel
+
+	if m.zoomedPane != 0 {
+		t.Fatalf("expected zoomedPane to be 0 after zoom, got %d", m.zoomedPane)
+	}
+
+	// Press = again to unzoom
+	updated, _ = m.handleBuiltInKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'='}})
+	updatedModel, ok = updated.(*Model)
+	if !ok {
+		t.Fatalf("expected updated model, got %T", updated)
+	}
+	m = updatedModel
+
+	if m.zoomedPane != -1 {
+		t.Fatalf("expected zoomedPane to be -1 after unzoom, got %d", m.zoomedPane)
+	}
+}
+
+func TestZoomPaneExitsOnPaneKeys(t *testing.T) {
+	cfg := &config.AppConfig{
+		WorktreeDir: t.TempDir(),
+	}
+	m := NewModel(cfg, "")
+	m.focusedPane = 0
+	m.zoomedPane = 0
+
+	// Press 2 to switch to pane 2 and exit zoom
+	updated, _ := m.handleBuiltInKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
+	updatedModel, ok := updated.(*Model)
+	if !ok {
+		t.Fatalf("expected updated model, got %T", updated)
+	}
+	m = updatedModel
+
+	if m.zoomedPane != -1 {
+		t.Fatalf("expected zoomedPane to be -1 after pressing 2, got %d", m.zoomedPane)
+	}
+	if m.focusedPane != 1 {
+		t.Fatalf("expected focusedPane to be 1, got %d", m.focusedPane)
+	}
+}
+
+func TestZoomPaneExitsOnTabKey(t *testing.T) {
+	cfg := &config.AppConfig{
+		WorktreeDir: t.TempDir(),
+	}
+	m := NewModel(cfg, "")
+	m.focusedPane = 0
+	m.zoomedPane = 0
+
+	// Press tab to cycle panes and exit zoom
+	updated, _ := m.handleBuiltInKey(tea.KeyMsg{Type: tea.KeyTab})
+	updatedModel, ok := updated.(*Model)
+	if !ok {
+		t.Fatalf("expected updated model, got %T", updated)
+	}
+	m = updatedModel
+
+	if m.zoomedPane != -1 {
+		t.Fatalf("expected zoomedPane to be -1 after pressing tab, got %d", m.zoomedPane)
+	}
+	if m.focusedPane != 1 {
+		t.Fatalf("expected focusedPane to be 1 after tab, got %d", m.focusedPane)
+	}
+}
+
+func TestZoomPaneExitsOnBracketKey(t *testing.T) {
+	cfg := &config.AppConfig{
+		WorktreeDir: t.TempDir(),
+	}
+	m := NewModel(cfg, "")
+	m.focusedPane = 1
+	m.zoomedPane = 1
+
+	// Press [ to cycle back and exit zoom
+	updated, _ := m.handleBuiltInKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'['}})
+	updatedModel, ok := updated.(*Model)
+	if !ok {
+		t.Fatalf("expected updated model, got %T", updated)
+	}
+	m = updatedModel
+
+	if m.zoomedPane != -1 {
+		t.Fatalf("expected zoomedPane to be -1 after pressing [, got %d", m.zoomedPane)
+	}
+	if m.focusedPane != 0 {
+		t.Fatalf("expected focusedPane to be 0 after [, got %d", m.focusedPane)
 	}
 }

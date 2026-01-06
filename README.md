@@ -354,7 +354,10 @@ custom_commands:
 | `alt+n`, `alt+p` | Move selection and fill filter input |
 | `↑`, `↓` | Move selection (filter active, no fill) |
 | `s` | Cycle sort mode (Path / Last Active / Last Switched) |
+| `Home` | Go to first item in focused pane |
+| `End` | Go to last item in focused pane |
 | `?` | Show help |
+| `=` | Toggle zoom for focused pane (full screen) |
 
 **Log Pane** (when focused on commit log):
 
@@ -391,6 +394,8 @@ are sorted alphabetically within each directory level.
 | `Enter` | Toggle directory expand/collapse, or show diff for files |
 | `e` | Open selected file in editor |
 | `d` | Show full diff of all files in pager |
+| `g` | Open LazyGit |
+| `ctrl+←`, `ctrl+→` | Jump to previous/next folder |
 | `/` | Search file/directory names (incremental) |
 
 **Filter Mode:**
@@ -399,8 +404,10 @@ Filter mode applies to the focused pane (worktrees, file names, commit titles).
 
 - `alt+n`, `alt+p`: Navigate and update filter input with selected item
 - `↑`, `↓`, `ctrl+j`, `ctrl+k`: Navigate list without changing filter input
-- `Enter`: Exit filter mode
+- `Enter`: Exit filter mode (filter remains active)
 - `Esc`, `Ctrl+C`: Exit filter mode
+
+When a filter is active, the pane title shows a filter indicator with `[Esc] Clear` hint. Press `Esc` to clear the filter.
 
 **Search Mode:**
 

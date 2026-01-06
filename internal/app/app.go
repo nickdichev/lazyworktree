@@ -262,6 +262,7 @@ type Model struct {
 	showingSearch       bool
 	searchTarget        searchTarget
 	focusedPane         int // 0=table, 1=status, 2=log
+	zoomedPane          int // -1 = no zoom, 0/1/2 = which pane is zoomed
 	windowWidth         int
 	windowHeight        int
 	infoContent         string
@@ -481,6 +482,7 @@ func NewModel(cfg *config.AppConfig, initialFilter string) *Model {
 		ctx:             ctx,
 		cancel:          cancel,
 		focusedPane:     0,
+		zoomedPane:      -1,
 		infoContent:     errNoWorktreeSelected,
 		statusContent:   "Loading...",
 		spinner:         sp,
@@ -896,6 +898,18 @@ func (m *Model) setFilterQuery(target filterTarget, query string) {
 	default:
 		m.filterQuery = query
 	}
+}
+
+func (m *Model) hasActiveFilterForPane(paneIndex int) bool {
+	switch paneIndex {
+	case 0:
+		return strings.TrimSpace(m.filterQuery) != ""
+	case 1:
+		return strings.TrimSpace(m.statusFilterQuery) != ""
+	case 2:
+		return strings.TrimSpace(m.logFilterQuery) != ""
+	}
+	return false
 }
 
 func (m *Model) setFilterTarget(target filterTarget) {
@@ -3777,6 +3791,35 @@ func (m *Model) computeLayout() layoutDims {
 
 	bodyHeight := max(height-headerHeight-footerHeight-filterHeight, 8)
 
+	// Handle zoom mode: zoomed pane gets full body area
+	if m.zoomedPane >= 0 {
+		paneFrameX := m.basePaneStyle().GetHorizontalFrameSize()
+		paneFrameY := m.basePaneStyle().GetVerticalFrameSize()
+		fullWidth := width
+		fullInnerWidth := maxInt(1, fullWidth-paneFrameX)
+		fullInnerHeight := maxInt(1, bodyHeight-paneFrameY)
+
+		return layoutDims{
+			width:                  width,
+			height:                 height,
+			headerHeight:           headerHeight,
+			footerHeight:           footerHeight,
+			filterHeight:           filterHeight,
+			bodyHeight:             bodyHeight,
+			gapX:                   0,
+			gapY:                   0,
+			leftWidth:              fullWidth,
+			rightWidth:             fullWidth,
+			leftInnerWidth:         fullInnerWidth,
+			rightInnerWidth:        fullInnerWidth,
+			leftInnerHeight:        fullInnerHeight,
+			rightTopHeight:         bodyHeight,
+			rightBottomHeight:      bodyHeight,
+			rightTopInnerHeight:    fullInnerHeight,
+			rightBottomInnerHeight: fullInnerHeight,
+		}
+	}
+
 	leftRatio := 0.55
 	switch m.focusedPane {
 	case 0:
@@ -3907,6 +3950,18 @@ func (m *Model) renderFilter(layout layoutDims) string {
 }
 
 func (m *Model) renderBody(layout layoutDims) string {
+	// Handle zoom mode: only render the zoomed pane
+	if m.zoomedPane >= 0 {
+		switch m.zoomedPane {
+		case 0:
+			return m.renderZoomedLeftPane(layout)
+		case 1:
+			return m.renderZoomedRightTopPane(layout)
+		case 2:
+			return m.renderZoomedRightBottomPane(layout)
+		}
+	}
+
 	left := m.renderLeftPane(layout)
 	right := m.renderRightPane(layout)
 	gap := lipgloss.NewStyle().
@@ -3966,6 +4021,53 @@ func (m *Model) renderRightBottomPane(layout layoutDims) string {
 	return m.paneStyle(m.focusedPane == 2).
 		Width(layout.rightWidth).
 		Height(layout.rightBottomHeight).
+		Render(content)
+}
+
+func (m *Model) renderZoomedLeftPane(layout layoutDims) string {
+	title := m.renderPaneTitle(1, "Worktrees", true, layout.leftInnerWidth)
+	tableView := m.worktreeTable.View()
+	content := lipgloss.JoinVertical(lipgloss.Left, title, tableView)
+	return m.paneStyle(true).
+		Width(layout.leftWidth).
+		Height(layout.bodyHeight).
+		Render(content)
+}
+
+func (m *Model) renderZoomedRightTopPane(layout layoutDims) string {
+	title := m.renderPaneTitle(2, "Status", true, layout.rightInnerWidth)
+	infoBox := m.renderInnerBox("Info", m.infoContent, layout.rightInnerWidth, 0)
+
+	innerBoxStyle := m.baseInnerBoxStyle()
+	statusBoxHeight := max(layout.rightTopInnerHeight-lipgloss.Height(title)-lipgloss.Height(infoBox)-2, 3)
+	statusViewportWidth := maxInt(1, layout.rightInnerWidth-innerBoxStyle.GetHorizontalFrameSize())
+	statusViewportHeight := maxInt(1, statusBoxHeight-innerBoxStyle.GetVerticalFrameSize())
+	m.statusViewport.Width = statusViewportWidth
+	m.statusViewport.Height = statusViewportHeight
+	m.statusViewport.SetContent(m.statusContent)
+	statusBox := innerBoxStyle.
+		Width(layout.rightInnerWidth).
+		Height(statusBoxHeight).
+		Render(m.statusViewport.View())
+
+	content := lipgloss.JoinVertical(
+		lipgloss.Left,
+		title,
+		infoBox,
+		statusBox,
+	)
+	return m.paneStyle(true).
+		Width(layout.rightWidth).
+		Height(layout.bodyHeight).
+		Render(content)
+}
+
+func (m *Model) renderZoomedRightBottomPane(layout layoutDims) string {
+	title := m.renderPaneTitle(3, "Log", true, layout.rightInnerWidth)
+	content := lipgloss.JoinVertical(lipgloss.Left, title, m.logTable.View())
+	return m.paneStyle(true).
+		Width(layout.rightWidth).
+		Height(layout.bodyHeight).
 		Render(content)
 }
 
@@ -4052,6 +4154,7 @@ func (m *Model) renderFooter(layout layoutDims) string {
 			m.renderKeyHint("ctrl+p", "Palette"),
 		)
 	}
+
 	footerContent := strings.Join(hints, "  ")
 	if !m.loading {
 		return footerStyle.Width(layout.width).Render(footerContent)
@@ -4110,7 +4213,23 @@ func (m *Model) renderPaneTitle(index int, title string, focused bool, width int
 	num := numStyle.Render(fmt.Sprintf("[%d]", index))
 	focusIndicator := numStyle.Render(indicator)
 	name := titleStyle.Render(title)
-	return lipgloss.NewStyle().Width(width).Render(fmt.Sprintf("%s %s %s", focusIndicator, num, name))
+
+	filterIndicator := ""
+	paneIdx := index - 1 // index is 1-based, panes are 0-based
+	if !m.showingFilter && !m.showingSearch && m.hasActiveFilterForPane(paneIdx) {
+		filteredStyle := lipgloss.NewStyle().Foreground(m.theme.WarnFg).Italic(true)
+		keyStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#000000")).
+			Background(m.theme.Accent).
+			Bold(true).
+			Padding(0, 1)
+		filterIndicator = fmt.Sprintf(" 🔍 %s  %s %s",
+			filteredStyle.Render("Filtered"),
+			keyStyle.Render("Esc"),
+			lipgloss.NewStyle().Foreground(m.theme.MutedFg).Render("Clear"))
+	}
+
+	return lipgloss.NewStyle().Width(width).Render(fmt.Sprintf("%s %s %s%s", focusIndicator, num, name, filterIndicator))
 }
 
 func (m *Model) renderInnerBox(title, content string, width, height int) string {
