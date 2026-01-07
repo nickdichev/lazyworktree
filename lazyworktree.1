@@ -37,7 +37,7 @@ LazyGit Integration: Launch lazygit directly for the currently selected worktree
 Override the default worktree root directory (default: ~/.local/share/worktrees)
 .TP
 .B \-\-theme \fINAME\fR
-Select a UI theme (dracula, narna, clean-light, solarized-dark, solarized-light, gruvbox-dark, gruvbox-light, nord, monokai, catppuccin-mocha)
+Select a UI theme (dracula, narna, clean-light, solarized-dark, solarized-light, gruvbox-dark, gruvbox-light, nord, monokai, catppuccin-mocha). If unspecified, lazyworktree attempts to auto-detect the theme based on the terminal's background color (defaulting to dracula for dark or clean-light for light).
 .TP
 .B \-\-show\-syntax\-themes
 Display the default delta syntax-theme values for each UI theme
@@ -217,7 +217,7 @@ Maximum number of untracked file diffs to show (default: 10). Set to 0 to hide u
 Maximum characters to display in diffs before truncation (default: 200000). Set to 0 to disable truncation.
 .TP
 .B theme
-UI color theme. Options: \fBdracula\fR (default), \fBnarna\fR, \fBclean-light\fR, \fBsolarized-dark\fR, \fBsolarized-light\fR, \fBgruvbox-dark\fR, \fBgruvbox-light\fR, \fBnord\fR, \fBmonokai\fR, \fBcatppuccin-mocha\fR. Can also be set with \fB--theme\fR.
+UI color theme. Options: \fBdracula\fR (default), \fBnarna\fR, \fBclean-light\fR, \fBsolarized-dark\fR, \fBsolarized-light\fR, \fBgruvbox-dark\fR, \fBgruvbox-light\fR, \fBnord\fR, \fBmonokai\fR, \fBcatppuccin-mocha\fR. If left empty or unspecified, the theme is auto-detected from the terminal background. Can also be set with \fB--theme\fR.
 .TP
 .B delta_path
 Path to delta executable (default: \fBdelta\fR). Set to empty string to disable delta and use plain git diff output.

@@ -10,6 +10,7 @@ require (
 	github.com/epilande/go-devicons v0.0.0-20250505162540-0661cab71a28
 	github.com/muesli/reflow v0.3.0
 	github.com/stretchr/testify v1.11.1
+	golang.org/x/term v0.38.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 

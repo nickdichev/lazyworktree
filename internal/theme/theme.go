@@ -20,6 +20,20 @@ type Theme struct {
 	Yellow     lipgloss.Color
 }
 
+// Theme names.
+const (
+	DraculaName         = "dracula"
+	NarnaName           = "narna"
+	CleanLightName      = "clean-light"
+	SolarizedDarkName   = "solarized-dark"
+	SolarizedLightName  = "solarized-light"
+	GruvboxDarkName     = "gruvbox-dark"
+	GruvboxLightName    = "gruvbox-light"
+	NordName            = "nord"
+	MonokaiName         = "monokai"
+	CatppuccinMochaName = "catppuccin-mocha"
+)
+
 // Dracula returns the Dracula theme (dark background, vibrant colors).
 func Dracula() *Theme {
 	return &Theme{
@@ -213,41 +227,61 @@ func CatppuccinMocha() *Theme {
 // GetTheme returns a theme by name, or Dracula if not found.
 func GetTheme(name string) *Theme {
 	switch name {
-	case "narna":
+	case NarnaName:
 		return Narna()
-	case "clean-light":
+	case CleanLightName:
 		return CleanLight()
-	case "solarized-dark":
+	case SolarizedDarkName:
 		return SolarizedDark()
-	case "solarized-light":
+	case SolarizedLightName:
 		return SolarizedLight()
-	case "gruvbox-dark":
+	case GruvboxDarkName:
 		return GruvboxDark()
-	case "gruvbox-light":
+	case GruvboxLightName:
 		return GruvboxLight()
-	case "nord":
+	case NordName:
 		return Nord()
-	case "monokai":
+	case MonokaiName:
 		return Monokai()
-	case "catppuccin-mocha":
+	case CatppuccinMochaName:
 		return CatppuccinMocha()
 	default:
 		return Dracula()
 	}
 }
 
+// IsLight returns true if the theme is a light theme.
+func IsLight(name string) bool {
+	switch name {
+	case CleanLightName, SolarizedLightName, GruvboxLightName:
+		return true
+	default:
+		return false
+	}
+}
+
+// DefaultDark returns the default dark theme name.
+func DefaultDark() string {
+	return DraculaName
+}
+
+// DefaultLight returns the default light theme name.
+func DefaultLight() string {
+	return CleanLightName
+}
+
 // AvailableThemes returns a list of available theme names.
 func AvailableThemes() []string {
 	return []string{
-		"dracula",
-		"narna",
-		"clean-light",
-		"solarized-dark",
-		"solarized-light",
-		"gruvbox-dark",
-		"gruvbox-light",
-		"nord",
-		"monokai",
-		"catppuccin-mocha",
+		DraculaName,
+		NarnaName,
+		CleanLightName,
+		SolarizedDarkName,
+		SolarizedLightName,
+		GruvboxDarkName,
+		GruvboxLightName,
+		NordName,
+		MonokaiName,
+		CatppuccinMochaName,
 	}
 }

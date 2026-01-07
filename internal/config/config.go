@@ -8,7 +8,9 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/chmouel/lazyworktree/internal/theme"
 	"gopkg.in/yaml.v3"
 )
 
@@ -78,10 +80,10 @@ func DefaultConfig() *AppConfig {
 		SearchAutoSelect:  false,
 		MaxUntrackedDiffs: 10,
 		MaxDiffChars:      200000,
-		DeltaArgs:         DefaultDeltaArgsForTheme("dracula"),
+		DeltaArgs:         DefaultDeltaArgsForTheme(theme.DraculaName),
 		DeltaPath:         "delta",
 		TrustMode:         "tofu",
-		Theme:             "dracula",
+		Theme:             "",
 		MergeMethod:       "rebase",
 		FuzzyFinderInput:  false,
 		ShowIcons:         true,
@@ -382,8 +384,8 @@ func parseConfig(data map[string]any) *AppConfig {
 		}
 	}
 
-	if theme, ok := data["theme"].(string); ok {
-		if normalized := NormalizeThemeName(theme); normalized != "" {
+	if themeName, ok := data["theme"].(string); ok {
+		if normalized := NormalizeThemeName(themeName); normalized != "" {
 			cfg.Theme = normalized
 		}
 	}
@@ -491,6 +493,8 @@ func LoadConfig(configPath string) (*AppConfig, error) {
 		}
 	}
 
+	var cfg *AppConfig
+
 	for _, path := range paths {
 		if _, err := os.Stat(path); os.IsNotExist(err) {
 			continue
@@ -507,10 +511,28 @@ func LoadConfig(configPath string) (*AppConfig, error) {
 			return DefaultConfig(), nil
 		}
 
-		return parseConfig(yamlData), nil
+		cfg = parseConfig(yamlData)
+		break
 	}
 
-	return DefaultConfig(), nil
+	if cfg == nil {
+		cfg = DefaultConfig()
+	}
+
+	if cfg.Theme == "" {
+		detected, err := theme.DetectBackground(500 * time.Millisecond)
+		if err == nil {
+			cfg.Theme = detected
+		} else {
+			cfg.Theme = theme.DefaultDark()
+		}
+
+		if !cfg.DeltaArgsSet {
+			cfg.DeltaArgs = DefaultDeltaArgsForTheme(cfg.Theme)
+		}
+	}
+
+	return cfg, nil
 }
 
 func expandPath(path string) (string, error) {
@@ -542,25 +564,25 @@ func isPathWithin(base, target string) bool {
 }
 
 // DefaultDeltaArgsForTheme returns the default delta arguments for a given theme.
-func DefaultDeltaArgsForTheme(theme string) []string {
-	switch theme {
-	case "narna":
+func DefaultDeltaArgsForTheme(themeName string) []string {
+	switch themeName {
+	case theme.NarnaName:
 		return []string{"--syntax-theme", "OneHalfDark"}
-	case "clean-light":
+	case theme.CleanLightName:
 		return []string{"--syntax-theme", "GitHub"}
-	case "solarized-dark":
+	case theme.SolarizedDarkName:
 		return []string{"--syntax-theme", "Solarized (dark)"}
-	case "solarized-light":
+	case theme.SolarizedLightName:
 		return []string{"--syntax-theme", "Solarized (light)"}
-	case "gruvbox-dark":
+	case theme.GruvboxDarkName:
 		return []string{"--syntax-theme", "Gruvbox Dark"}
-	case "gruvbox-light":
+	case theme.GruvboxLightName:
 		return []string{"--syntax-theme", "Gruvbox Light"}
-	case "nord":
+	case theme.NordName:
 		return []string{"--syntax-theme", "Nord"}
-	case "monokai":
+	case theme.MonokaiName:
 		return []string{"--syntax-theme", "Monokai Extended"}
-	case "catppuccin-mocha":
+	case theme.CatppuccinMochaName:
 		return []string{"--syntax-theme", "Catppuccin Mocha"}
 	default:
 		return []string{"--syntax-theme", "Dracula"}
@@ -568,8 +590,8 @@ func DefaultDeltaArgsForTheme(theme string) []string {
 }
 
 // SyntaxThemeForUITheme returns the default delta syntax theme for a UI theme.
-func SyntaxThemeForUITheme(theme string) string {
-	args := DefaultDeltaArgsForTheme(theme)
+func SyntaxThemeForUITheme(themeName string) string {
+	args := DefaultDeltaArgsForTheme(themeName)
 	for i := 0; i < len(args)-1; i++ {
 		if args[i] == "--syntax-theme" {
 			return args[i+1]
@@ -582,16 +604,16 @@ func SyntaxThemeForUITheme(theme string) string {
 func NormalizeThemeName(name string) string {
 	name = strings.ToLower(strings.TrimSpace(name))
 	switch name {
-	case "dracula",
-		"narna",
-		"clean-light",
-		"solarized-dark",
-		"solarized-light",
-		"gruvbox-dark",
-		"gruvbox-light",
-		"nord",
-		"monokai",
-		"catppuccin-mocha":
+	case theme.DraculaName,
+		theme.NarnaName,
+		theme.CleanLightName,
+		theme.SolarizedDarkName,
+		theme.SolarizedLightName,
+		theme.GruvboxDarkName,
+		theme.GruvboxLightName,
+		theme.NordName,
+		theme.MonokaiName,
+		theme.CatppuccinMochaName:
 		return name
 	default:
 		return ""

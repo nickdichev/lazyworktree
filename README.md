@@ -458,7 +458,9 @@ search_auto_select: false
 fuzzy_finder_input: false
 max_untracked_diffs: 10
 max_diff_chars: 200000
-theme: dracula  # Options: "dracula" (default), "narna", "clean-light", "solarized-dark",
+theme: ""       # Leave empty to auto-detect based on terminal background color
+                # (defaults to "dracula" for dark, "clean-light" for light).
+                # Options: "dracula", "narna", "clean-light", "solarized-dark",
                 #          "solarized-light", "gruvbox-dark", "gruvbox-light",
                 #          "nord", "monokai", "catppuccin-mocha"
 delta_path: delta
@@ -484,7 +486,7 @@ custom_commands:
 Notes:
 
 - `--worktree-dir` overrides the `worktree_dir` setting.
-- `theme` selects the colour theme. Available themes: `dracula`, `narna`, `clean-light`, `solarized-dark`, `solarized-light`, `gruvbox-dark`, `gruvbox-light`, `nord`, `monokai`, `catppuccin-mocha`. Default: `dracula`.
+- `theme` selects the colour theme. Available themes: `dracula`, `narna`, `clean-light`, `solarized-dark`, `solarized-light`, `gruvbox-dark`, `gruvbox-light`, `nord`, `monokai`, `catppuccin-mocha`. Default: auto-detected (or `dracula` if detection fails).
 - `init_commands` and `terminate_commands` execute prior to any repository-specific `.wt` commands (if present).
 - `sort_mode` controls the default sort order: `"switched"` (last accessed, default), `"active"` (last commit date), or `"path"` (alphabetical). The old `sort_by_active` option is still supported for backwards compatibility.
 - Set `auto_fetch_prs` to `true` to fetch PR data upon startup.
@@ -507,7 +509,7 @@ lazyworktree includes built-in themes:
 
 | Theme | Background | Best For |
 |-------|-----------|----------|
-| **dracula** | Dark (#282A36) | Dark terminals, vibrant colours, default |
+| **dracula** | Dark (#282A36) | Dark terminals, vibrant colours, default fallback |
 | **narna** | Charcoal (#0D1117) | Dark terminals, blue highlights |
 | **clean-light** | White (#FFFFFF) | Light terminals, soft colours |
 | **solarized-dark** | Deep teal (#002B36) | Classic Solarized dark palette |
