@@ -20,6 +20,7 @@ func TestAvailableThemesIncludesDefaults(t *testing.T) {
 	themes := AvailableThemes()
 	required := map[string]bool{
 		"dracula":          false,
+		"dracula-light":    false,
 		"narna":            false,
 		"clean-light":      false,
 		"catppuccin-latte": false,
@@ -53,6 +54,7 @@ func TestIsLight(t *testing.T) {
 		name string
 		want bool
 	}{
+		{DraculaLightName, true},
 		{CleanLightName, true},
 		{CatppuccinLatteName, true},
 		{RosePineDawnName, true},
@@ -79,7 +81,7 @@ func TestDefaults(t *testing.T) {
 	if got := DefaultDark(); got != DraculaName {
 		t.Errorf("DefaultDark() = %q, want %q", got, DraculaName)
 	}
-	if got := DefaultLight(); got != CleanLightName {
-		t.Errorf("DefaultLight() = %q, want %q", got, CleanLightName)
+	if got := DefaultLight(); got != DraculaLightName {
+		t.Errorf("DefaultLight() = %q, want %q", got, DraculaLightName)
 	}
 }

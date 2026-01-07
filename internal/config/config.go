@@ -566,32 +566,34 @@ func isPathWithin(base, target string) bool {
 // DefaultDeltaArgsForTheme returns the default delta arguments for a given theme.
 func DefaultDeltaArgsForTheme(themeName string) []string {
 	switch themeName {
+	case theme.DraculaLightName:
+		return []string{"--syntax-theme", "\"Monokai Extended Light\""}
 	case theme.NarnaName:
-		return []string{"--syntax-theme", "OneHalfDark"}
+		return []string{"--syntax-theme", "\"OneHalfDark\""}
 	case theme.CleanLightName:
 		return []string{"--syntax-theme", "GitHub"}
 	case theme.SolarizedDarkName:
-		return []string{"--syntax-theme", "Solarized (dark)"}
+		return []string{"--syntax-theme", "\"Solarized (dark)\""}
 	case theme.SolarizedLightName:
-		return []string{"--syntax-theme", "Solarized (light)"}
+		return []string{"--syntax-theme", "\"Solarized (light)\""}
 	case theme.GruvboxDarkName:
-		return []string{"--syntax-theme", "Gruvbox Dark"}
+		return []string{"--syntax-theme", "\"Gruvbox Dark\""}
 	case theme.GruvboxLightName:
-		return []string{"--syntax-theme", "Gruvbox Light"}
+		return []string{"--syntax-theme", "\"Gruvbox Light\""}
 	case theme.NordName:
-		return []string{"--syntax-theme", "Nord"}
+		return []string{"--syntax-theme", "\"Nord\""}
 	case theme.MonokaiName:
-		return []string{"--syntax-theme", "Monokai Extended"}
+		return []string{"--syntax-theme", "\"Monokai Extended\""}
 	case theme.CatppuccinMochaName:
-		return []string{"--syntax-theme", "Catppuccin Mocha"}
+		return []string{"--syntax-theme", "\"Catppuccin Mocha\""}
 	case theme.CatppuccinLatteName:
-		return []string{"--syntax-theme", "Catppuccin Latte"}
+		return []string{"--syntax-theme", "\"Catppuccin Latte\""}
 	case theme.RosePineDawnName:
 		return []string{"--syntax-theme", "GitHub"}
 	case theme.OneLightName:
-		return []string{"--syntax-theme", "OneHalfLight"}
+		return []string{"--syntax-theme", "\"OneHalfLight\""}
 	case theme.EverforestLightName:
-		return []string{"--syntax-theme", "Gruvbox Light"}
+		return []string{"--syntax-theme", "\"Gruvbox Light\""}
 	default:
 		return []string{"--syntax-theme", "Dracula"}
 	}
@@ -613,6 +615,7 @@ func NormalizeThemeName(name string) string {
 	name = strings.ToLower(strings.TrimSpace(name))
 	switch name {
 	case theme.DraculaName,
+		theme.DraculaLightName,
 		theme.NarnaName,
 		theme.CleanLightName,
 		theme.CatppuccinLatteName,

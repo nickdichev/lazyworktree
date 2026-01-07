@@ -1212,7 +1212,7 @@ func (s *PRSelectionScreen) View() string {
 		Padding(0, 1).
 		Width(s.width - 2).
 		Background(s.thm.Accent).
-		Foreground(s.thm.TextFg).
+		Foreground(s.thm.AccentFg).
 		Bold(true)
 
 	noResultsStyle := lipgloss.NewStyle().
@@ -1326,7 +1326,7 @@ func (s *ListSelectionScreen) View() string {
 		Padding(0, 1).
 		Width(s.width - 2).
 		Background(s.thm.Accent).
-		Foreground(s.thm.TextFg).
+		Foreground(s.thm.AccentFg).
 		Bold(true)
 
 	descStyle := lipgloss.NewStyle().
@@ -1505,7 +1505,7 @@ func (s *HelpScreen) renderContent() string {
 	// Handle search filtering
 	if strings.TrimSpace(s.searchQuery) != "" {
 		query := strings.ToLower(strings.TrimSpace(s.searchQuery))
-		highlightStyle := lipgloss.NewStyle().Foreground(s.thm.TextFg).Background(s.thm.Accent).Bold(true)
+		highlightStyle := lipgloss.NewStyle().Foreground(s.thm.AccentFg).Background(s.thm.Accent).Bold(true)
 		filteredLines := []string{}
 		for _, line := range styledLines {
 			lower := strings.ToLower(line)
@@ -1640,7 +1640,7 @@ func (s *CommandPaletteScreen) View() string {
 		Padding(0, 1).
 		Width(width - 2).
 		Background(s.thm.Accent).
-		Foreground(s.thm.TextFg).
+		Foreground(s.thm.AccentFg).
 		Bold(true)
 
 	descStyle := lipgloss.NewStyle().

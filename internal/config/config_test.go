@@ -44,19 +44,20 @@ func TestSyntaxThemeForUITheme(t *testing.T) {
 		want       string
 	}{
 		{name: "default dracula", inputTheme: "dracula", want: "Dracula"},
-		{name: "narna", inputTheme: "narna", want: "OneHalfDark"},
+		{name: "dracula-light", inputTheme: "dracula-light", want: "\"Monokai Extended Light\""},
+		{name: "narna", inputTheme: "narna", want: "\"OneHalfDark\""},
 		{name: "clean-light", inputTheme: "clean-light", want: "GitHub"},
-		{name: "solarized-dark", inputTheme: "solarized-dark", want: "Solarized (dark)"},
-		{name: "solarized-light", inputTheme: "solarized-light", want: "Solarized (light)"},
-		{name: "gruvbox-dark", inputTheme: "gruvbox-dark", want: "Gruvbox Dark"},
-		{name: "gruvbox-light", inputTheme: "gruvbox-light", want: "Gruvbox Light"},
-		{name: "nord", inputTheme: "nord", want: "Nord"},
-		{name: "monokai", inputTheme: "monokai", want: "Monokai Extended"},
-		{name: "catppuccin-mocha", inputTheme: "catppuccin-mocha", want: "Catppuccin Mocha"},
-		{name: "catppuccin-latte", inputTheme: "catppuccin-latte", want: "Catppuccin Latte"},
+		{name: "solarized-dark", inputTheme: "solarized-dark", want: "\"Solarized (dark)\""},
+		{name: "solarized-light", inputTheme: "solarized-light", want: "\"Solarized (light)\""},
+		{name: "gruvbox-dark", inputTheme: "gruvbox-dark", want: "\"Gruvbox Dark\""},
+		{name: "gruvbox-light", inputTheme: "gruvbox-light", want: "\"Gruvbox Light\""},
+		{name: "nord", inputTheme: "nord", want: "\"Nord\""},
+		{name: "monokai", inputTheme: "monokai", want: "\"Monokai Extended\""},
+		{name: "catppuccin-mocha", inputTheme: "catppuccin-mocha", want: "\"Catppuccin Mocha\""},
+		{name: "catppuccin-latte", inputTheme: "catppuccin-latte", want: "\"Catppuccin Latte\""},
 		{name: "rose-pine-dawn", inputTheme: "rose-pine-dawn", want: "GitHub"},
-		{name: "one-light", inputTheme: "one-light", want: "OneHalfLight"},
-		{name: "everforest-light", inputTheme: "everforest-light", want: "Gruvbox Light"},
+		{name: "one-light", inputTheme: "one-light", want: "\"OneHalfLight\""},
+		{name: "everforest-light", inputTheme: "everforest-light", want: "\"Gruvbox Light\""},
 		{name: "unknown falls back to dracula", inputTheme: "unknown", want: "Dracula"},
 	}
 
@@ -560,7 +561,7 @@ func TestParseConfig(t *testing.T) {
 			},
 			validate: func(t *testing.T, cfg *AppConfig) {
 				assert.Equal(t, "narna", cfg.Theme)
-				assert.Equal(t, []string{"--syntax-theme", "OneHalfDark"}, cfg.DeltaArgs)
+				assert.Equal(t, []string{"--syntax-theme", "\"OneHalfDark\""}, cfg.DeltaArgs)
 			},
 		},
 		{
@@ -580,7 +581,7 @@ func TestParseConfig(t *testing.T) {
 			},
 			validate: func(t *testing.T, cfg *AppConfig) {
 				assert.Equal(t, "solarized-dark", cfg.Theme)
-				assert.Equal(t, []string{"--syntax-theme", "Solarized (dark)"}, cfg.DeltaArgs)
+				assert.Equal(t, []string{"--syntax-theme", "\"Solarized (dark)\""}, cfg.DeltaArgs)
 			},
 		},
 		{
@@ -590,7 +591,7 @@ func TestParseConfig(t *testing.T) {
 			},
 			validate: func(t *testing.T, cfg *AppConfig) {
 				assert.Equal(t, "solarized-light", cfg.Theme)
-				assert.Equal(t, []string{"--syntax-theme", "Solarized (light)"}, cfg.DeltaArgs)
+				assert.Equal(t, []string{"--syntax-theme", "\"Solarized (light)\""}, cfg.DeltaArgs)
 			},
 		},
 		{
@@ -600,7 +601,7 @@ func TestParseConfig(t *testing.T) {
 			},
 			validate: func(t *testing.T, cfg *AppConfig) {
 				assert.Equal(t, "gruvbox-dark", cfg.Theme)
-				assert.Equal(t, []string{"--syntax-theme", "Gruvbox Dark"}, cfg.DeltaArgs)
+				assert.Equal(t, []string{"--syntax-theme", "\"Gruvbox Dark\""}, cfg.DeltaArgs)
 			},
 		},
 		{
@@ -610,7 +611,7 @@ func TestParseConfig(t *testing.T) {
 			},
 			validate: func(t *testing.T, cfg *AppConfig) {
 				assert.Equal(t, "gruvbox-light", cfg.Theme)
-				assert.Equal(t, []string{"--syntax-theme", "Gruvbox Light"}, cfg.DeltaArgs)
+				assert.Equal(t, []string{"--syntax-theme", "\"Gruvbox Light\""}, cfg.DeltaArgs)
 			},
 		},
 		{
@@ -620,7 +621,7 @@ func TestParseConfig(t *testing.T) {
 			},
 			validate: func(t *testing.T, cfg *AppConfig) {
 				assert.Equal(t, "nord", cfg.Theme)
-				assert.Equal(t, []string{"--syntax-theme", "Nord"}, cfg.DeltaArgs)
+				assert.Equal(t, []string{"--syntax-theme", "\"Nord\""}, cfg.DeltaArgs)
 			},
 		},
 		{
@@ -630,7 +631,7 @@ func TestParseConfig(t *testing.T) {
 			},
 			validate: func(t *testing.T, cfg *AppConfig) {
 				assert.Equal(t, "monokai", cfg.Theme)
-				assert.Equal(t, []string{"--syntax-theme", "Monokai Extended"}, cfg.DeltaArgs)
+				assert.Equal(t, []string{"--syntax-theme", "\"Monokai Extended\""}, cfg.DeltaArgs)
 			},
 		},
 		{
@@ -640,7 +641,7 @@ func TestParseConfig(t *testing.T) {
 			},
 			validate: func(t *testing.T, cfg *AppConfig) {
 				assert.Equal(t, "catppuccin-mocha", cfg.Theme)
-				assert.Equal(t, []string{"--syntax-theme", "Catppuccin Mocha"}, cfg.DeltaArgs)
+				assert.Equal(t, []string{"--syntax-theme", "\"Catppuccin Mocha\""}, cfg.DeltaArgs)
 			},
 		},
 		{
@@ -650,7 +651,7 @@ func TestParseConfig(t *testing.T) {
 			},
 			validate: func(t *testing.T, cfg *AppConfig) {
 				assert.Equal(t, "catppuccin-latte", cfg.Theme)
-				assert.Equal(t, []string{"--syntax-theme", "Catppuccin Latte"}, cfg.DeltaArgs)
+				assert.Equal(t, []string{"--syntax-theme", "\"Catppuccin Latte\""}, cfg.DeltaArgs)
 			},
 		},
 		{
@@ -670,7 +671,7 @@ func TestParseConfig(t *testing.T) {
 			},
 			validate: func(t *testing.T, cfg *AppConfig) {
 				assert.Equal(t, "one-light", cfg.Theme)
-				assert.Equal(t, []string{"--syntax-theme", "OneHalfLight"}, cfg.DeltaArgs)
+				assert.Equal(t, []string{"--syntax-theme", "\"OneHalfLight\""}, cfg.DeltaArgs)
 			},
 		},
 		{
@@ -680,7 +681,7 @@ func TestParseConfig(t *testing.T) {
 			},
 			validate: func(t *testing.T, cfg *AppConfig) {
 				assert.Equal(t, "everforest-light", cfg.Theme)
-				assert.Equal(t, []string{"--syntax-theme", "Gruvbox Light"}, cfg.DeltaArgs)
+				assert.Equal(t, []string{"--syntax-theme", "\"Gruvbox Light\""}, cfg.DeltaArgs)
 			},
 		},
 		{

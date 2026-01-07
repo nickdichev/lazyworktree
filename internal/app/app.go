@@ -421,8 +421,8 @@ func NewModel(cfg *config.AppConfig, initialFilter string) *Model {
 		Foreground(thm.Cyan).
 		Background(thm.AccentDim) // Add subtle background to header
 	s.Selected = s.Selected.
-		Foreground(thm.TextFg).
-		Background(thm.Accent). // Use Accent instead of AccentDim for better visibility
+		Foreground(thm.AccentFg). // Text color that contrasts with Accent background
+		Background(thm.Accent).   // Use Accent instead of AccentDim for better visibility
 		Bold(true)
 	// Add subtle background to unselected cells for better readability
 	s.Cell = s.Cell.
@@ -2129,19 +2129,21 @@ func (m *Model) showAbsorbWorktree() tea.Cmd {
 
 func (m *Model) showCommandPalette() tea.Cmd {
 	m.debugf("open palette")
-	items := []paletteItem{
-		{id: "create", label: "Create worktree (c)", description: "Add a new worktree from base branch or PR/MR"},
-		{id: "create-from-changes", label: "Create from changes", description: "Create a new worktree from current uncommitted changes"},
-		{id: "delete", label: "Delete worktree (D)", description: "Remove worktree and branch"},
-		{id: "rename", label: "Rename worktree (m)", description: "Rename worktree and branch"},
-		{id: "absorb", label: "Absorb worktree (A)", description: "Merge branch into main and remove worktree"},
-		{id: "prune", label: "Prune merged (X)", description: "Remove merged PR worktrees"},
-		{id: "refresh", label: "Refresh (r)", description: "Reload worktrees"},
-		{id: "fetch", label: "Fetch remotes (R)", description: "git fetch --all"},
-		{id: "pr", label: "Open PR (o)", description: "Open PR in browser"},
-		{id: "help", label: "Help (?)", description: "Show help"},
-	}
-	items = append(items, m.customPaletteItems()...)
+	customItems := m.customPaletteItems()
+	items := make([]paletteItem, 0, 10+len(customItems))
+	items = append(items,
+		paletteItem{id: "create", label: "Create worktree (c)", description: "Add a new worktree from base branch or PR/MR"},
+		paletteItem{id: "create-from-changes", label: "Create from changes", description: "Create a new worktree from current uncommitted changes"},
+		paletteItem{id: "delete", label: "Delete worktree (D)", description: "Remove worktree and branch"},
+		paletteItem{id: "rename", label: "Rename worktree (m)", description: "Rename worktree and branch"},
+		paletteItem{id: "absorb", label: "Absorb worktree (A)", description: "Merge branch into main and remove worktree"},
+		paletteItem{id: "prune", label: "Prune merged (X)", description: "Remove merged PR worktrees"},
+		paletteItem{id: "refresh", label: "Refresh (r)", description: "Reload worktrees"},
+		paletteItem{id: "fetch", label: "Fetch remotes (R)", description: "git fetch --all"},
+		paletteItem{id: "pr", label: "Open PR (o)", description: "Open PR in browser"},
+		paletteItem{id: "help", label: "Help (?)", description: "Show help"},
+	)
+	items = append(items, customItems...)
 
 	m.paletteScreen = NewCommandPaletteScreen(items, m.theme)
 	m.paletteSubmit = func(action string) tea.Cmd {
@@ -5227,7 +5229,7 @@ func (m *Model) renderStatusFiles() string {
 	stagedStyle := lipgloss.NewStyle().Foreground(m.theme.Cyan)
 	dirStyle := lipgloss.NewStyle().Foreground(m.theme.MutedFg)
 	selectedStyle := lipgloss.NewStyle().
-		Foreground(m.theme.TextFg).
+		Foreground(m.theme.AccentFg).
 		Background(m.theme.Accent).
 		Bold(true)
 

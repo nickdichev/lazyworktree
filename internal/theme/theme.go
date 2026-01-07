@@ -7,6 +7,7 @@ import "github.com/charmbracelet/lipgloss"
 type Theme struct {
 	Background lipgloss.Color
 	Accent     lipgloss.Color
+	AccentFg   lipgloss.Color // Foreground color for text on Accent background
 	AccentDim  lipgloss.Color
 	Border     lipgloss.Color
 	BorderDim  lipgloss.Color
@@ -23,6 +24,7 @@ type Theme struct {
 // Theme names.
 const (
 	DraculaName         = "dracula"
+	DraculaLightName    = "dracula-light"
 	NarnaName           = "narna"
 	CleanLightName      = "clean-light"
 	SolarizedDarkName   = "solarized-dark"
@@ -43,6 +45,7 @@ func Dracula() *Theme {
 	return &Theme{
 		Background: lipgloss.Color("#282A36"), // Background
 		Accent:     lipgloss.Color("#BD93F9"), // Purple (primary accent)
+		AccentFg:   lipgloss.Color("#282A36"), // Dark text on accent
 		AccentDim:  lipgloss.Color("#44475A"), // Current Line / Selection
 		Border:     lipgloss.Color("#6272A4"), // Comment (subtle borders)
 		BorderDim:  lipgloss.Color("#44475A"), // Darker borders
@@ -57,11 +60,32 @@ func Dracula() *Theme {
 	}
 }
 
+// DraculaLight returns the Dracula theme adapted for light backgrounds.
+func DraculaLight() *Theme {
+	return &Theme{
+		Background: lipgloss.Color("#FFFFFF"), // White
+		Accent:     lipgloss.Color("#7C3AED"), // Purple (darker for light bg)
+		AccentFg:   lipgloss.Color("#FFFFFF"), // White text on accent
+		AccentDim:  lipgloss.Color("#F3E8FF"), // Light purple wash
+		Border:     lipgloss.Color("#D0D7DE"), // Subtle gray border
+		BorderDim:  lipgloss.Color("#E8E8E8"), // Lighter border
+		MutedFg:    lipgloss.Color("#6E7781"), // Muted gray text
+		TextFg:     lipgloss.Color("#24292F"), // Dark text
+		SuccessFg:  lipgloss.Color("#059669"), // Green
+		WarnFg:     lipgloss.Color("#D97706"), // Orange
+		ErrorFg:    lipgloss.Color("#DC2626"), // Red
+		Cyan:       lipgloss.Color("#0891B2"), // Cyan/Teal
+		Pink:       lipgloss.Color("#DB2777"), // Pink
+		Yellow:     lipgloss.Color("#CA8A04"), // Yellow
+	}
+}
+
 // Narna returns a balanced dark theme with blue accents.
 func Narna() *Theme {
 	return &Theme{
 		Background: lipgloss.Color("#0D1117"), // Charcoal background
 		Accent:     lipgloss.Color("#41ADFF"), // Blue accent
+		AccentFg:   lipgloss.Color("#0D1117"), // Dark text on accent
 		AccentDim:  lipgloss.Color("#1A2230"), // Selected rows / panels
 		Border:     lipgloss.Color("#30363D"), // Subtle borders
 		BorderDim:  lipgloss.Color("#20252D"), // Dim borders
@@ -80,7 +104,8 @@ func Narna() *Theme {
 func CleanLight() *Theme {
 	return &Theme{
 		Background: lipgloss.Color("#FFFFFF"), // Pure White
-		Accent:     lipgloss.Color("#0969DA"), // Professional Blue
+		Accent:     lipgloss.Color("#0598BC"), // Cyan (matching header)
+		AccentFg:   lipgloss.Color("#FFFFFF"), // White text on accent
 		AccentDim:  lipgloss.Color("#DDF4FF"), // Very light blue wash
 		Border:     lipgloss.Color("#D0D7DE"), // Subtle cool gray
 		BorderDim:  lipgloss.Color("#E1E4E8"), // Very subtle divider
@@ -100,6 +125,7 @@ func CatppuccinLatte() *Theme {
 	return &Theme{
 		Background: lipgloss.Color("#EFF1F5"),
 		Accent:     lipgloss.Color("#1E66F5"), // Blue
+		AccentFg:   lipgloss.Color("#FFFFFF"), // White text on accent
 		AccentDim:  lipgloss.Color("#CCD0DA"), // Surface0
 		Border:     lipgloss.Color("#9CA0B0"), // Overlay0
 		BorderDim:  lipgloss.Color("#BCC0CC"), // Surface1
@@ -119,6 +145,7 @@ func RosePineDawn() *Theme {
 	return &Theme{
 		Background: lipgloss.Color("#FAF4ED"),
 		Accent:     lipgloss.Color("#286983"), // Pine
+		AccentFg:   lipgloss.Color("#FFFFFF"), // White text on accent
 		AccentDim:  lipgloss.Color("#DFDAD9"), // Highlight
 		Border:     lipgloss.Color("#CECACD"), // Muted (approx)
 		BorderDim:  lipgloss.Color("#F2E9E1"), // Surface
@@ -138,6 +165,7 @@ func OneLight() *Theme {
 	return &Theme{
 		Background: lipgloss.Color("#FAFAFA"),
 		Accent:     lipgloss.Color("#528BFF"), // Blue
+		AccentFg:   lipgloss.Color("#FFFFFF"), // White text on accent
 		AccentDim:  lipgloss.Color("#E5E5E6"), // Light Gray
 		Border:     lipgloss.Color("#A0A1A7"), // Muted Gray
 		BorderDim:  lipgloss.Color("#DBDBDC"), // Light Border
@@ -157,6 +185,7 @@ func EverforestLight() *Theme {
 	return &Theme{
 		Background: lipgloss.Color("#F3EFDA"),
 		Accent:     lipgloss.Color("#3A94C5"), // Blue
+		AccentFg:   lipgloss.Color("#FFFFFF"), // White text on accent
 		AccentDim:  lipgloss.Color("#EAE4CA"), // Lighter background
 		Border:     lipgloss.Color("#C5C1A5"), // Border
 		BorderDim:  lipgloss.Color("#E0DCC7"), // Light Border
@@ -176,6 +205,7 @@ func SolarizedDark() *Theme {
 	return &Theme{
 		Background: lipgloss.Color("#002B36"),
 		Accent:     lipgloss.Color("#268BD2"),
+		AccentFg:   lipgloss.Color("#FDF6E3"), // Light text on accent
 		AccentDim:  lipgloss.Color("#073642"),
 		Border:     lipgloss.Color("#586E75"),
 		BorderDim:  lipgloss.Color("#073642"),
@@ -195,6 +225,7 @@ func SolarizedLight() *Theme {
 	return &Theme{
 		Background: lipgloss.Color("#FDF6E3"),
 		Accent:     lipgloss.Color("#268BD2"),
+		AccentFg:   lipgloss.Color("#FDF6E3"), // Light text on accent
 		AccentDim:  lipgloss.Color("#EEE8D5"),
 		Border:     lipgloss.Color("#93A1A1"),
 		BorderDim:  lipgloss.Color("#E4DDC7"),
@@ -214,6 +245,7 @@ func GruvboxDark() *Theme {
 	return &Theme{
 		Background: lipgloss.Color("#282828"),
 		Accent:     lipgloss.Color("#FABD2F"),
+		AccentFg:   lipgloss.Color("#282828"), // Dark text on yellow accent
 		AccentDim:  lipgloss.Color("#3C3836"),
 		Border:     lipgloss.Color("#504945"),
 		BorderDim:  lipgloss.Color("#3C3836"),
@@ -233,6 +265,7 @@ func GruvboxLight() *Theme {
 	return &Theme{
 		Background: lipgloss.Color("#FBF1C7"),
 		Accent:     lipgloss.Color("#D79921"),
+		AccentFg:   lipgloss.Color("#FBF1C7"), // Light text on yellow accent
 		AccentDim:  lipgloss.Color("#E0CFA9"),
 		Border:     lipgloss.Color("#D5C4A1"),
 		BorderDim:  lipgloss.Color("#C0B58A"),
@@ -252,6 +285,7 @@ func Nord() *Theme {
 	return &Theme{
 		Background: lipgloss.Color("#2E3440"),
 		Accent:     lipgloss.Color("#88C0D0"),
+		AccentFg:   lipgloss.Color("#2E3440"), // Dark text on accent
 		AccentDim:  lipgloss.Color("#3B4252"),
 		Border:     lipgloss.Color("#4C566A"),
 		BorderDim:  lipgloss.Color("#434C5E"),
@@ -271,6 +305,7 @@ func Monokai() *Theme {
 	return &Theme{
 		Background: lipgloss.Color("#272822"),
 		Accent:     lipgloss.Color("#A6E22E"),
+		AccentFg:   lipgloss.Color("#272822"), // Dark text on green accent
 		AccentDim:  lipgloss.Color("#3E3D32"),
 		Border:     lipgloss.Color("#75715E"),
 		BorderDim:  lipgloss.Color("#3E3D32"),
@@ -290,6 +325,7 @@ func CatppuccinMocha() *Theme {
 	return &Theme{
 		Background: lipgloss.Color("#1E1E2E"),
 		Accent:     lipgloss.Color("#B4BEFE"),
+		AccentFg:   lipgloss.Color("#1E1E2E"), // Dark text on accent
 		AccentDim:  lipgloss.Color("#313244"),
 		Border:     lipgloss.Color("#45475A"),
 		BorderDim:  lipgloss.Color("#313244"),
@@ -307,6 +343,8 @@ func CatppuccinMocha() *Theme {
 // GetTheme returns a theme by name, or Dracula if not found.
 func GetTheme(name string) *Theme {
 	switch name {
+	case DraculaLightName:
+		return DraculaLight()
 	case NarnaName:
 		return Narna()
 	case CleanLightName:
@@ -341,7 +379,7 @@ func GetTheme(name string) *Theme {
 // IsLight returns true if the theme is a light theme.
 func IsLight(name string) bool {
 	switch name {
-	case CleanLightName, SolarizedLightName, GruvboxLightName, CatppuccinLatteName, RosePineDawnName, OneLightName, EverforestLightName:
+	case DraculaLightName, CleanLightName, SolarizedLightName, GruvboxLightName, CatppuccinLatteName, RosePineDawnName, OneLightName, EverforestLightName:
 		return true
 	default:
 		return false
@@ -355,13 +393,14 @@ func DefaultDark() string {
 
 // DefaultLight returns the default light theme name.
 func DefaultLight() string {
-	return CleanLightName
+	return DraculaLightName
 }
 
 // AvailableThemes returns a list of available theme names.
 func AvailableThemes() []string {
 	return []string{
 		DraculaName,
+		DraculaLightName,
 		NarnaName,
 		CleanLightName,
 		CatppuccinLatteName,

@@ -9,9 +9,10 @@ search_auto_select: false
 max_untracked_diffs: 10
 max_diff_chars: 200000
 
-# TUI theme (default: "dracula")
-# Options: "dracula", "narna", "clean-light", "solarized-dark", "solarized-light",
-#          "gruvbox-dark", "gruvbox-light", "nord", "monokai", "catppuccin-mocha"
+# TUI theme (defaults: "dracula" for dark, "dracula-light" for light)
+# Options: "dracula", "dracula-light", "narna", "clean-light", "solarized-dark",
+#          "solarized-light", "gruvbox-dark", "gruvbox-light", "nord", "monokai",
+#          "catppuccin-mocha"
 theme: dracula
 
 # Path to delta executable (default: "delta")
@@ -28,9 +29,10 @@ editor: nvim
 
 # Extra arguments passed to delta for diff rendering.
 # If omitted, lazyworktree picks a syntax theme matching your UI:
-#   - dracula -> Dracula
-#   - narna       -> OneHalfDark
-#   - clean-light -> GitHub
+#   - dracula       -> Dracula
+#   - dracula-light -> Monokai Extended Light
+#   - narna         -> OneHalfDark
+#   - clean-light   -> GitHub
 delta_args:
   - --syntax-theme
   - Dracula
