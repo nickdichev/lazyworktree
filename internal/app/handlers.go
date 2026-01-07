@@ -357,6 +357,9 @@ func (m *Model) handleBuiltInKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, m.refreshWorktrees()
 
 	case "c":
+		if m.focusedPane == 1 {
+			return m, m.commitStagedChanges()
+		}
 		return m, m.showCreateWorktree()
 
 	case "D":
@@ -415,7 +418,14 @@ func (m *Model) handleBuiltInKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, m.startSearch(target)
 
 	case "s":
-		// Cycle through sort modes: path -> active -> switched -> path
+		// In status pane: stage/unstage selected file
+		if m.focusedPane == 1 && len(m.statusTreeFlat) > 0 && m.statusTreeIndex >= 0 && m.statusTreeIndex < len(m.statusTreeFlat) {
+			node := m.statusTreeFlat[m.statusTreeIndex]
+			if !node.IsDir() {
+				return m, m.stageCurrentFile(*node.File)
+			}
+		}
+		// Otherwise: cycle through sort modes: path -> active -> switched -> path
 		m.sortMode = (m.sortMode + 1) % 3
 		m.updateTable()
 		return m, nil

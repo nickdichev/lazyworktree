@@ -627,6 +627,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.currentScreen = screenInfo
 		return m, nil
 
+	case refreshCompleteMsg:
+		return m, m.updateDetailsView()
+
 	case fetchRemotesCompleteMsg:
 		m.statusContent = "Remotes fetched"
 		// Continue showing loading screen while refreshing worktrees
@@ -1635,8 +1638,110 @@ func (m *Model) commitAllChanges() tea.Cmd {
 		envVars = append(envVars, fmt.Sprintf("%s=%s", k, v))
 	}
 
+	// Clear cache so status pane refreshes with latest git status
+	delete(m.detailsCache, wt.Path)
+
 	// #nosec G204 -- command is a fixed git command
 	c := m.commandRunner("bash", "-c", "git add -A && git commit")
+	c.Dir = wt.Path
+	c.Env = envVars
+
+	return m.execProcess(c, func(err error) tea.Msg {
+		if err != nil {
+			return errMsg{err: err}
+		}
+		return refreshCompleteMsg{}
+	})
+}
+
+func (m *Model) commitStagedChanges() tea.Cmd {
+	if m.selectedIndex < 0 || m.selectedIndex >= len(m.filteredWts) {
+		return nil
+	}
+	wt := m.filteredWts[m.selectedIndex]
+
+	// Check if there are any staged changes
+	hasStagedChanges := false
+	for _, sf := range m.statusFilesAll {
+		if len(sf.Status) >= 2 {
+			x := sf.Status[0] // Staged status
+			if x != '.' && x != ' ' {
+				hasStagedChanges = true
+				break
+			}
+		}
+	}
+
+	if !hasStagedChanges {
+		m.showInfo("No staged changes to commit", nil)
+		return nil
+	}
+
+	env := m.buildCommandEnv(wt.Branch, wt.Path)
+	envVars := os.Environ()
+	for k, v := range env {
+		envVars = append(envVars, fmt.Sprintf("%s=%s", k, v))
+	}
+
+	// Clear cache so status pane refreshes with latest git status
+	delete(m.detailsCache, wt.Path)
+
+	// #nosec G204 -- command is a fixed git command
+	c := m.commandRunner("bash", "-c", "git commit")
+	c.Dir = wt.Path
+	c.Env = envVars
+
+	return m.execProcess(c, func(err error) tea.Msg {
+		if err != nil {
+			return errMsg{err: err}
+		}
+		return refreshCompleteMsg{}
+	})
+}
+
+func (m *Model) stageCurrentFile(sf StatusFile) tea.Cmd {
+	if m.selectedIndex < 0 || m.selectedIndex >= len(m.filteredWts) {
+		return nil
+	}
+	wt := m.filteredWts[m.selectedIndex]
+
+	// Status is XY format: X=staged, Y=unstaged
+	// Examples: "M " = staged, " M" = unstaged, "MM" = both
+	if len(sf.Status) < 2 {
+		return nil
+	}
+
+	x := sf.Status[0] // Staged status
+	y := sf.Status[1] // Unstaged status
+
+	var cmdStr string
+	hasUnstagedChanges := y != '.' && y != ' '
+	hasStagedChanges := x != '.' && x != ' '
+	hasNoUnstagedChanges := y == '.' || y == ' '
+
+	switch {
+	case hasUnstagedChanges:
+		// If there are unstaged changes, stage them
+		cmdStr = fmt.Sprintf("git add %s", shellQuote(sf.Filename))
+	case hasStagedChanges && hasNoUnstagedChanges:
+		// File is fully staged with no unstaged changes, so unstage it
+		cmdStr = fmt.Sprintf("git restore --staged %s", shellQuote(sf.Filename))
+	default:
+		// File is clean or in an unexpected state
+		return nil
+	}
+
+	env := m.buildCommandEnv(wt.Branch, wt.Path)
+	envVars := os.Environ()
+	for k, v := range env {
+		envVars = append(envVars, fmt.Sprintf("%s=%s", k, v))
+	}
+
+	// Clear cache so status pane refreshes with latest git status
+	delete(m.detailsCache, wt.Path)
+
+	// #nosec G204 -- command is constructed with quoted filename
+	c := m.commandRunner("bash", "-c", cmdStr)
 	c.Dir = wt.Path
 	c.Env = envVars
 
@@ -4874,6 +4979,48 @@ func (m *Model) advanceSearchMatch(forward bool) tea.Cmd {
 	return nil
 }
 
+// formatStatusDisplay converts a git status code (XY format) to a user-friendly display string.
+// X = staged status, Y = unstaged status
+// Examples: "M " -> "S ", " M" -> "M", "MM" -> "SM", " ?" -> "?"
+func formatStatusDisplay(status string) string {
+	if len(status) < 2 {
+		return status
+	}
+
+	x := status[0] // Staged status
+	y := status[1] // Unstaged status
+
+	// Special case for untracked files
+	if status == " ?" {
+		return "?"
+	}
+
+	// Build display string
+	var display [2]rune
+
+	// First character: show staged status as S for modifications, or original for add/delete
+	// #nosec G602 -- array size is 2, index is 0 and 1, always within bounds after len check
+	switch x {
+	case 'M':
+		display[0] = 'S' // Staged modification
+	case '.', ' ':
+		display[0] = ' ' // No staged changes
+	default:
+		display[0] = rune(x) // A, D, R, C, etc.
+	}
+
+	// Second character: show unstaged status
+	// #nosec G602 -- array size is 2, index is 0 and 1, always within bounds after len check
+	switch y {
+	case '.', ' ':
+		display[1] = ' ' // No unstaged changes
+	default:
+		display[1] = rune(y) // M, A, D, R, C, etc.
+	}
+
+	return string(display[:])
+}
+
 // renderStatusFiles renders the status file list with current selection highlighted.
 func (m *Model) renderStatusFiles() string {
 	if len(m.statusTreeFlat) == 0 {
@@ -4892,6 +5039,7 @@ func (m *Model) renderStatusFiles() string {
 	addedStyle := lipgloss.NewStyle().Foreground(m.theme.SuccessFg)
 	deletedStyle := lipgloss.NewStyle().Foreground(m.theme.ErrorFg)
 	untrackedStyle := lipgloss.NewStyle().Foreground(m.theme.Yellow)
+	stagedStyle := lipgloss.NewStyle().Foreground(m.theme.Cyan)
 	dirStyle := lipgloss.NewStyle().Foreground(m.theme.MutedFg)
 	selectedStyle := lipgloss.NewStyle().
 		Foreground(m.theme.TextFg).
@@ -4918,9 +5066,9 @@ func (m *Model) renderStatusFiles() string {
 			}
 			lineContent = fmt.Sprintf("%s%s %s%s", indent, expandIcon, dirIcon, node.Path)
 		} else {
-			// File line: "    M  filename"
+			// File line: "    M  filename" or "    S  filename" for staged
 			status := node.File.Status
-			displayStatus := strings.ReplaceAll(status, ".", " ")
+			displayStatus := formatStatusDisplay(status)
 			if m.config.ShowIcons {
 				fileIcon = iconWithSpace(deviconForName(node.Name(), false))
 			}
@@ -4937,35 +5085,64 @@ func (m *Model) renderStatusFiles() string {
 		case node.IsDir():
 			lines = append(lines, dirStyle.Render(lineContent))
 		default:
-			// Color based on file status
+			// Color based on file status - apply different colors for staged vs unstaged
 			status := node.File.Status
-			var style lipgloss.Style
-			x := status[0]
-			y := status[1]
-			switch {
-			case status == " ?":
-				style = untrackedStyle
-			case x == 'D' || y == 'D':
-				style = deletedStyle
-			case x == 'A' || y == 'A':
-				style = addedStyle
-			case x == 'M' || y == 'M' || x == '.' || y == '.':
-				style = modifiedStyle
-			case x == 'R' || y == 'R':
-				style = modifiedStyle
-			default:
-				style = lipgloss.NewStyle()
+			if len(status) < 2 {
+				lines = append(lines, lineContent)
+				continue
 			}
 
-			// Render with colored status
-			displayStatus := strings.ReplaceAll(status, ".", " ")
+			// Special case for untracked files
+			if status == " ?" {
+				displayStatus := formatStatusDisplay(status)
+				formatted := fmt.Sprintf("%s  %s %s%s", indent, untrackedStyle.Render(displayStatus), fileIcon, node.Name())
+				lines = append(lines, formatted)
+				continue
+			}
+
+			x := status[0] // Staged status
+			y := status[1] // Unstaged status
+			displayStatus := formatStatusDisplay(status)
+
+			// Render each character with appropriate color based on position
 			var statusRendered strings.Builder
-			for _, char := range displayStatus {
+			for i, char := range displayStatus {
 				if char == ' ' {
 					statusRendered.WriteString(" ")
-				} else {
-					statusRendered.WriteString(style.Render(string(char)))
+					continue
 				}
+
+				var style lipgloss.Style
+				if i == 0 {
+					// First character is staged (X position)
+					switch x {
+					case 'M':
+						style = stagedStyle // Cyan for staged modifications
+					case 'A':
+						style = addedStyle // Green for staged additions
+					case 'D':
+						style = deletedStyle // Red for staged deletions
+					case 'R', 'C':
+						style = stagedStyle // Cyan for staged renames/copies
+					default:
+						style = lipgloss.NewStyle()
+					}
+				} else {
+					// Second character is unstaged (Y position)
+					switch y {
+					case 'M':
+						style = modifiedStyle // Orange for unstaged modifications
+					case 'A':
+						style = addedStyle // Green for unstaged additions
+					case 'D':
+						style = deletedStyle // Red for unstaged deletions
+					case 'R', 'C':
+						style = modifiedStyle // Orange for unstaged renames/copies
+					default:
+						style = lipgloss.NewStyle()
+					}
+				}
+				statusRendered.WriteString(style.Render(string(char)))
 			}
 			formatted := fmt.Sprintf("%s  %s %s%s", indent, statusRendered.String(), fileIcon, node.Name())
 			lines = append(lines, formatted)

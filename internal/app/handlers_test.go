@@ -966,7 +966,7 @@ func TestStatusFileEditOpensEditor(t *testing.T) {
 	if gotCmd.Dir != wtPath {
 		t.Fatalf("expected worktree dir %q, got %q", wtPath, gotCmd.Dir)
 	}
-	if len(gotCmd.Args) < 3 || gotCmd.Args[0] != "bash" || gotCmd.Args[1] != "-c" {
+	if len(gotCmd.Args) < 3 || gotCmd.Args[0] != testBashCmd || gotCmd.Args[1] != "-c" {
 		t.Fatalf("expected bash -c command, got %v", gotCmd.Args)
 	}
 	if !strings.Contains(gotCmd.Args[2], "nvim") || !strings.Contains(gotCmd.Args[2], filename) {
@@ -1010,7 +1010,7 @@ func TestCommitAllChangesFromStatusPane(t *testing.T) {
 	if gotCmd.Dir != wtPath {
 		t.Fatalf("expected worktree dir %q, got %q", wtPath, gotCmd.Dir)
 	}
-	if len(gotCmd.Args) < 3 || gotCmd.Args[0] != "bash" || gotCmd.Args[1] != "-c" {
+	if len(gotCmd.Args) < 3 || gotCmd.Args[0] != testBashCmd || gotCmd.Args[1] != "-c" {
 		t.Fatalf("expected bash -c command, got %v", gotCmd.Args)
 	}
 	if !strings.Contains(gotCmd.Args[2], "git add -A") || !strings.Contains(gotCmd.Args[2], "git commit") {
@@ -1028,6 +1028,289 @@ func TestCommitAllChangesNotInStatusPane(t *testing.T) {
 	_, cmd := m.handleBuiltInKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
 	if cmd != nil {
 		t.Fatal("expected no command when not in status pane")
+	}
+}
+
+func TestCommitStagedChangesFromStatusPane(t *testing.T) {
+	cfg := &config.AppConfig{
+		WorktreeDir: t.TempDir(),
+	}
+	m := NewModel(cfg, "")
+	m.focusedPane = 1
+	m.statusViewport = viewport.New(40, 10)
+
+	wtPath := filepath.Join(cfg.WorktreeDir, "wt1")
+	if err := os.MkdirAll(wtPath, 0o700); err != nil {
+		t.Fatalf("failed to create worktree dir: %v", err)
+	}
+
+	m.filteredWts = []*models.WorktreeInfo{
+		{Path: wtPath, Branch: "feature"},
+	}
+	m.selectedIndex = 0
+
+	// Set up staged changes
+	m.setStatusFiles([]StatusFile{
+		{Filename: "file1.go", Status: "M ", IsUntracked: false}, // Staged modification
+	})
+
+	var gotCmd *exec.Cmd
+	m.execProcess = func(cmd *exec.Cmd, cb tea.ExecCallback) tea.Cmd {
+		gotCmd = cmd
+		return func() tea.Msg { return cb(nil) }
+	}
+
+	_, cmd := m.handleBuiltInKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'c'}})
+	if cmd == nil {
+		t.Fatal("expected command to be returned")
+	}
+	_ = cmd()
+
+	if gotCmd == nil {
+		t.Fatal("expected execProcess to be called")
+	}
+	if gotCmd.Dir != wtPath {
+		t.Fatalf("expected worktree dir %q, got %q", wtPath, gotCmd.Dir)
+	}
+	if len(gotCmd.Args) < 3 || gotCmd.Args[0] != testBashCmd || gotCmd.Args[1] != "-c" {
+		t.Fatalf("expected bash -c command, got %v", gotCmd.Args)
+	}
+	// Should only run git commit (not git add -A)
+	if !strings.Contains(gotCmd.Args[2], "git commit") {
+		t.Fatalf("expected git commit command, got %q", gotCmd.Args[2])
+	}
+	if strings.Contains(gotCmd.Args[2], "git add -A") {
+		t.Fatalf("expected no git add -A in command, got %q", gotCmd.Args[2])
+	}
+}
+
+func TestCommitStagedChangesNoStagedFiles(t *testing.T) {
+	cfg := &config.AppConfig{
+		WorktreeDir: t.TempDir(),
+	}
+	m := NewModel(cfg, "")
+	m.focusedPane = 1
+	m.statusViewport = viewport.New(40, 10)
+
+	wtPath := filepath.Join(cfg.WorktreeDir, "wt1")
+	if err := os.MkdirAll(wtPath, 0o700); err != nil {
+		t.Fatalf("failed to create worktree dir: %v", err)
+	}
+
+	m.filteredWts = []*models.WorktreeInfo{
+		{Path: wtPath, Branch: "feature"},
+	}
+	m.selectedIndex = 0
+
+	// Set up only unstaged changes (no staged)
+	m.setStatusFiles([]StatusFile{
+		{Filename: "file1.go", Status: " M", IsUntracked: false}, // Unstaged modification
+	})
+
+	_, cmd := m.handleBuiltInKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'c'}})
+	if cmd != nil {
+		t.Fatal("expected no command when no staged changes")
+	}
+
+	// Should show info screen with message
+	if m.currentScreen != screenInfo {
+		t.Fatalf("expected screenInfo, got %v", m.currentScreen)
+	}
+	if m.infoScreen == nil {
+		t.Fatal("expected infoScreen to be set")
+	}
+}
+
+func TestCommitStagedChangesNotInStatusPane(t *testing.T) {
+	cfg := &config.AppConfig{
+		WorktreeDir: t.TempDir(),
+	}
+	m := NewModel(cfg, "")
+	m.focusedPane = 0 // Not status pane
+
+	_, cmd := m.handleBuiltInKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'c'}})
+	// When not in status pane, 'c' should trigger create worktree which returns a command
+	if cmd == nil {
+		t.Fatal("expected command for create worktree when not in status pane")
+	}
+}
+
+func TestStageUnstagedFile(t *testing.T) {
+	cfg := &config.AppConfig{
+		WorktreeDir: t.TempDir(),
+	}
+	m := NewModel(cfg, "")
+	m.focusedPane = 1
+	m.statusViewport = viewport.New(40, 10)
+
+	wtPath := filepath.Join(cfg.WorktreeDir, "wt1")
+	if err := os.MkdirAll(wtPath, 0o700); err != nil {
+		t.Fatalf("failed to create worktree dir: %v", err)
+	}
+
+	m.filteredWts = []*models.WorktreeInfo{
+		{Path: wtPath, Branch: "feature"},
+	}
+	m.selectedIndex = 0
+	m.setStatusFiles([]StatusFile{
+		{Filename: "file1.go", Status: " M", IsUntracked: false}, // Unstaged modification
+	})
+	m.statusTreeIndex = 0
+
+	var gotCmd *exec.Cmd
+	m.execProcess = func(cmd *exec.Cmd, cb tea.ExecCallback) tea.Cmd {
+		gotCmd = cmd
+		return func() tea.Msg { return cb(nil) }
+	}
+
+	_, cmd := m.handleBuiltInKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	if cmd == nil {
+		t.Fatal("expected command to be returned")
+	}
+	_ = cmd()
+
+	if gotCmd == nil {
+		t.Fatal("expected execProcess to be called")
+	}
+	if gotCmd.Dir != wtPath {
+		t.Fatalf("expected worktree dir %q, got %q", wtPath, gotCmd.Dir)
+	}
+	if len(gotCmd.Args) < 3 || gotCmd.Args[0] != testBashCmd || gotCmd.Args[1] != "-c" {
+		t.Fatalf("expected bash -c command, got %v", gotCmd.Args)
+	}
+	if !strings.Contains(gotCmd.Args[2], "git add") {
+		t.Fatalf("expected git add command, got %q", gotCmd.Args[2])
+	}
+}
+
+func TestUnstageStagedFile(t *testing.T) {
+	cfg := &config.AppConfig{
+		WorktreeDir: t.TempDir(),
+	}
+	m := NewModel(cfg, "")
+	m.focusedPane = 1
+	m.statusViewport = viewport.New(40, 10)
+
+	wtPath := filepath.Join(cfg.WorktreeDir, "wt1")
+	if err := os.MkdirAll(wtPath, 0o700); err != nil {
+		t.Fatalf("failed to create worktree dir: %v", err)
+	}
+
+	m.filteredWts = []*models.WorktreeInfo{
+		{Path: wtPath, Branch: "feature"},
+	}
+	m.selectedIndex = 0
+	m.setStatusFiles([]StatusFile{
+		{Filename: "file1.go", Status: "M ", IsUntracked: false}, // Staged modification
+	})
+	m.statusTreeIndex = 0
+
+	var gotCmd *exec.Cmd
+	m.execProcess = func(cmd *exec.Cmd, cb tea.ExecCallback) tea.Cmd {
+		gotCmd = cmd
+		return func() tea.Msg { return cb(nil) }
+	}
+
+	_, cmd := m.handleBuiltInKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	if cmd == nil {
+		t.Fatal("expected command to be returned")
+	}
+	_ = cmd()
+
+	if gotCmd == nil {
+		t.Fatal("expected execProcess to be called")
+	}
+	if !strings.Contains(gotCmd.Args[2], "git restore --staged") {
+		t.Fatalf("expected git restore --staged command, got %q", gotCmd.Args[2])
+	}
+}
+
+func TestStageMixedStatusFile(t *testing.T) {
+	cfg := &config.AppConfig{
+		WorktreeDir: t.TempDir(),
+	}
+	m := NewModel(cfg, "")
+	m.focusedPane = 1
+	m.statusViewport = viewport.New(40, 10)
+
+	wtPath := filepath.Join(cfg.WorktreeDir, "wt1")
+	if err := os.MkdirAll(wtPath, 0o700); err != nil {
+		t.Fatalf("failed to create worktree dir: %v", err)
+	}
+
+	m.filteredWts = []*models.WorktreeInfo{
+		{Path: wtPath, Branch: "feature"},
+	}
+	m.selectedIndex = 0
+	m.setStatusFiles([]StatusFile{
+		{Filename: "file1.go", Status: "MM", IsUntracked: false}, // Both staged and unstaged
+	})
+	m.statusTreeIndex = 0
+
+	var gotCmd *exec.Cmd
+	m.execProcess = func(cmd *exec.Cmd, cb tea.ExecCallback) tea.Cmd {
+		gotCmd = cmd
+		return func() tea.Msg { return cb(nil) }
+	}
+
+	_, cmd := m.handleBuiltInKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	if cmd == nil {
+		t.Fatal("expected command to be returned")
+	}
+	_ = cmd()
+
+	if gotCmd == nil {
+		t.Fatal("expected execProcess to be called")
+	}
+	if !strings.Contains(gotCmd.Args[2], "git add") {
+		t.Fatalf("expected git add command for mixed status, got %q", gotCmd.Args[2])
+	}
+}
+
+func TestStageFileNotInStatusPane(t *testing.T) {
+	cfg := &config.AppConfig{
+		WorktreeDir: t.TempDir(),
+	}
+	m := NewModel(cfg, "")
+	m.focusedPane = 0 // Not status pane
+	m.setStatusFiles([]StatusFile{
+		{Filename: "file1.go", Status: " M", IsUntracked: false},
+	})
+	m.statusTreeIndex = 0
+
+	_, cmd := m.handleBuiltInKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	if cmd != nil {
+		t.Fatal("expected no command when not in status pane")
+	}
+}
+
+func TestStageDirectoryDoesNothing(t *testing.T) {
+	cfg := &config.AppConfig{
+		WorktreeDir: t.TempDir(),
+	}
+	m := NewModel(cfg, "")
+	m.focusedPane = 1
+	m.statusViewport = viewport.New(40, 10)
+	m.filteredWts = []*models.WorktreeInfo{
+		{Path: cfg.WorktreeDir, Branch: "feature"},
+	}
+	m.selectedIndex = 0
+
+	// Build a tree with a directory by creating a file inside a directory
+	m.setStatusFiles([]StatusFile{
+		{Filename: "src/file.go", Status: " M", IsUntracked: false},
+	})
+	// Index 0 should be the directory node, index 1 should be the file
+	m.statusTreeIndex = 0 // Select the directory
+
+	// Verify we have a directory at index 0
+	if len(m.statusTreeFlat) < 2 || !m.statusTreeFlat[0].IsDir() {
+		t.Fatal("expected directory node at index 0")
+	}
+
+	_, cmd := m.handleBuiltInKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	if cmd != nil {
+		t.Fatal("expected no command when staging a directory")
 	}
 }
 
