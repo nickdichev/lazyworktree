@@ -17,7 +17,7 @@ Read the README if you really need to know what this project do.
 
 ## Before Finishing
 
-- Always Run `make sanity` which will run golangci-lint, gofumpt, and go test.
+- Always Run `make sanity` which will run `golangci-lint`, `gofumpt`, and `go test`.
 - Add tests for any new functionality.
 - For any user-facing changes (Features, options, keybindings, etc), make sure you update:
   - The README.md. Do not sound like it is written by a brain-dead

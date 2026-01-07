@@ -447,6 +447,9 @@ func (m *Model) handleBuiltInKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, m.showRunCommand()
 
 	case "C":
+		if m.focusedPane == 1 {
+			return m, m.commitAllChanges()
+		}
 		return m, m.showCherryPick()
 
 	case "=":

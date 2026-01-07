@@ -643,6 +643,7 @@ func NewHelpScreen(maxWidth, maxHeight int, customCommands map[string]*config.Cu
 - Enter: Show diff for selected file in pager
 - e: Open selected file in editor
 - d: Show full diff (all files) in pager
+- C: Stage all changes and commit
 - Ctrl+← / →: Jump to previous / next folder
 - /: Search file names
 - Ctrl+D / Space: Half page down

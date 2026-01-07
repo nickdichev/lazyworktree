@@ -974,6 +974,63 @@ func TestStatusFileEditOpensEditor(t *testing.T) {
 	}
 }
 
+func TestCommitAllChangesFromStatusPane(t *testing.T) {
+	cfg := &config.AppConfig{
+		WorktreeDir: t.TempDir(),
+	}
+	m := NewModel(cfg, "")
+	m.focusedPane = 1
+	m.statusViewport = viewport.New(40, 10)
+
+	wtPath := filepath.Join(cfg.WorktreeDir, "wt1")
+	if err := os.MkdirAll(wtPath, 0o700); err != nil {
+		t.Fatalf("failed to create worktree dir: %v", err)
+	}
+
+	m.filteredWts = []*models.WorktreeInfo{
+		{Path: wtPath, Branch: "feature"},
+	}
+	m.selectedIndex = 0
+
+	var gotCmd *exec.Cmd
+	m.execProcess = func(cmd *exec.Cmd, cb tea.ExecCallback) tea.Cmd {
+		gotCmd = cmd
+		return func() tea.Msg { return cb(nil) }
+	}
+
+	_, cmd := m.handleBuiltInKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+	if cmd == nil {
+		t.Fatal("expected command to be returned")
+	}
+	_ = cmd()
+
+	if gotCmd == nil {
+		t.Fatal("expected execProcess to be called")
+	}
+	if gotCmd.Dir != wtPath {
+		t.Fatalf("expected worktree dir %q, got %q", wtPath, gotCmd.Dir)
+	}
+	if len(gotCmd.Args) < 3 || gotCmd.Args[0] != "bash" || gotCmd.Args[1] != "-c" {
+		t.Fatalf("expected bash -c command, got %v", gotCmd.Args)
+	}
+	if !strings.Contains(gotCmd.Args[2], "git add -A") || !strings.Contains(gotCmd.Args[2], "git commit") {
+		t.Fatalf("expected git add -A && git commit command, got %q", gotCmd.Args[2])
+	}
+}
+
+func TestCommitAllChangesNotInStatusPane(t *testing.T) {
+	cfg := &config.AppConfig{
+		WorktreeDir: t.TempDir(),
+	}
+	m := NewModel(cfg, "")
+	m.focusedPane = 0 // Not status pane
+
+	_, cmd := m.handleBuiltInKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'C'}})
+	if cmd != nil {
+		t.Fatal("expected no command when not in status pane")
+	}
+}
+
 // TestStatusFileEnterNoFilesDoesNothing tests Enter with no status files.
 func TestStatusFileEnterNoFilesDoesNothing(t *testing.T) {
 	cfg := &config.AppConfig{
