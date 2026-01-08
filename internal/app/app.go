@@ -4668,14 +4668,14 @@ func (m *Model) renderKeyHint(key, label string) string {
 func (m *Model) renderPaneTitle(index int, title string, focused bool, width int) string {
 	numStyle := lipgloss.NewStyle().Foreground(m.theme.MutedFg)
 	titleStyle := lipgloss.NewStyle().Foreground(m.theme.MutedFg)
-	indicator := "○" // Hollow circle for unfocused
 	if focused {
-		numStyle = numStyle.Foreground(m.theme.Accent).Bold(true)
+		numStyle = numStyle.Foreground(m.theme.Pink).Bold(true)
 		titleStyle = titleStyle.Foreground(m.theme.TextFg).Bold(true)
-		indicator = symbolFilledCircle // Filled circle for focused
 	}
 	num := numStyle.Render(fmt.Sprintf("[%d]", index))
-	focusIndicator := numStyle.Render(indicator)
+	if m.config.ShowIcons {
+		num = numStyle.Render(fmt.Sprintf("(%d)", index))
+	}
 	name := titleStyle.Render(title)
 
 	filterIndicator := ""
@@ -4708,7 +4708,7 @@ func (m *Model) renderPaneTitle(index int, title string, focused bool, width int
 			lipgloss.NewStyle().Foreground(m.theme.MutedFg).Render("Unzoom"))
 	}
 
-	return lipgloss.NewStyle().Width(width).Render(fmt.Sprintf("%s %s %s%s%s", focusIndicator, num, name, filterIndicator, zoomIndicator))
+	return lipgloss.NewStyle().Width(width).Render(fmt.Sprintf("%s %s%s%s", num, name, filterIndicator, zoomIndicator))
 }
 
 func (m *Model) renderInnerBox(title, content string, width, height int) string {
