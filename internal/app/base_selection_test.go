@@ -1,8 +1,10 @@
 package app
 
 import (
+	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/chmouel/lazyworktree/internal/config"
 )
@@ -201,6 +203,147 @@ func TestStripRemotePrefix(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := stripRemotePrefix(tt.branch); got != tt.expected {
 				t.Fatalf("expected %q, got %q", tt.expected, got)
+			}
+		})
+	}
+}
+
+func TestParseBranchOptionsWithDate(t *testing.T) {
+	now := time.Now().Unix()
+	yesterday := now - 86400
+	raw := strings.Join([]string{
+		fmt.Sprintf("main\trefs/heads/main\t%d", now),
+		fmt.Sprintf("feature/x\trefs/heads/feature/x\t%d", yesterday),
+		fmt.Sprintf("origin/main\trefs/remotes/origin/main\t%d", now),
+		fmt.Sprintf("v1.0.0\trefs/tags/v1.0.0\t%d", yesterday),
+		fmt.Sprintf("origin/HEAD\trefs/remotes/origin/HEAD\t%d", now),
+		"",
+	}, "\n")
+
+	got := parseBranchOptionsWithDate(raw)
+	if len(got) != 4 {
+		t.Fatalf("expected 4 branch/tag options, got %d", len(got))
+	}
+	if got[0].name != mainWorktreeName || got[0].isRemote || got[0].isTag {
+		t.Errorf("expected main to be local branch, got %+v", got[0])
+	}
+	if got[0].committerDate.IsZero() {
+		t.Errorf("expected main to have a commit date")
+	}
+	if got[1].name != "feature/x" || got[1].isRemote || got[1].isTag {
+		t.Errorf("expected feature/x to be local branch, got %+v", got[1])
+	}
+	if got[2].name != "origin/main" || !got[2].isRemote || got[2].isTag {
+		t.Errorf("expected origin/main to be remote branch, got %+v", got[2])
+	}
+	if got[3].name != "v1.0.0" || got[3].isRemote || !got[3].isTag {
+		t.Errorf("expected v1.0.0 to be tag, got %+v", got[3])
+	}
+}
+
+func TestSortBranchOptions(t *testing.T) {
+	now := time.Now()
+	yesterday := now.Add(-24 * time.Hour)
+	lastWeek := now.Add(-7 * 24 * time.Hour)
+
+	tests := []struct {
+		name     string
+		input    []branchOption
+		expected []string
+	}{
+		{
+			name: "local main first",
+			input: []branchOption{
+				{name: "feature", isRemote: false, committerDate: now},
+				{name: "main", isRemote: false, committerDate: yesterday},
+				{name: "dev", isRemote: false, committerDate: lastWeek},
+			},
+			expected: []string{"main", "feature", "dev"},
+		},
+		{
+			name: "local master when no main",
+			input: []branchOption{
+				{name: "feature", isRemote: false, committerDate: now},
+				{name: "master", isRemote: false, committerDate: yesterday},
+				{name: "dev", isRemote: false, committerDate: lastWeek},
+			},
+			expected: []string{"master", "feature", "dev"},
+		},
+		{
+			name: "remote origin/main after local main",
+			input: []branchOption{
+				{name: "feature", isRemote: false, committerDate: now},
+				{name: "main", isRemote: false, committerDate: yesterday},
+				{name: "origin/main", isRemote: true, committerDate: now},
+			},
+			expected: []string{"main", "origin/main", "feature"},
+		},
+		{
+			name: "date sorting for others",
+			input: []branchOption{
+				{name: "old-branch", isRemote: false, committerDate: lastWeek},
+				{name: "new-branch", isRemote: false, committerDate: now},
+				{name: "mid-branch", isRemote: false, committerDate: yesterday},
+			},
+			expected: []string{"new-branch", "mid-branch", "old-branch"},
+		},
+		{
+			name: "same date alphabetical tiebreaker",
+			input: []branchOption{
+				{name: "zebra", isRemote: false, committerDate: now},
+				{name: "alpha", isRemote: false, committerDate: now},
+				{name: "beta", isRemote: false, committerDate: now},
+			},
+			expected: []string{"alpha", "beta", "zebra"},
+		},
+		{
+			name:     "empty list",
+			input:    []branchOption{},
+			expected: []string{},
+		},
+		{
+			name: "all priority branches",
+			input: []branchOption{
+				{name: "feature", isRemote: false, committerDate: now},
+				{name: "origin/master", isRemote: true, committerDate: now},
+				{name: "main", isRemote: false, committerDate: yesterday},
+				{name: "origin/main", isRemote: true, committerDate: now},
+				{name: "master", isRemote: false, committerDate: lastWeek},
+			},
+			expected: []string{"main", "origin/main", "origin/master", "feature"},
+		},
+		{
+			name: "tags mixed with branches by date",
+			input: []branchOption{
+				{name: "feature", isRemote: false, isTag: false, committerDate: now},
+				{name: "v1.0.0", isRemote: false, isTag: true, committerDate: yesterday},
+				{name: "main", isRemote: false, isTag: false, committerDate: lastWeek},
+				{name: "v0.9.0", isRemote: false, isTag: true, committerDate: lastWeek.Add(-24 * time.Hour)},
+				{name: "dev", isRemote: false, isTag: false, committerDate: yesterday.Add(-12 * time.Hour)},
+			},
+			expected: []string{"main", "feature", "v1.0.0", "dev", "v0.9.0"},
+		},
+		{
+			name: "tags don't appear in priority positions",
+			input: []branchOption{
+				{name: "main", isRemote: false, isTag: true, committerDate: now},
+				{name: "feature", isRemote: false, isTag: false, committerDate: yesterday},
+				{name: "main", isRemote: false, isTag: false, committerDate: lastWeek},
+			},
+			expected: []string{"main", "main", "feature"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := sortBranchOptions(tt.input)
+			if len(got) != len(tt.expected) {
+				t.Fatalf("expected %d branches, got %d", len(tt.expected), len(got))
+			}
+			for i, expected := range tt.expected {
+				if got[i].name != expected {
+					t.Errorf("at index %d: expected %q, got %q", i, expected, got[i].name)
+				}
 			}
 		})
 	}

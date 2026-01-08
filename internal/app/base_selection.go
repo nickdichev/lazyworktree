@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -16,11 +17,17 @@ import (
 	"github.com/chmouel/lazyworktree/internal/config"
 )
 
-const commitListLimit = 25
+const (
+	commitListLimit = 25
+	originMain      = "origin/main"
+	originMaster    = "origin/master"
+)
 
 type branchOption struct {
-	name     string
-	isRemote bool
+	name          string
+	isRemote      bool
+	isTag         bool
+	committerDate time.Time
 }
 
 type commitOption struct {
@@ -32,7 +39,7 @@ type commitOption struct {
 
 func (m *Model) showBaseSelection(defaultBase string) tea.Cmd {
 	items := []selectionItem{
-		{id: "branch-list", label: "Pick a base branch", description: "Local and remote branches"},
+		{id: "branch-list", label: "Pick a base branch or tag", description: "Branches, tags, and remotes"},
 		{id: "commit-list", label: "Pick a base commit", description: "Choose a branch, then a commit"},
 		{id: "from-pr", label: "Create from PR/MR", description: "Create from a pull/merge request"},
 		{id: "from-issue", label: "Create from Issue", description: "Create from a GitHub/GitLab issue"},
@@ -380,10 +387,11 @@ func (m *Model) branchSelectionItems(preferred string) []selectionItem {
 		m.ctx,
 		[]string{
 			"git", "for-each-ref",
-			"--sort=refname",
-			"--format=%(refname:short)\t%(refname)",
+			"--sort=-committerdate",
+			"--format=%(refname:short)\t%(refname)\t%(committerdate:unix)",
 			"refs/heads",
 			"refs/remotes",
+			"refs/tags",
 		},
 		"",
 		[]int{0},
@@ -391,13 +399,15 @@ func (m *Model) branchSelectionItems(preferred string) []selectionItem {
 		false,
 	)
 
-	options := parseBranchOptions(raw)
-	options = prioritizeBranchOptions(options, preferred)
+	options := parseBranchOptionsWithDate(raw)
+	options = sortBranchOptions(options)
 	items := make([]selectionItem, 0, len(options))
 	for _, opt := range options {
 		desc := ""
 		if opt.isRemote {
 			desc = "remote"
+		} else if opt.isTag {
+			desc = "tag"
 		}
 		items = append(items, selectionItem{
 			id:          opt.name,
@@ -437,6 +447,104 @@ func parseBranchOptions(raw string) []branchOption {
 		})
 	}
 	return options
+}
+
+func parseBranchOptionsWithDate(raw string) []branchOption {
+	lines := strings.Split(strings.TrimSpace(raw), "\n")
+	if len(lines) == 1 && strings.TrimSpace(lines[0]) == "" {
+		return nil
+	}
+
+	options := make([]branchOption, 0, len(lines))
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+		parts := strings.Split(line, "\t")
+		if len(parts) < 3 {
+			continue
+		}
+		name := strings.TrimSpace(parts[0])
+		fullRef := strings.TrimSpace(parts[1])
+		timestampStr := strings.TrimSpace(parts[2])
+		if name == "" || fullRef == "" {
+			continue
+		}
+		if strings.HasSuffix(name, "/HEAD") {
+			continue
+		}
+
+		var commitDate time.Time
+		if timestamp, err := strconv.ParseInt(timestampStr, 10, 64); err == nil {
+			commitDate = time.Unix(timestamp, 0)
+		}
+
+		options = append(options, branchOption{
+			name:          name,
+			isRemote:      strings.HasPrefix(fullRef, "refs/remotes/"),
+			isTag:         strings.HasPrefix(fullRef, "refs/tags/"),
+			committerDate: commitDate,
+		})
+	}
+	return options
+}
+
+func sortBranchOptions(options []branchOption) []branchOption {
+	if len(options) == 0 {
+		return options
+	}
+
+	var localMain, localMaster, remoteOriginMain, remoteOriginMaster *branchOption
+	others := make([]branchOption, 0, len(options))
+
+	for i := range options {
+		opt := &options[i]
+		switch {
+		case opt.name == "main" && !opt.isRemote && !opt.isTag:
+			localMain = opt
+		case opt.name == "master" && !opt.isRemote && !opt.isTag:
+			localMaster = opt
+		case opt.name == originMain && opt.isRemote && !opt.isTag:
+			remoteOriginMain = opt
+		case opt.name == originMaster && opt.isRemote && !opt.isTag:
+			remoteOriginMaster = opt
+		default:
+			others = append(others, *opt)
+		}
+	}
+
+	// Sort others by commit date (descending), then alphabetically
+	for i := 0; i < len(others); i++ {
+		for j := i + 1; j < len(others); j++ {
+			// Sort by date descending (newer first)
+			if others[i].committerDate.Before(others[j].committerDate) {
+				others[i], others[j] = others[j], others[i]
+			} else if others[i].committerDate.Equal(others[j].committerDate) {
+				// If dates are equal, sort alphabetically
+				if others[i].name > others[j].name {
+					others[i], others[j] = others[j], others[i]
+				}
+			}
+		}
+	}
+
+	// Build result in priority order
+	result := make([]branchOption, 0, len(options))
+	if localMain != nil {
+		result = append(result, *localMain)
+	} else if localMaster != nil {
+		result = append(result, *localMaster)
+	}
+
+	if remoteOriginMain != nil {
+		result = append(result, *remoteOriginMain)
+	}
+	if remoteOriginMaster != nil {
+		result = append(result, *remoteOriginMaster)
+	}
+
+	result = append(result, others...)
+	return result
 }
 
 func prioritizeBranchOptions(options []branchOption, preferred string) []branchOption {
