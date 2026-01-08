@@ -349,6 +349,15 @@ func (m *Model) createWorktreeFromBase(newBranch, targetPath, baseRef string) te
 	env := m.buildCommandEnv(newBranch, targetPath)
 	initCmds := m.collectInitCommands()
 	after := func() tea.Msg {
+		// If there's a custom menu with post-command, run it
+		if m.pendingCustomMenu != nil && m.pendingCustomMenu.PostCommand != "" {
+			return customPostCommandPendingMsg{
+				targetPath: targetPath,
+				env:        env,
+			}
+		}
+
+		// Otherwise just reload worktrees
 		worktrees, err := m.git.GetWorktrees(m.ctx)
 		return worktreesLoadedMsg{
 			worktrees: worktrees,
@@ -624,4 +633,60 @@ func (m *Model) showBaseBranchForCustomCreateMenu(menu *config.CustomCreateMenu)
 			return m.executeCustomCreateCommand(menu)
 		},
 	)
+}
+
+// executeCustomPostCommand runs a non-interactive post-creation command in the new worktree directory.
+func (m *Model) executeCustomPostCommand(script, targetPath string, env map[string]string) tea.Cmd {
+	m.loadingScreen = NewLoadingScreen("Running post-creation command...", m.theme)
+	m.currentScreen = screenLoading
+
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
+		defer cancel()
+
+		// #nosec G204 -- user-configured command from trusted config
+		cmd := exec.CommandContext(ctx, "bash", "-c", script)
+		cmd.Dir = targetPath
+
+		// Merge environment variables
+		cmd.Env = os.Environ()
+		for k, v := range env {
+			cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, v))
+		}
+
+		var stderr bytes.Buffer
+		cmd.Stderr = &stderr
+
+		if err := cmd.Run(); err != nil {
+			errMsg := strings.TrimSpace(stderr.String())
+			if errMsg == "" {
+				errMsg = err.Error()
+			}
+			return customPostCommandResultMsg{err: fmt.Errorf("%s", errMsg)}
+		}
+
+		return customPostCommandResultMsg{err: nil}
+	}
+}
+
+// executeCustomPostCommandInteractive runs an interactive post-creation command in the new worktree directory.
+// The TUI suspends and the command runs in the terminal.
+func (m *Model) executeCustomPostCommandInteractive(script, targetPath string, env map[string]string) tea.Cmd {
+	// Build environment for command
+	envList := os.Environ()
+	for k, v := range env {
+		envList = append(envList, fmt.Sprintf("%s=%s", k, v))
+	}
+
+	// #nosec G204 -- user-configured command from trusted config
+	c := m.commandRunner("bash", "-c", script)
+	c.Dir = targetPath
+	c.Env = envList
+
+	return m.execProcess(c, func(err error) tea.Msg {
+		if err != nil {
+			return customPostCommandResultMsg{err: err}
+		}
+		return customPostCommandResultMsg{err: nil}
+	})
 }

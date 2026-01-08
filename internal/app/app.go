@@ -164,6 +164,13 @@ type (
 		branchName string
 		err        error
 	}
+	customPostCommandPendingMsg struct {
+		targetPath string
+		env        map[string]string
+	}
+	customPostCommandResultMsg struct {
+		err error
+	}
 )
 
 type commitLogEntry struct {
@@ -640,6 +647,48 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Store the branch name and show branch name input with the selected base ref
 		m.pendingCustomBranchName = msg.branchName
 		return m, m.showBranchNameInput(m.pendingCustomBaseRef, msg.branchName)
+
+	case customPostCommandPendingMsg:
+		if m.pendingCustomMenu == nil || m.pendingCustomMenu.PostCommand == "" {
+			// No post-command, just reload
+			worktrees, err := m.git.GetWorktrees(m.ctx)
+			return m, func() tea.Msg {
+				return worktreesLoadedMsg{worktrees: worktrees, err: err}
+			}
+		}
+
+		menu := m.pendingCustomMenu
+		cmd := menu.PostCommand
+		interactive := menu.PostInteractive
+
+		// Clear the pending menu
+		m.pendingCustomMenu = nil
+		m.pendingCustomBaseRef = ""
+		m.pendingCustomBranchName = ""
+
+		// Run the post-command
+		if interactive {
+			return m, m.executeCustomPostCommandInteractive(cmd, msg.targetPath, msg.env)
+		}
+		return m, m.executeCustomPostCommand(cmd, msg.targetPath, msg.env)
+
+	case customPostCommandResultMsg:
+		m.loading = false
+		if m.currentScreen == screenLoading {
+			m.currentScreen = screenNone
+			m.loadingScreen = nil
+		}
+
+		if msg.err != nil {
+			// Show error but continue (worktree was already created)
+			m.showInfo(fmt.Sprintf("Post-creation command failed: %v", msg.err), nil)
+		}
+
+		// Reload worktrees regardless
+		worktrees, err := m.git.GetWorktrees(m.ctx)
+		return m, func() tea.Msg {
+			return worktreesLoadedMsg{worktrees: worktrees, err: err}
+		}
 
 	case createFromChangesReadyMsg:
 		return m, m.handleCreateFromChangesReady(msg)

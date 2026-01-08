@@ -893,6 +893,35 @@ func TestParseConfig(t *testing.T) {
 			},
 		},
 		{
+			name: "custom_create_menus with post_command",
+			data: map[string]interface{}{
+				"custom_create_menus": []interface{}{
+					map[string]interface{}{
+						"label":            "JIRA with commit",
+						"command":          "jayrah browse SRVKP --choose",
+						"interactive":      true,
+						"post_command":     "git commit --allow-empty -m 'Initial commit'",
+						"post_interactive": false,
+					},
+					map[string]interface{}{
+						"label":            "Feature with editor",
+						"command":          "echo feature-xyz",
+						"post_command":     "$EDITOR README.md",
+						"post_interactive": true,
+					},
+				},
+			},
+			validate: func(t *testing.T, cfg *AppConfig) {
+				require.Len(t, cfg.CustomCreateMenus, 2)
+				assert.Equal(t, "JIRA with commit", cfg.CustomCreateMenus[0].Label)
+				assert.Equal(t, "git commit --allow-empty -m 'Initial commit'", cfg.CustomCreateMenus[0].PostCommand)
+				assert.False(t, cfg.CustomCreateMenus[0].PostInteractive)
+				assert.Equal(t, "Feature with editor", cfg.CustomCreateMenus[1].Label)
+				assert.Equal(t, "$EDITOR README.md", cfg.CustomCreateMenus[1].PostCommand)
+				assert.True(t, cfg.CustomCreateMenus[1].PostInteractive)
+			},
+		},
+		{
 			name: "custom_create_menus skips invalid entries",
 			data: map[string]interface{}{
 				"custom_create_menus": []interface{}{

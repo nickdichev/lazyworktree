@@ -153,9 +153,9 @@ custom_commands:
 
 # Custom items for the worktree creation menu (triggered by 'c' key)
 # Each item runs an external command that outputs a branch name.
-# After the command runs, you select a base branch, then enter the branch name.
+# Workflow: select base branch first, then command runs, then enter branch name.
 # Non-interactive commands run with a 30-second timeout.
-# Output is sanitised (lowercase, special characters replaced with hyphens).
+# Output (first line, whitespace trimmed, case preserved) is used as suggested name.
 #
 # Fields:
 #   label: Display label shown in the menu (required)
@@ -164,12 +164,19 @@ custom_commands:
 #   interactive: Run interactively (default: false). Set to true for TUI-based
 #                commands like fzf or jayrah. Suspends lazyworktree, runs the
 #                command in the terminal, and captures stdout via temp file.
+#   post_command: Command to run in new worktree after creation (optional).
+#                 Runs after global/repo init_commands. Has access to env vars
+#                 like WORKTREE_BRANCH, WORKTREE_PATH, etc.
+#   post_interactive: Run post-command interactively (default: false). When true,
+#                     TUI suspends to show command I/O.
 #
 # custom_create_menus:
 #   - label: "From JIRA ticket"
 #     description: "Create from JIRA issue"
 #     command: "jayrah browse 'SRVKP' --choose"
 #     interactive: true
+#     post_command: "git commit --allow-empty -m 'Initial commit for ${WORKTREE_BRANCH}'"
+#     post_interactive: false
 #   - label: "From clipboard"
 #     description: "Use clipboard as branch name"
 #     command: "pbpaste"

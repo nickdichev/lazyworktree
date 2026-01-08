@@ -43,10 +43,12 @@ type TmuxWindow struct {
 // CustomCreateMenu defines a custom entry in the worktree creation menu.
 // The command should output a branch name that will be sanitized and used.
 type CustomCreateMenu struct {
-	Label       string // Display label in the menu
-	Description string // Help text shown next to label
-	Command     string // Shell command that outputs branch name
-	Interactive bool   // Run interactively (TUI suspends, captures stdout via temp file)
+	Label           string // Display label in the menu
+	Description     string // Help text shown next to label
+	Command         string // Shell command that outputs branch name
+	Interactive     bool   // Run interactively (TUI suspends, captures stdout via temp file)
+	PostCommand     string // Command to run after worktree creation (optional)
+	PostInteractive bool   // Run post-command interactively (default: false)
 }
 
 // AppConfig defines the global lazyworktree configuration options.
@@ -502,6 +504,10 @@ func parseCustomCreateMenus(data any) []*CustomCreateMenu {
 			menu.Command = strings.TrimSpace(cmd)
 		}
 		menu.Interactive = coerceBool(itemMap["interactive"], false)
+		if postCmd, ok := itemMap["post_command"].(string); ok {
+			menu.PostCommand = strings.TrimSpace(postCmd)
+		}
+		menu.PostInteractive = coerceBool(itemMap["post_interactive"], false)
 
 		// Only add if label and command are non-empty
 		if menu.Label != "" && menu.Command != "" {

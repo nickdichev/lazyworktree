@@ -500,6 +500,8 @@ custom_create_menus:
     description: "Create from JIRA issue"
     command: "jayrah browse 'SRVKP' --choose"
     interactive: true  # TUI-based commands need this to suspend lazyworktree
+    post_command: "git commit --allow-empty -m 'Initial commit for ${WORKTREE_BRANCH}'"
+    post_interactive: false  # Run post-command in background
   - label: "From clipboard"
     description: "Use clipboard as branch name"
     command: "pbpaste"
@@ -528,7 +530,7 @@ Notes:
 - `issue_branch_name_template` defines the template for issue branch names with placeholders: `{prefix}`, `{number}`, `{title}` (default: `"{prefix}-{number}-{title}"`). Examples: `issue-123-fix-bug-in-login`, `123-fix-bug-in-login`, `fix/123-fix-bug-in-login`.
 - `pr_prefix` sets the prefix for PR branch names (default: `"pr"`).
 - `pr_branch_name_template` defines the template for PR branch names with placeholders: `{prefix}`, `{number}`, `{title}` (default: `"{prefix}-{number}-{title}"`). Examples: `pr-123-fix-bug`, `pr123-fix-bug`, `123-fix-bug`.
-- `custom_create_menus` adds custom items to the worktree creation menu (`c` key). Each entry requires a `label` and `command`; `description` is optional. By default, commands run non-interactively with a 30-second timeout and their stdout is captured directly. Set `interactive: true` for TUI-based commands (like `jayrah browse` or `fzf`); this suspends lazyworktree, runs the command in the terminal, and captures stdout via a temp file. The output is sanitised (lowercase, special characters replaced with hyphens) and used as the suggested branch name. After the command runs, you select a base branch before creating the worktree.
+- `custom_create_menus` adds custom items to the worktree creation menu (`c` key). Each entry requires a `label` and `command`; `description` is optional. The workflow: you first select a base branch, then the command runs to generate a branch name. By default, commands run non-interactively with a 30-second timeout and their stdout is captured directly. Set `interactive: true` for TUI-based commands (like `jayrah browse` or `fzf`); this suspends lazyworktree, runs the command in the terminal with no timeout, and captures stdout via a temp file. The command output (first line only, whitespace trimmed, case preserved) is used as the suggested branch name. Optionally, specify `post_command` to run a command in the new worktree directory after creation (runs after global/repo `init_commands`); non-interactive post-commands have a 30-second timeout, whilst `post_interactive: true` suspends the TUI with no timeout for interactive post-commands. Post-commands have access to environment variables like `WORKTREE_BRANCH`, `WORKTREE_PATH`, etc. If a post-command fails, the error is shown but the worktree is kept.
 
 ## Themes
 

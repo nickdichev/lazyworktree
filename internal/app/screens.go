@@ -685,7 +685,7 @@ func NewHelpScreen(maxWidth, maxHeight int, customCommands map[string]*config.Cu
 - q / Esc: Return to commit log
 
 **⚡ Worktree Actions**
-- c: Create new worktree (from branch, commit, PR/MR, or issue)
+- c: Create new worktree (branch, commit, PR/MR, issue, or custom)
 - m: Rename selected worktree
 - D: Delete selected worktree
 - A: Absorb worktree into main (merge + delete)
