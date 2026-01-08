@@ -864,6 +864,55 @@ func TestParseConfig(t *testing.T) {
 				assert.Equal(t, "delta", cfg.DeltaPath)
 			},
 		},
+		{
+			name: "custom_create_menus parsing",
+			data: map[string]interface{}{
+				"custom_create_menus": []interface{}{
+					map[string]interface{}{
+						"label":       "From JIRA",
+						"description": "Create from JIRA ticket",
+						"command":     "jayrah browse SRVKP --choose",
+						"interactive": true,
+					},
+					map[string]interface{}{
+						"label":   "Quick create",
+						"command": "echo feature-branch",
+					},
+				},
+			},
+			validate: func(t *testing.T, cfg *AppConfig) {
+				require.Len(t, cfg.CustomCreateMenus, 2)
+				assert.Equal(t, "From JIRA", cfg.CustomCreateMenus[0].Label)
+				assert.Equal(t, "Create from JIRA ticket", cfg.CustomCreateMenus[0].Description)
+				assert.Equal(t, "jayrah browse SRVKP --choose", cfg.CustomCreateMenus[0].Command)
+				assert.True(t, cfg.CustomCreateMenus[0].Interactive)
+				assert.Equal(t, "Quick create", cfg.CustomCreateMenus[1].Label)
+				assert.Empty(t, cfg.CustomCreateMenus[1].Description)
+				assert.Equal(t, "echo feature-branch", cfg.CustomCreateMenus[1].Command)
+				assert.False(t, cfg.CustomCreateMenus[1].Interactive)
+			},
+		},
+		{
+			name: "custom_create_menus skips invalid entries",
+			data: map[string]interface{}{
+				"custom_create_menus": []interface{}{
+					map[string]interface{}{
+						"label": "No command",
+					},
+					map[string]interface{}{
+						"command": "echo test",
+					},
+					map[string]interface{}{
+						"label":   "Valid",
+						"command": "echo valid",
+					},
+				},
+			},
+			validate: func(t *testing.T, cfg *AppConfig) {
+				require.Len(t, cfg.CustomCreateMenus, 1)
+				assert.Equal(t, "Valid", cfg.CustomCreateMenus[0].Label)
+			},
+		},
 	}
 
 	for _, tt := range tests {

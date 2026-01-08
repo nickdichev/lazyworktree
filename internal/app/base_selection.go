@@ -1,14 +1,19 @@
 package app
 
 import (
+	"bytes"
+	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/chmouel/lazyworktree/internal/config"
 )
 
 const commitListLimit = 25
@@ -33,12 +38,22 @@ func (m *Model) showBaseSelection(defaultBase string) tea.Cmd {
 		{id: "from-issue", label: "Create from Issue", description: "Create from a GitHub/GitLab issue"},
 		{id: "freeform", label: "Enter base ref manually", description: "Type a branch or commit"},
 	}
+
+	// Append custom create menu items from global config
+	for i, menu := range m.config.CustomCreateMenus {
+		items = append(items, selectionItem{
+			id:          fmt.Sprintf("custom-%d", i),
+			label:       menu.Label,
+			description: menu.Description,
+		})
+	}
+
 	title := "Select base for new worktree"
 
 	m.listScreen = NewListSelectionScreen(items, title, "Filter options...", "No base options available.", m.windowWidth, m.windowHeight, "", m.theme)
 	m.listSubmit = func(item selectionItem) tea.Cmd {
-		switch item.id {
-		case "branch-list":
+		switch {
+		case item.id == "branch-list":
 			return m.showBranchSelection(
 				"Select base branch",
 				"Filter branches...",
@@ -49,14 +64,23 @@ func (m *Model) showBaseSelection(defaultBase string) tea.Cmd {
 					return m.showBranchNameInput(branch, suggestedName)
 				},
 			)
-		case "commit-list":
+		case item.id == "commit-list":
 			return m.showCommitSelection(defaultBase)
-		case "freeform":
+		case item.id == "freeform":
 			return m.showFreeformBaseInput(defaultBase)
-		case "from-pr":
+		case item.id == "from-pr":
 			return m.showCreateFromPR()
-		case "from-issue":
+		case item.id == "from-issue":
 			return m.showCreateFromIssue()
+		case strings.HasPrefix(item.id, "custom-"):
+			idxStr := strings.TrimPrefix(item.id, "custom-")
+			var idx int
+			if _, err := fmt.Sscanf(idxStr, "%d", &idx); err == nil {
+				if idx >= 0 && idx < len(m.config.CustomCreateMenus) {
+					return m.showBaseBranchForCustomCreateMenu(m.config.CustomCreateMenus[idx])
+				}
+			}
+			return nil
 		default:
 			return nil
 		}
@@ -470,4 +494,134 @@ func buildCommitItems(options []commitOption) []selectionItem {
 		})
 	}
 	return items
+}
+
+// executeCustomCreateCommand runs a custom create menu command and returns the result.
+func (m *Model) executeCustomCreateCommand(menu *config.CustomCreateMenu) tea.Cmd {
+	m.clearListSelection()
+
+	// Get main worktree path for command execution
+	mainWorktreePath := ""
+	if len(m.worktrees) > 0 {
+		for _, wt := range m.worktrees {
+			if wt.IsMain {
+				mainWorktreePath = wt.Path
+				break
+			}
+		}
+	}
+
+	if menu.Interactive {
+		// Interactive mode: suspend TUI, run command in terminal, capture stdout via temp file
+		return m.executeCustomCreateCommandInteractive(menu, mainWorktreePath)
+	}
+
+	// Non-interactive mode: capture stdout directly
+	m.loadingScreen = NewLoadingScreen(fmt.Sprintf("Running: %s", menu.Label), m.theme)
+	m.currentScreen = screenLoading
+
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(m.ctx, 30*time.Second)
+		defer cancel()
+
+		// #nosec G204 -- user-configured command from trusted config
+		cmd := exec.CommandContext(ctx, "bash", "-c", menu.Command)
+		cmd.Dir = mainWorktreePath
+
+		var stdout, stderr bytes.Buffer
+		cmd.Stdout = &stdout
+		cmd.Stderr = &stderr
+
+		if err := cmd.Run(); err != nil {
+			errMsg := strings.TrimSpace(stderr.String())
+			if errMsg == "" {
+				errMsg = err.Error()
+			}
+			return customCreateResultMsg{err: fmt.Errorf("%s", errMsg)}
+		}
+
+		output := strings.TrimSpace(stdout.String())
+		if output == "" {
+			return customCreateResultMsg{err: fmt.Errorf("command produced no output")}
+		}
+
+		// Take the first line of output
+		if idx := strings.Index(output, "\n"); idx > 0 {
+			output = output[:idx]
+		}
+
+		// Use output as-is (preserve case, no lowercasing)
+		branchName := strings.TrimSpace(output)
+
+		return customCreateResultMsg{branchName: branchName}
+	}
+}
+
+// executeCustomCreateCommandInteractive runs a custom create command interactively.
+// The TUI suspends, the command runs in the terminal, and stdout is captured to a temp file.
+func (m *Model) executeCustomCreateCommandInteractive(menu *config.CustomCreateMenu, workDir string) tea.Cmd {
+	// Create temp file for capturing stdout
+	tmpFile, err := os.CreateTemp("", "lazyworktree-custom-create-*")
+	if err != nil {
+		return func() tea.Msg {
+			return customCreateResultMsg{err: fmt.Errorf("failed to create temp file: %w", err)}
+		}
+	}
+	tmpPath := tmpFile.Name()
+	_ = tmpFile.Close()
+
+	// Wrap command to redirect stdout to temp file
+	// Interactive commands typically write UI to stderr or /dev/tty
+	wrappedCmd := fmt.Sprintf("%s > %s", menu.Command, tmpPath)
+
+	// #nosec G204 -- user-configured command from trusted config
+	c := m.commandRunner("bash", "-c", wrappedCmd)
+	c.Dir = workDir
+
+	return m.execProcess(c, func(err error) tea.Msg {
+		defer func() { _ = os.Remove(tmpPath) }()
+
+		if err != nil {
+			return customCreateResultMsg{err: err}
+		}
+
+		// Read branch name from temp file
+		// #nosec G304 -- tmpPath is created by os.CreateTemp, not user input
+		content, readErr := os.ReadFile(tmpPath)
+		if readErr != nil {
+			return customCreateResultMsg{err: fmt.Errorf("failed to read output: %w", readErr)}
+		}
+
+		output := strings.TrimSpace(string(content))
+		if output == "" {
+			return customCreateResultMsg{err: fmt.Errorf("command produced no output")}
+		}
+
+		// Take the first line of output
+		if idx := strings.Index(output, "\n"); idx > 0 {
+			output = output[:idx]
+		}
+
+		// Use output as-is (preserve case, no lowercasing)
+		branchName := strings.TrimSpace(output)
+
+		return customCreateResultMsg{branchName: branchName}
+	})
+}
+
+// showBaseBranchForCustomCreateMenu shows the branch picker before running a custom create command.
+func (m *Model) showBaseBranchForCustomCreateMenu(menu *config.CustomCreateMenu) tea.Cmd {
+	return m.showBranchSelection(
+		"Select base branch for worktree",
+		"Filter branches...",
+		"No branches found.",
+		"",
+		func(branch string) tea.Cmd {
+			// Store base branch and menu for later use
+			m.pendingCustomBaseRef = branch
+			m.pendingCustomMenu = menu
+			// Now run the command
+			return m.executeCustomCreateCommand(menu)
+		},
+	)
 }

@@ -160,6 +160,10 @@ type (
 		meta         commitMeta
 		err          error
 	}
+	customCreateResultMsg struct {
+		branchName string
+		err        error
+	}
 )
 
 type commitLogEntry struct {
@@ -327,13 +331,16 @@ type Model struct {
 	loadingScreen *LoadingScreen
 
 	// Trust / repo commands
-	repoConfig      *config.RepoConfig
-	repoConfigPath  string
-	pendingCommands []string
-	pendingCmdEnv   map[string]string
-	pendingCmdCwd   string
-	pendingAfter    func() tea.Msg
-	pendingTrust    string
+	repoConfig              *config.RepoConfig
+	repoConfigPath          string
+	pendingCommands         []string
+	pendingCmdEnv           map[string]string
+	pendingCmdCwd           string
+	pendingAfter            func() tea.Msg
+	pendingTrust            string
+	pendingCustomBranchName string                   // Branch name from custom create command
+	pendingCustomBaseRef    string                   // Base ref for custom create (selected before running command)
+	pendingCustomMenu       *config.CustomCreateMenu // Menu item for custom create
 
 	// Log cache for commit detail viewer
 	logEntries    []commitLogEntry
@@ -619,6 +626,20 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return worktreesLoadedMsg{worktrees: worktrees, err: err}
 		}
 		return m, m.runCommandsWithTrust(initCmds, msg.targetPath, env, after)
+
+	case customCreateResultMsg:
+		m.loading = false
+		if m.currentScreen == screenLoading {
+			m.currentScreen = screenNone
+			m.loadingScreen = nil
+		}
+		if msg.err != nil {
+			m.showInfo(fmt.Sprintf("Custom command failed: %v", msg.err), nil)
+			return m, nil
+		}
+		// Store the branch name and show branch name input with the selected base ref
+		m.pendingCustomBranchName = msg.branchName
+		return m, m.showBranchNameInput(m.pendingCustomBaseRef, msg.branchName)
 
 	case createFromChangesReadyMsg:
 		return m, m.handleCreateFromChangesReady(msg)

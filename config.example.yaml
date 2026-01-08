@@ -15,17 +15,17 @@ max_diff_chars: 200000
 #          "catppuccin-mocha"
 theme: dracula
 
-# Path to delta executable (default: "delta")
-# Set to empty string to disable delta and use plain git diff output
-# Example: delta_path: ""  # disables delta
-# Example: delta_path: /usr/local/bin/delta  # custom path
-delta_path: delta
-
 # Pager used for show_output custom commands (default: $PAGER or less)
 pager: "less --use-color --wordwrap -qcR -P 'Press q to exit..'"
 
 # Editor for Status pane file edits (default: $EDITOR, then nvim, then vi)
 editor: nvim
+
+# Path to delta executable (default: "delta")
+# Set to empty string to disable delta and use plain git diff output
+# Example: delta_path: ""  # disables delta
+# Example: delta_path: /usr/local/bin/delta  # custom path
+delta_path: delta
 
 # Extra arguments passed to delta for diff rendering.
 # If omitted, lazyworktree picks a syntax theme matching your UI:
@@ -150,3 +150,26 @@ custom_commands:
           command: zsh
         - name: lazygit
           command: lazygit
+
+# Custom items for the worktree creation menu (triggered by 'c' key)
+# Each item runs an external command that outputs a branch name.
+# After the command runs, you select a base branch, then enter the branch name.
+# Non-interactive commands run with a 30-second timeout.
+# Output is sanitised (lowercase, special characters replaced with hyphens).
+#
+# Fields:
+#   label: Display label shown in the menu (required)
+#   description: Help text shown next to the label (optional)
+#   command: Shell command that outputs a branch name on stdout (required)
+#   interactive: Run interactively (default: false). Set to true for TUI-based
+#                commands like fzf or jayrah. Suspends lazyworktree, runs the
+#                command in the terminal, and captures stdout via temp file.
+#
+# custom_create_menus:
+#   - label: "From JIRA ticket"
+#     description: "Create from JIRA issue"
+#     command: "jayrah browse 'SRVKP' --choose"
+#     interactive: true
+#   - label: "From clipboard"
+#     description: "Use clipboard as branch name"
+#     command: "pbpaste"

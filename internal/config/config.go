@@ -40,6 +40,15 @@ type TmuxWindow struct {
 	Cwd     string
 }
 
+// CustomCreateMenu defines a custom entry in the worktree creation menu.
+// The command should output a branch name that will be sanitized and used.
+type CustomCreateMenu struct {
+	Label       string // Display label in the menu
+	Description string // Help text shown next to label
+	Command     string // Shell command that outputs branch name
+	Interactive bool   // Run interactively (TUI suspends, captures stdout via temp file)
+}
+
 // AppConfig defines the global lazyworktree configuration options.
 type AppConfig struct {
 	WorktreeDir             string
@@ -67,6 +76,7 @@ type AppConfig struct {
 	IssueBranchNameTemplate string // Template for issue branch names with placeholders: {prefix}, {number}, {title} (default: "{prefix}-{number}-{title}")
 	PRPrefix                string // Prefix for PR branch names (default: "pr")
 	PRBranchNameTemplate    string // Template for PR branch names with placeholders: {prefix}, {number}, {title} (default: "{prefix}-{number}-{title}")
+	CustomCreateMenus       []*CustomCreateMenu
 }
 
 // RepoConfig represents repository-scoped commands from .wt
@@ -458,7 +468,48 @@ func parseConfig(data map[string]any) *AppConfig {
 		}
 	}
 
+	cfg.CustomCreateMenus = parseCustomCreateMenus(data["custom_create_menus"])
+
 	return cfg
+}
+
+// parseCustomCreateMenus parses the custom_create_menus list from config data.
+func parseCustomCreateMenus(data any) []*CustomCreateMenu {
+	if data == nil {
+		return nil
+	}
+
+	list, ok := data.([]any)
+	if !ok {
+		return nil
+	}
+
+	var menus []*CustomCreateMenu
+	for _, item := range list {
+		itemMap, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+
+		menu := &CustomCreateMenu{}
+		if label, ok := itemMap["label"].(string); ok {
+			menu.Label = strings.TrimSpace(label)
+		}
+		if desc, ok := itemMap["description"].(string); ok {
+			menu.Description = strings.TrimSpace(desc)
+		}
+		if cmd, ok := itemMap["command"].(string); ok {
+			menu.Command = strings.TrimSpace(cmd)
+		}
+		menu.Interactive = coerceBool(itemMap["interactive"], false)
+
+		// Only add if label and command are non-empty
+		if menu.Label != "" && menu.Command != "" {
+			menus = append(menus, menu)
+		}
+	}
+
+	return menus
 }
 
 // LoadRepoConfig loads repository-specific commands from .wt in repoPath

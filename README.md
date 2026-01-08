@@ -494,6 +494,15 @@ custom_commands:
     description: Run tests
     show_help: true
     wait: true
+# Custom worktree creation menu items
+custom_create_menus:
+  - label: "From JIRA ticket"
+    description: "Create from JIRA issue"
+    command: "jayrah browse 'SRVKP' --choose"
+    interactive: true  # TUI-based commands need this to suspend lazyworktree
+  - label: "From clipboard"
+    description: "Use clipboard as branch name"
+    command: "pbpaste"
 ```
 
 Notes:
@@ -519,6 +528,7 @@ Notes:
 - `issue_branch_name_template` defines the template for issue branch names with placeholders: `{prefix}`, `{number}`, `{title}` (default: `"{prefix}-{number}-{title}"`). Examples: `issue-123-fix-bug-in-login`, `123-fix-bug-in-login`, `fix/123-fix-bug-in-login`.
 - `pr_prefix` sets the prefix for PR branch names (default: `"pr"`).
 - `pr_branch_name_template` defines the template for PR branch names with placeholders: `{prefix}`, `{number}`, `{title}` (default: `"{prefix}-{number}-{title}"`). Examples: `pr-123-fix-bug`, `pr123-fix-bug`, `123-fix-bug`.
+- `custom_create_menus` adds custom items to the worktree creation menu (`c` key). Each entry requires a `label` and `command`; `description` is optional. By default, commands run non-interactively with a 30-second timeout and their stdout is captured directly. Set `interactive: true` for TUI-based commands (like `jayrah browse` or `fzf`); this suspends lazyworktree, runs the command in the terminal, and captures stdout via a temp file. The output is sanitised (lowercase, special characters replaced with hyphens) and used as the suggested branch name. After the command runs, you select a base branch before creating the worktree.
 
 ## Themes
 

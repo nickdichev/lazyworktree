@@ -311,6 +311,35 @@ For zellij sessions, the following fields are available:
 .IP \(bu 2
 \fBwindows\fR: List of tab definitions. Each tab has: name (supports env vars), command (empty uses default shell), cwd (default: $WORKTREE_PATH). If omitted, creates a single shell tab.
 .RE
+.TP
+.B custom_create_menus
+Custom items for the worktree creation menu (triggered by \fBc\fR key). Each item runs an external command that outputs a branch name, then prompts for base branch selection.
+
+Each custom create menu entry supports the following fields:
+.RS
+.IP \(bu 2
+\fBlabel\fR: Display label shown in the menu (required)
+.IP \(bu 2
+\fBdescription\fR: Help text shown next to the label (optional)
+.IP \(bu 2
+\fBcommand\fR: Shell command that outputs a branch name on stdout (required)
+.IP \(bu 2
+\fBinteractive\fR: Run interactively (default: false). Set to true for TUI-based commands like fzf or jayrah. When true, lazyworktree suspends, the command runs in the terminal, and stdout is captured via a temp file.
+.RE
+
+By default, commands run non-interactively with a 30-second timeout. When \fBinteractive: true\fR, there is no timeout. The output is sanitised (lowercase, special characters replaced with hyphens) and used as the suggested branch name. After the command runs, you select a base branch before creating the worktree. This is useful for integrating external tools like JIRA, Linear, or custom scripts.
+
+Example configuration:
+.RS
+.nf
+custom_create_menus:
+  - label: "From JIRA ticket"
+    description: "Create from JIRA issue"
+    command: "jayrah browse 'SRVKP' --choose"
+    interactive: true
+.fi
+.RE
+
 .SH PREREQUISITES
 .IP \(bu 2
 Git 2.31+ (recommended)

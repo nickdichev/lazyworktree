@@ -26,7 +26,7 @@ func runBranchNameScript(ctx context.Context, script, diff string) (string, erro
 	defer cancel()
 
 	// #nosec G204 -- script is user-configured and trusted
-	cmd := exec.CommandContext(ctx, "sh", "-c", script)
+	cmd := exec.CommandContext(ctx, "bash", "-c", script)
 	cmd.Stdin = strings.NewReader(diff)
 
 	var stdout, stderr bytes.Buffer
