@@ -1,4 +1,6 @@
 # lazyworktree - Lazy Git Worktree Manager
+<img align="right" width="180" height="180" alt="lw-logo" src="https://github.com/user-attachments/assets/77b63679-40b8-494c-a62d-19ccc39ac38e" />
+
 
 A [BubbleTea](https://github.com/charmbracelet/bubbletea)-based Terminal User Interface designed for efficient Git worktree management. Visualise the repository's status, oversee branches, and navigate between worktrees with ease.
 
