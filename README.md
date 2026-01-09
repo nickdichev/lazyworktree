@@ -1,4 +1,5 @@
-# lazyworktree - Lazy Git Worktree Manager
+# LazyWorktree - Effortless Git worktree management for the terminal.
+
 <img align="right" width="180" height="180" alt="lw-logo" src="https://github.com/user-attachments/assets/77b63679-40b8-494c-a62d-19ccc39ac38e" />
 
 
