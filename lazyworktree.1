@@ -1,11 +1,14 @@
 .TH LAZYWORKTREE 1 "January 2026" "lazyworktree" "User Commands"
 .SH NAME
 lazyworktree \- A TUI tool to manage git worktrees
+.
 .SH SYNOPSIS
 .B lazyworktree
 [\fIOPTIONS\fR]
+.
 .SH DESCRIPTION
-lazyworktree is a BubbleTea-based Terminal User Interface (TUI) designed for efficient Git worktree management. It enables you to visualize the repository's status, oversee branches, and navigate between worktrees with ease.
+lazyworktree is a BubbleTea-based Terminal User Interface (TUI) designed for efficient Git worktree management. It enables you to visualise the repository's status, oversee branches, and navigate between worktrees with ease.
+.
 .SH FEATURES
 .IP \(bu 2
 Worktree Management: Create, rename, delete, absorb, and prune merged worktrees
@@ -33,239 +36,439 @@ Diff Viewer: View diff with optional delta support
 Repo Automation: \fB.wt\fR init/terminate commands with TOFU security
 .IP \(bu 2
 LazyGit Integration: Launch lazygit directly for the currently selected worktree
+.IP \(bu 2
+Mouse Support: Click to focus panes, select items, and scroll with the mouse wheel
+.
 .SH OPTIONS
 .TP
 .B \-\-worktree\-dir \fIDIR\fR
-Override the default worktree root directory (default: ~/.local/share/worktrees)
+Override the default worktree root directory.
+.br
+Default: ~/.local/share/worktrees
+.
 .TP
 .B \-\-theme \fINAME\fR
-Select a UI theme (dracula, dracula-light, narna, clean-light, catppuccin-latte, rose-pine-dawn, one-light, everforest-light, solarized-dark, solarized-light, gruvbox-dark, gruvbox-light, nord, monokai, catppuccin-mocha). If unspecified, lazyworktree attempts to auto-detect the theme based on the terminal's background color (defaulting to dracula for dark or dracula-light for light).
+Select a UI theme. Available themes: dracula, dracula-light, narna, clean-light, catppuccin-latte, rose-pine-dawn, one-light, everforest-light, solarized-dark, solarized-light, gruvbox-dark, gruvbox-light, nord, monokai, catppuccin-mocha.
+.br
+If unspecified, lazyworktree attempts to auto-detect the theme based on the terminal's background colour (defaulting to dracula for dark or dracula-light for light).
+.
 .TP
 .B \-\-show\-syntax\-themes
-Display the default delta syntax-theme values for each UI theme
+Display the default delta syntax-theme values for each UI theme.
+.
 .TP
 .B \-\-search\-auto\-select
-Start with filter focused
+Start with filter focused and select first match on Enter.
+.
 .TP
 .B \-\-output\-selection \fIFILE\fR
-Write the selected worktree path to FILE on exit (for shell integration)
+Write the selected worktree path to FILE on exit (for shell integration).
+.
+.TP
+.B \-\-debug\-log \fIPATH\fR
+Path to debug log file for troubleshooting.
+.
+.TP
+.B \-\-version
+Print version information and exit.
+.
 .SH KEY BINDINGS
+.SS General Navigation
 .TP
-.B Enter
-Jump to worktree (exit and cd), open commit file tree in log pane
-.TP
-.B c
-Create new worktree (from branch, commit, PR/MR, or issue)
-.TP
-.B m
-Rename selected worktree
-.TP
-.B D
-Delete selected worktree
-.TP
-.B d
-View diff in pager
-.TP
-.B e
-Open selected file in Status pane using editor
-.SH STATUS PANE
-The Status pane displays changed files in a collapsible tree view, grouped by directory. Directories are shown with expand/collapse indicators (▼/▶) and can be toggled with Enter. Files are sorted alphabetically within each directory level and include Nerd Font v3 icons when enabled (set show_icons: false to disable).
-.TP
-.B j, k
-Navigate between files and directories in the tree
-.TP
-.B Enter
-Toggle directory expand/collapse, or show diff for selected file
-.TP
-.B s
-Stage/unstage selected file or directory
-.TP
-.B D
-Delete selected file or directory (with confirmation)
-.TP
-.B c
-Commit staged changes
-.TP
-.B C
-Stage all changes and commit
-.TP
-.B A
-Absorb worktree into main
-.TP
-.B X
-Prune merged worktrees
-.TP
-.B !
-Run arbitrary command in selected worktree
-.TP
-.B p
-Fetch PR/MR status (also refreshes CI checks)
-.TP
-.B o
-Open PR/MR in browser
-.TP
-.B ctrl+p, :
-Command palette
-.TP
-.B g
-Open LazyGit
-.TP
-.B r
-Refresh list
-.TP
-.B R
-Fetch all remotes
-.TP
-.B f
-Filter focused pane (worktrees, files, commits). When a filter is active, the pane title shows a filter indicator with [Esc] Clear hint.
-.TP
-.B Esc
-Clear filter for focused pane (when filter is active)
-.TP
-.B /
-Search focused pane (incremental)
-.TP
-.B n, N
-Next or previous search match
-.TP
-.B s
-Cycle sort mode (Path / Last Active / Last Switched)
+.B j, k, Up, Down
+Navigate between items in the focused pane.
+.
 .TP
 .B Home
-Go to first item in focused pane
+Go to first item in focused pane.
+.
 .TP
 .B End
-Go to last item in focused pane
-.TP
-.B ctrl+Left, ctrl+Right
-Jump to previous/next folder (Status pane only)
-.TP
-.B ?
-Show help
-.TP
-.B 1
-Switch to Worktree pane (toggle zoom if already focused)
-.TP
-.B 2
-Switch to Status pane (toggle zoom if already focused)
-.TP
-.B 3
-Switch to Log pane (toggle zoom if already focused)
+Go to last item in focused pane.
+.
 .TP
 .B Tab, ]
-Cycle to next pane
+Cycle to next pane.
+.
 .TP
 .B [
-Cycle to previous pane
+Cycle to previous pane.
+.
+.TP
+.B 1
+Switch to Worktree pane (toggle zoom if already focused).
+.
+.TP
+.B 2
+Switch to Status pane (toggle zoom if already focused).
+.
+.TP
+.B 3
+Switch to Log pane (toggle zoom if already focused).
+.
 .TP
 .B =
-Toggle zoom for focused pane (full screen, press again to unzoom)
+Toggle zoom for focused pane (full screen, press again to unzoom).
+.
 .TP
-.B ctrl+j
-Move to next commit and open commit file tree in log pane
-.SH COMMIT FILE TREE
-When pressing Enter on a commit in the log pane, a file tree view opens showing all files changed in that commit. The tree is collapsible by directory and includes Nerd Font v3 icons when enabled (set show_icons: false to disable).
+.B ?
+Show help screen.
+.
 .TP
-.B j, k
-Navigate between files and directories in the tree
+.B q
+Quit application.
+.
+.SS Worktree Operations
 .TP
 .B Enter
-Toggle directory expand/collapse, or show diff for selected file
+Jump to worktree (exit and cd), or open commit file tree in log pane.
+.
+.TP
+.B c
+Create new worktree (from branch, commit, PR/MR, or issue).
+.
+.TP
+.B m
+Rename selected worktree.
+.
+.TP
+.B D
+Delete selected worktree.
+.
+.TP
+.B A
+Absorb worktree into main (merge or rebase based on configuration).
+.
+.TP
+.B X
+Prune merged worktrees.
+.
+.TP
+.B !
+Run arbitrary command in selected worktree.
+.
+.TP
+.B r
+Refresh worktree list.
+.
+.TP
+.B R
+Fetch all remotes.
+.
+.TP
+.B s
+Cycle sort mode (Path / Last Active / Last Switched).
+.
+.SS Status Pane
+The Status pane displays changed files in a collapsible tree view, grouped by directory. Directories are shown with expand/collapse indicators (▼/▶) and can be toggled with Enter. Files are sorted alphabetically within each directory level and include Nerd Font v3 icons when enabled.
+.
+.TP
+.B Enter
+Toggle directory expand/collapse, or show diff for selected file.
+.
+.TP
+.B s
+Stage/unstage selected file or directory.
+.
+.TP
+.B D
+Delete selected file or directory (with confirmation).
+.
+.TP
+.B e
+Open selected file in editor.
+.
+.TP
+.B c
+Commit staged changes.
+.
+.TP
+.B C
+Stage all changes and commit.
+.
 .TP
 .B d
-Show full commit diff in pager
+View diff in pager.
+.
 .TP
-.B f
-Filter files by name
+.B ctrl+Left, ctrl+Right
+Jump to previous/next folder.
+.
+.SS Log Pane
 .TP
-.B /
-Search files (incremental)
+.B Enter
+Open commit file tree view.
+.
 .TP
-.B n, N
-Next or previous search match
+.B C
+Cherry-pick commit to another worktree (interactive picker).
+.
+.TP
+.B ctrl+j
+Move to next commit and open commit file tree.
+.
+.SS Commit File Tree
+When pressing Enter on a commit in the log pane, a file tree view opens showing all files changed in that commit. The tree is collapsible by directory and includes Nerd Font v3 icons when enabled.
+.
+.TP
+.B Enter
+Toggle directory expand/collapse, or show diff for selected file.
+.
+.TP
+.B d
+Show full commit diff in pager.
+.
 .TP
 .B q, Esc
-Return to commit log
+Return to commit log.
+.
+.SS Filter and Search
+.TP
+.B f
+Filter focused pane by fuzzy matching. When a filter is active, the pane title shows a filter indicator with [Esc] Clear hint. Filtering narrows the visible items to those matching your input.
+.
+.TP
+.B /
+Search focused pane incrementally. Unlike filter, search highlights matches whilst keeping all items visible. Use n/N to navigate between matches.
+.
+.TP
+.B n
+Jump to next search match.
+.
+.TP
+.B N
+Jump to previous search match.
+.
+.TP
+.B Esc
+Clear filter for focused pane (when filter is active).
+.
+.SS Forge Integration
+.TP
+.B p
+Fetch PR/MR status (also refreshes CI checks).
+.
+.TP
+.B o
+Open PR/MR in browser.
+.
+.SS Command Palette
+.TP
+.B ctrl+p, :
+Open command palette showing all available commands.
+.
+.SS LazyGit
+.TP
+.B g
+Open LazyGit for the currently selected worktree.
+.
+.SH MOUSE SUPPORT
+lazyworktree provides comprehensive mouse support for improved navigation and interaction:
+.
+.TP
+.B Click on pane
+Focus the clicked pane (Worktree, Status, or Log).
+.
+.TP
+.B Click on item
+Select the clicked item in a table or list.
+.
+.TP
+.B Mouse wheel
+Scroll up or down in the focused pane.
+.
+.PP
+Mouse support works in all panes and is particularly useful for quickly switching context or selecting specific items without keyboard navigation.
+.
 .SH SHELL INTEGRATION
 To enable the "jump" functionality, source the helper functions from the installation:
-
+.
+.PP
 For source builds:
+.RS
 .nf
 source /path/to/lazyworktree/shell/functions.shell
 jt() { worktree_jump ~/path/to/your/main/repo "$@"; }
 .fi
-
+.RE
+.
+.PP
 For Homebrew:
+.RS
 .nf
 source $(brew --prefix)/opt/lazyworktree/share/lazyworktree/functions.shell
 jt() { worktree_jump ~/path/to/your/main/repo "$@"; }
 .fi
-
-With completion:
+.RE
+.
+.PP
+With completion (zsh):
+.RS
 .nf
 _jt() { _worktree_jump ~/path/to/your/main/repo; }
 compdef _jt jt
 .fi
+.RE
+.
 .SH CONFIGURATION
-lazyworktree reads configuration from \fB~/.config/lazyworktree/config.yaml\fR (or \fBconfig.yml\fR). The following configuration options are available:
+lazyworktree reads configuration from \fB~/.config/lazyworktree/config.yaml\fR (or \fBconfig.yml\fR).
+.
+.SS General Settings
 .TP
 .B worktree_dir
-Default worktree root directory (default: ~/.local/share/worktrees). Can be overridden with \fB--worktree-dir\fR. Worktrees are organized under ~/.local/share/worktrees/<repo_name> by default. The application attempts to resolve repository locations via \fBgh repo view\fR or \fBglab repo view\fR. If the repository name is not detectable, lazyworktree falls back to a local \fBlocal-<hash>\fR key for cache and last-selected storage.
+Default worktree root directory. Worktrees are organised under ~/.local/share/worktrees/<repo_name> by default. The application attempts to resolve repository locations via \fBgh repo view\fR or \fBglab repo view\fR. If the repository name is not detectable, lazyworktree falls back to a local \fBlocal-<hash>\fR key for cache and last-selected storage.
+.br
+Default: ~/.local/share/worktrees
+.br
+Can be overridden with \fB--worktree-dir\fR.
+.
 .TP
 .B sort_mode
-Default sort order for worktrees. Options: \fBpath\fR (alphabetical), \fBactive\fR (last commit date), \fBswitched\fR (last accessed, default). The old \fBsort_by_active\fR option is still supported for backwards compatibility.
-.TP
-.B auto_fetch_prs
-Automatically fetch PR/MR data on startup (default: false).
-.TP
-.B show_icons
-Toggle Nerd Font v3 icons in file trees, PR views, and CI checks (default: true).
+Default sort order for worktrees.
+.br
+Options: \fBpath\fR (alphabetical), \fBactive\fR (last commit date), \fBswitched\fR (last accessed).
+.br
+Default: switched
+.br
+Note: The old \fBsort_by_active\fR option is still supported for backwards compatibility.
+.
 .TP
 .B search_auto_select
-Start with filter focused and select first match on Enter (default: false). Can also be enabled with \fB--search-auto-select\fR.
+Start with filter focused and select first match on Enter.
+.br
+Default: false
+.br
+Can also be enabled with \fB--search-auto-select\fR.
+.
 .TP
-.B fuzzy_finder_input
-Enable fuzzy finder suggestions in input dialogs. When enabled, typing in text input fields displays fuzzy-filtered suggestions from available options. Use arrow keys to navigate suggestions and Enter to select (default: false).
-.TP
-.B max_untracked_diffs
-Maximum number of untracked file diffs to show (default: 10). Set to 0 to hide untracked diffs.
-.TP
-.B max_diff_chars
-Maximum characters to display in diffs before truncation (default: 200000). Set to 0 to disable truncation.
+.B debug_log
+Path to debug log file for troubleshooting. When set, detailed debug information is written to this file.
+.br
+Can also be set with \fB--debug-log\fR.
+.
+.SS User Interface
 .TP
 .B theme
-UI color theme. Options: \fBdracula\fR (default for dark), \fBdracula-light\fR (default for light), \fBnarna\fR, \fBclean-light\fR, \fBcatppuccin-latte\fR, \fBrose-pine-dawn\fR, \fBone-light\fR, \fBeverforest-light\fR, \fBsolarized-dark\fR, \fBsolarized-light\fR, \fBgruvbox-dark\fR, \fBgruvbox-light\fR, \fBnord\fR, \fBmonokai\fR, \fBcatppuccin-mocha\fR. If left empty or unspecified, the theme is auto-detected from the terminal background. Can also be set with \fB--theme\fR.
+UI colour theme. If left empty or unspecified, the theme is auto-detected from the terminal background.
+.br
+Options: \fBdracula\fR (default for dark), \fBdracula-light\fR (default for light), \fBnarna\fR, \fBclean-light\fR, \fBcatppuccin-latte\fR, \fBrose-pine-dawn\fR, \fBone-light\fR, \fBeverforest-light\fR, \fBsolarized-dark\fR, \fBsolarized-light\fR, \fBgruvbox-dark\fR, \fBgruvbox-light\fR, \fBnord\fR, \fBmonokai\fR, \fBcatppuccin-mocha\fR.
+.br
+Can also be set with \fB--theme\fR.
+.
+.TP
+.B show_icons
+Toggle Nerd Font v3 icons in file trees, PR views, and CI checks.
+.br
+Default: true
+.
+.TP
+.B fuzzy_finder_input
+Enable fuzzy finder suggestions in input dialogues. When enabled, typing in text input fields displays fuzzy-filtered suggestions from available options. Use arrow keys to navigate suggestions and Enter to select.
+.br
+Default: false
+.
+.TP
+.B max_untracked_diffs
+Maximum number of untracked file diffs to show. Set to 0 to hide untracked diffs.
+.br
+Default: 10
+.
+.TP
+.B max_diff_chars
+Maximum characters to display in diffs before truncation. Set to 0 to disable truncation.
+.br
+Default: 200000
+.
+.SS Diff and Pager
 .TP
 .B delta_path
-Path to delta executable (default: \fBdelta\fR). Set to empty string to disable delta and use plain git diff output.
-.TP
-.B pager
-Pager command for show_output custom commands and diff viewer (default: $PAGER, fallback: less --use-color --wordwrap -qcR -P 'Press q to exit..', then more, then cat). When the pager is less, lazyworktree configures LESS= and LESSHISTFILE=- to ignore user defaults.
-.TP
-.B editor
-Editor command for Status pane file edits (default: config value, then $EDITOR, then nvim, then vi).
+Path to delta executable. Set to empty string to disable delta and use plain git diff output.
+.br
+Default: delta
+.
 .TP
 .B delta_args
-List of extra arguments passed to delta for diff rendering. If omitted, lazyworktree picks a syntax theme matching your UI theme. Default mappings: dracula → Dracula, dracula-light → Monokai Extended Light, narna → OneHalfDark, clean-light → GitHub, catppuccin-latte → Catppuccin Latte, rose-pine-dawn → GitHub, one-light → OneHalfLight, everforest-light → Gruvbox Light, solarized-dark → Solarized (dark), solarized-light → Solarized (light), gruvbox-dark → Gruvbox Dark, gruvbox-light → Gruvbox Light, nord → Nord, monokai → Monokai Extended, catppuccin-mocha → Catppuccin Mocha. Use \fB--show-syntax-themes\fR to display default values.
+List of extra arguments passed to delta for diff rendering. If omitted, lazyworktree picks a syntax theme matching your UI theme.
+.br
+Default mappings: dracula → Dracula, dracula-light → Monokai Extended Light, narna → OneHalfDark, clean-light → GitHub, catppuccin-latte → Catppuccin Latte, rose-pine-dawn → GitHub, one-light → OneHalfLight, everforest-light → Gruvbox Light, solarized-dark → Solarized (dark), solarized-light → Solarized (light), gruvbox-dark → Gruvbox Dark, gruvbox-light → Gruvbox Light, nord → Nord, monokai → Monokai Extended, catppuccin-mocha → Catppuccin Mocha.
+.br
+Use \fB--show-syntax-themes\fR to display default values.
+.
+.TP
+.B pager
+Pager command for show_output custom commands and diff viewer.
+.br
+Default: $PAGER, fallback: less --use-color --wordwrap -qcR -P 'Press q to exit..', then more, then cat.
+.br
+When the pager is less, lazyworktree configures LESS= and LESSHISTFILE=- to ignore user defaults.
+.
+.TP
+.B editor
+Editor command for Status pane file edits.
+.br
+Default: config value, then $EDITOR, then nvim, then vi.
+.
+.SS Forge Integration
+.TP
+.B auto_fetch_prs
+Automatically fetch PR/MR data on startup.
+.br
+Default: false
+.
+.TP
+.B issue_branch_name_template
+Template for branch names created from GitHub/GitLab issues. Available placeholders: \fB{number}\fR (issue number) and \fB{title}\fR (sanitised issue title).
+.br
+Default: issue-{number}-{title}
+.br
+Example: With template "fix-{number}-{title}", issue #42 titled "Memory Leak" becomes branch "fix-42-memory-leak".
+.
+.TP
+.B pr_branch_name_template
+Template for branch names created from pull/merge requests. Available placeholders: \fB{number}\fR (PR/MR number) and \fB{title}\fR (sanitised PR/MR title).
+.br
+Default: pr-{number}-{title}
+.br
+Example: With template "review-{number}", PR #123 becomes branch "review-123".
+.
+.SS Security and Behaviour
 .TP
 .B trust_mode
-Security setting for executing commands from .wt files. Options: \fBtofu\fR (default - prompts on first use/change), \fBnever\fR (never run commands), \fBalways\fR (always run without prompting, risky).
+Security setting for executing commands from .wt files.
+.br
+Options: \fBtofu\fR (default - prompts on first use/change), \fBnever\fR (never run commands), \fBalways\fR (always run without prompting, risky).
+.
 .TP
 .B merge_method
-Merge method for "Absorb worktree" action. Options: \fBrebase\fR (default - rebases onto main then fast-forwards), \fBmerge\fR (creates merge commit).
+Merge method for "Absorb worktree" action.
+.br
+Options: \fBrebase\fR (default - rebases onto main then fast-forwards), \fBmerge\fR (creates merge commit).
+.
+.SS Automation
 .TP
 .B branch_name_script
-Script to generate branch name suggestions when creating worktrees from changes. The script receives the git diff on stdin and should output a branch name (first line is used). Useful for AI-powered branch name generation. Script operates under a 30-second timeout.
+Script to generate branch name suggestions when creating worktrees from changes. The script receives the git diff on stdin and should output a branch name (first line is used). Useful for AI-powered branch name generation.
+.br
+Script operates under a 30-second timeout.
+.
 .TP
 .B init_commands
-List of commands to execute when creating a worktree. These execute before any repository-specific .wt commands (if present). Available environment variables: WORKTREE_BRANCH, MAIN_WORKTREE_PATH, WORKTREE_PATH, WORKTREE_NAME. Special built-in command: \fBlink_topsymlinks\fR (not a shell command) symlinks untracked/ignored files from main worktree root, editor configs (.vscode, .idea, .cursor, .claude), ensures tmp/ directory exists, and runs direnv allow if .envrc is present.
+List of commands to execute when creating a worktree. These execute before any repository-specific .wt commands (if present).
+.br
+Available environment variables: WORKTREE_BRANCH, MAIN_WORKTREE_PATH, WORKTREE_PATH, WORKTREE_NAME.
+.br
+Special built-in command: \fBlink_topsymlinks\fR (not a shell command) symlinks untracked/ignored files from main worktree root, editor configs (.vscode, .idea, .cursor, .claude), ensures tmp/ directory exists, and runs direnv allow if .envrc is present.
+.
 .TP
 .B terminate_commands
-List of commands to execute when removing a worktree. These execute before any repository-specific .wt commands (if present). Same environment variables as init_commands.
+List of commands to execute when removing a worktree. These execute before any repository-specific .wt commands (if present).
+.br
+Same environment variables as init_commands.
+.
 .TP
 .B custom_commands
 Custom keybindings to run commands in the selected worktree. Commands execute interactively (TUI suspends, like lazygit) and appear in the command palette. Custom commands take precedence over built-in keys.
-
+.PP
 Each custom command supports the following fields:
 .RS
 .IP \(bu 2
@@ -283,11 +486,11 @@ Each custom command supports the following fields:
 .IP \(bu 2
 \fBzellij\fR: Configure a zellij session instead of executing a single command (object, optional)
 .RE
-
+.PP
 Supported key formats: single keys (e, s, t), modifier combinations (ctrl+e, alt+t), special keys (enter, esc, tab, space).
-
+.PP
 Environment variables available in custom commands: WORKTREE_BRANCH, MAIN_WORKTREE_PATH, WORKTREE_PATH, WORKTREE_NAME, REPO_NAME.
-
+.PP
 For tmux sessions, the following fields are available:
 .RS
 .IP \(bu 2
@@ -295,11 +498,11 @@ For tmux sessions, the following fields are available:
 .IP \(bu 2
 \fBattach\fR: If true, attach/switch immediately; if false, show info modal (default: true)
 .IP \(bu 2
-\fBon_exists\fR: Behavior if session exists: switch, attach, kill, new (default: switch)
+\fBon_exists\fR: Behaviour if session exists: switch, attach, kill, new (default: switch)
 .IP \(bu 2
 \fBwindows\fR: List of window definitions. Each window has: name (supports env vars), command (empty uses default shell), cwd (default: $WORKTREE_PATH). If omitted, creates a single shell window.
 .RE
-
+.PP
 For zellij sessions, the following fields are available:
 .RS
 .IP \(bu 2
@@ -307,14 +510,15 @@ For zellij sessions, the following fields are available:
 .IP \(bu 2
 \fBattach\fR: If true, attach immediately; if false, show info modal (default: true)
 .IP \(bu 2
-\fBon_exists\fR: Behavior if session exists: switch, attach, kill, new (default: switch)
+\fBon_exists\fR: Behaviour if session exists: switch, attach, kill, new (default: switch)
 .IP \(bu 2
 \fBwindows\fR: List of tab definitions. Each tab has: name (supports env vars), command (empty uses default shell), cwd (default: $WORKTREE_PATH). If omitted, creates a single shell tab.
 .RE
+.
 .TP
 .B custom_create_menus
 Custom items for the worktree creation menu (triggered by \fBc\fR key). The workflow: you first select a base branch, then the command runs to generate a branch name, and optionally a post-command runs after worktree creation.
-
+.PP
 Each custom create menu entry supports the following fields:
 .RS
 .IP \(bu 2
@@ -330,9 +534,9 @@ Each custom create menu entry supports the following fields:
 .IP \(bu 2
 \fBpost_interactive\fR: Run post-command interactively (default: false). When true, the TUI suspends to show command I/O.
 .RE
-
+.PP
 By default, commands run non-interactively with a 30-second timeout. When \fBinteractive: true\fR, there is no timeout. The command output (first line only, whitespace trimmed, case preserved) is used as the suggested branch name. Post-commands are useful for automated setup tasks like creating initial commits, installing dependencies, or opening editors. If a post-command fails, the error is shown but the worktree is kept. This feature is useful for integrating external tools like JIRA, Linear, or custom scripts.
-
+.PP
 Example configuration:
 .RS
 .nf
@@ -345,13 +549,59 @@ custom_create_menus:
     post_interactive: false
 .fi
 .RE
+.
+.SS Example Configuration
+A practical configuration demonstrating common settings:
+.PP
+.RS
+.nf
+# UI and behaviour
+theme: nord
+show_icons: true
+sort_mode: switched
+fuzzy_finder_input: true
 
+# Forge integration
+auto_fetch_prs: true
+issue_branch_name_template: "fix-{number}-{title}"
+pr_branch_name_template: "review-{number}"
+
+# Diff settings
+delta_path: delta
+max_diff_chars: 500000
+
+# Security
+trust_mode: tofu
+merge_method: rebase
+
+# Automation
+init_commands:
+  - link_topsymlinks
+  - echo "Worktree ${WORKTREE_NAME} initialised"
+
+# Custom commands
+custom_commands:
+  - key: t
+    description: "Open tmux session"
+    show_help: true
+    tmux:
+      session_name: "${REPO_NAME}_${WORKTREE_NAME}"
+      attach: true
+      on_exists: switch
+      windows:
+        - name: "editor"
+          command: "nvim"
+        - name: "shell"
+          command: ""
+.fi
+.RE
+.
 .SH PREREQUISITES
 .IP \(bu 2
 Git 2.31+ (recommended)
 .IP \(bu 2
-Forge CLI: GitHub CLI (gh) or GitLab CLI (glab) for repo resolution and PR/MR status
-
+Forge CLI: GitHub CLI (gh) or GitLab CLI (glab) for repository resolution and PR/MR status
+.
 .SH OPTIONAL DEPENDENCIES
 .IP \(bu 2
 delta \- For syntax-highlighted diffs
@@ -361,29 +611,51 @@ lazygit \- For full TUI git control
 tmux \- For tmux integration support
 .IP \(bu 2
 zellij \- For zellij integration support
+.
 .SH EXAMPLES
 .TP
 Open lazyworktree:
+.RS
 .nf
 lazyworktree
 .fi
+.RE
+.
 .TP
 Specify custom worktree directory:
+.RS
 .nf
 lazyworktree --worktree-dir ~/my-worktrees
 .fi
+.RE
+.
 .TP
 Select a theme:
+.RS
 .nf
 lazyworktree --theme nord
 .fi
+.RE
+.
 .TP
 Use with shell function for "jump" functionality:
+.RS
 .nf
 jt  # Opens TUI, select a worktree and press Enter to jump
 .fi
+.RE
+.
+.TP
+Custom issue branch template in configuration:
+.RS
+.nf
+issue_branch_name_template: "bug-{number}-{title}"
+.fi
+This will create branches like "bug-42-memory-leak" from issue #42.
+.RE
+.
 .SH ENVIRONMENT
-The following environment variables affect lazyworktree's behavior when used with custom commands:
+The following environment variables affect lazyworktree's behaviour when used with custom commands:
 .IP \(bu 2
 WORKTREE_BRANCH \- Name of the git branch
 .IP \(bu 2
@@ -394,25 +666,32 @@ WORKTREE_PATH \- Path to the selected worktree
 WORKTREE_NAME \- Name of the worktree (directory name)
 .IP \(bu 2
 REPO_NAME \- Name of the repository (from GitHub/GitLab)
+.
 .SH CONFIGURATION FILES
 .TP
 .B ~/.config/lazyworktree/config.yaml
 Main configuration file
+.
 .TP
 .B ~/.local/share/lazyworktree/trusted.json
 Trust on First Use (TOFU) trusted file hashes
+.
 .TP
 .B ~/.local/share/worktrees/<repo-name>/
 Default worktree storage location
+.
 .SH SEE ALSO
 .BR git-worktree (1),
 .BR lazygit (1),
 .BR tmux (1),
 .BR zellij (1),
 .BR delta (1)
+.
 .SH AUTHOR
 Chmouel Boudjnah <chmouel@chmouel.com>
+.
 .SH COPYRIGHT
-Apache License 2.0
+Apache Licence 2.0
+.
 .SH REPORTING BUGS
 Report bugs at https://github.com/chmouel/lazyworktree/issues
