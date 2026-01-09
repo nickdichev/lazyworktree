@@ -2457,3 +2457,297 @@ func TestPaneKeyCrossPaneSwitching(t *testing.T) {
 		t.Fatalf("expected zoomedPane to remain -1, got %d", m.zoomedPane)
 	}
 }
+
+// Message handler tests
+
+func TestHandleWorktreesLoadedSuccess(t *testing.T) {
+	cfg := &config.AppConfig{WorktreeDir: t.TempDir()}
+	m := NewModel(cfg, "")
+
+	wts := []*models.WorktreeInfo{
+		{Path: filepath.Join(cfg.WorktreeDir, testWt1), Branch: "main"},
+		{Path: filepath.Join(cfg.WorktreeDir, testWt2), Branch: testFeat},
+	}
+
+	msg := worktreesLoadedMsg{worktrees: wts, err: nil}
+	updated, _ := m.handleWorktreesLoaded(msg)
+	updatedModel := updated.(*Model)
+
+	if !updatedModel.worktreesLoaded {
+		t.Error("expected worktreesLoaded to be true")
+	}
+	if updatedModel.loading {
+		t.Error("expected loading to be false")
+	}
+	if len(updatedModel.worktrees) != 2 {
+		t.Fatalf("expected 2 worktrees, got %d", len(updatedModel.worktrees))
+	}
+}
+
+func TestHandleWorktreesLoadedError(t *testing.T) {
+	cfg := &config.AppConfig{WorktreeDir: t.TempDir()}
+	m := NewModel(cfg, "")
+
+	msg := worktreesLoadedMsg{worktrees: nil, err: os.ErrPermission}
+	updated, _ := m.handleWorktreesLoaded(msg)
+	updatedModel := updated.(*Model)
+
+	if !updatedModel.worktreesLoaded {
+		t.Error("expected worktreesLoaded to be true even with error")
+	}
+	if updatedModel.infoScreen == nil {
+		t.Error("expected info screen to be shown on error")
+	}
+}
+
+func TestHandleWorktreesLoadedEmpty(t *testing.T) {
+	cfg := &config.AppConfig{WorktreeDir: t.TempDir()}
+	m := NewModel(cfg, "")
+
+	msg := worktreesLoadedMsg{worktrees: []*models.WorktreeInfo{}, err: nil}
+	updated, _ := m.handleWorktreesLoaded(msg)
+	updatedModel := updated.(*Model)
+
+	if updatedModel.currentScreen != screenWelcome {
+		t.Errorf("expected welcome screen, got %d", updatedModel.currentScreen)
+	}
+	if updatedModel.welcomeScreen == nil {
+		t.Error("expected welcome screen to be created")
+	}
+}
+
+func TestHandleWorktreesLoadedWithPendingSelection(t *testing.T) {
+	cfg := &config.AppConfig{WorktreeDir: t.TempDir()}
+	m := NewModel(cfg, "")
+
+	wtPath := filepath.Join(cfg.WorktreeDir, testWt1)
+	m.pendingSelectWorktreePath = wtPath
+
+	wts := []*models.WorktreeInfo{
+		{Path: wtPath, Branch: "main"},
+	}
+
+	msg := worktreesLoadedMsg{worktrees: wts, err: nil}
+	updated, _ := m.handleWorktreesLoaded(msg)
+	updatedModel := updated.(*Model)
+
+	if updatedModel.pendingSelectWorktreePath != "" {
+		t.Error("expected pendingSelectWorktreePath to be cleared")
+	}
+}
+
+func TestHandleCachedWorktreesLoaded(t *testing.T) {
+	cfg := &config.AppConfig{WorktreeDir: t.TempDir()}
+	m := NewModel(cfg, "")
+
+	wts := []*models.WorktreeInfo{
+		{Path: filepath.Join(cfg.WorktreeDir, testWt1), Branch: "main"},
+	}
+
+	msg := cachedWorktreesMsg{worktrees: wts}
+	updated, _ := m.handleCachedWorktrees(msg)
+	updatedModel := updated.(*Model)
+
+	if len(updatedModel.worktrees) != 1 {
+		t.Fatalf("expected 1 worktree, got %d", len(updatedModel.worktrees))
+	}
+}
+
+func TestHandleCachedWorktreesIgnoredWhenLoaded(t *testing.T) {
+	cfg := &config.AppConfig{WorktreeDir: t.TempDir()}
+	m := NewModel(cfg, "")
+	m.worktreesLoaded = true
+
+	msg := cachedWorktreesMsg{worktrees: []*models.WorktreeInfo{}}
+	updated, _ := m.handleCachedWorktrees(msg)
+	updatedModel := updated.(*Model)
+
+	if len(updatedModel.worktrees) != 0 {
+		t.Fatalf("expected 0 worktrees, got %d", len(updatedModel.worktrees))
+	}
+}
+
+func TestHandlePruneResultSuccess(t *testing.T) {
+	cfg := &config.AppConfig{WorktreeDir: t.TempDir()}
+	m := NewModel(cfg, "")
+	m.loading = true
+
+	wts := []*models.WorktreeInfo{
+		{Path: filepath.Join(cfg.WorktreeDir, testWt1), Branch: "main"},
+	}
+
+	msg := pruneResultMsg{worktrees: wts, pruned: 1, failed: 0, err: nil}
+	updated, _ := m.handlePruneResult(msg)
+	updatedModel := updated.(*Model)
+
+	if updatedModel.loading {
+		t.Error("expected loading to be false")
+	}
+	if !strings.Contains(updatedModel.statusContent, "Pruned 1") {
+		t.Errorf("expected status message to contain 'Pruned 1', got %q", updatedModel.statusContent)
+	}
+}
+
+func TestHandlePruneResultWithFailures(t *testing.T) {
+	cfg := &config.AppConfig{WorktreeDir: t.TempDir()}
+	m := NewModel(cfg, "")
+
+	msg := pruneResultMsg{worktrees: []*models.WorktreeInfo{}, pruned: 2, failed: 1, err: nil}
+	updated, _ := m.handlePruneResult(msg)
+	updatedModel := updated.(*Model)
+
+	if !strings.Contains(updatedModel.statusContent, "1 failed") {
+		t.Errorf("expected status to include failed count, got %q", updatedModel.statusContent)
+	}
+}
+
+func TestHandleAbsorbResultError(t *testing.T) {
+	cfg := &config.AppConfig{WorktreeDir: t.TempDir()}
+	m := NewModel(cfg, "")
+
+	msg := absorbMergeResultMsg{
+		path:   filepath.Join(cfg.WorktreeDir, testWt1),
+		branch: "main",
+		err:    os.ErrPermission,
+	}
+	updated, _ := m.handleAbsorbResult(msg)
+	updatedModel := updated.(*Model)
+
+	if updatedModel.currentScreen != screenInfo {
+		t.Errorf("expected info screen, got %d", updatedModel.currentScreen)
+	}
+	if updatedModel.infoScreen == nil {
+		t.Error("expected info screen to be shown")
+	}
+}
+
+func TestHandlePRDataLoadedSuccess(t *testing.T) {
+	cfg := &config.AppConfig{WorktreeDir: t.TempDir()}
+	m := NewModel(cfg, "")
+	m.worktrees = []*models.WorktreeInfo{
+		{Path: filepath.Join(cfg.WorktreeDir, "pr"), Branch: "pr-123", PR: nil},
+	}
+
+	prMap := map[string]*models.PRInfo{
+		"pr-123": {Number: 123, Title: "Test PR", Branch: "pr-123"},
+	}
+
+	msg := prDataLoadedMsg{prMap: prMap, worktreePRs: nil, err: nil}
+	updated, _ := m.handlePRDataLoaded(msg)
+	updatedModel := updated.(*Model)
+
+	if !updatedModel.prDataLoaded {
+		t.Error("expected prDataLoaded to be true")
+	}
+	if updatedModel.worktrees[0].PR == nil {
+		t.Error("expected PR to be assigned to worktree")
+	}
+}
+
+func TestHandlePRDataLoadedError(t *testing.T) {
+	cfg := &config.AppConfig{WorktreeDir: t.TempDir()}
+	m := NewModel(cfg, "")
+
+	msg := prDataLoadedMsg{prMap: nil, worktreePRs: nil, err: os.ErrPermission}
+	updated, cmd := m.handlePRDataLoaded(msg)
+	updatedModel := updated.(*Model)
+
+	if updatedModel.prDataLoaded {
+		t.Error("expected prDataLoaded to be false on error")
+	}
+	if cmd != nil {
+		t.Error("expected nil command on error")
+	}
+}
+
+func TestHandleCIStatusLoadedSuccess(t *testing.T) {
+	cfg := &config.AppConfig{WorktreeDir: t.TempDir()}
+	m := NewModel(cfg, "")
+	m.ciCache = make(map[string]*ciCacheEntry)
+
+	checks := []*models.CICheck{
+		{Name: "build", Conclusion: "success"},
+	}
+
+	msg := ciStatusLoadedMsg{branch: "main", checks: checks, err: nil}
+	updated, _ := m.handleCIStatusLoaded(msg)
+	updatedModel := updated.(*Model)
+
+	if _, ok := updatedModel.ciCache["main"]; !ok {
+		t.Error("expected CI status to be cached")
+	}
+}
+
+func TestHandleCIStatusLoadedError(t *testing.T) {
+	cfg := &config.AppConfig{WorktreeDir: t.TempDir()}
+	m := NewModel(cfg, "")
+	m.ciCache = make(map[string]*ciCacheEntry)
+
+	msg := ciStatusLoadedMsg{branch: "main", checks: nil, err: os.ErrPermission}
+	updated, _ := m.handleCIStatusLoaded(msg)
+	updatedModel := updated.(*Model)
+
+	if _, ok := updatedModel.ciCache["main"]; ok {
+		t.Error("expected CI status not to be cached on error")
+	}
+}
+
+func TestHandleOpenPRsLoadedEmpty(t *testing.T) {
+	cfg := &config.AppConfig{WorktreeDir: t.TempDir()}
+	m := NewModel(cfg, "")
+
+	msg := openPRsLoadedMsg{prs: []*models.PRInfo{}, err: nil}
+	cmd := m.handleOpenPRsLoaded(msg)
+
+	if m.infoScreen == nil {
+		t.Error("expected info screen to be shown for empty PRs")
+	}
+	if cmd != nil {
+		t.Error("expected nil command")
+	}
+}
+
+func TestHandleOpenPRsLoadedError(t *testing.T) {
+	cfg := &config.AppConfig{WorktreeDir: t.TempDir()}
+	m := NewModel(cfg, "")
+
+	msg := openPRsLoadedMsg{prs: nil, err: os.ErrPermission}
+	cmd := m.handleOpenPRsLoaded(msg)
+
+	if m.infoScreen == nil {
+		t.Error("expected info screen to be shown on error")
+	}
+	if cmd != nil {
+		t.Error("expected nil command")
+	}
+}
+
+func TestHandleOpenIssuesLoadedEmpty(t *testing.T) {
+	cfg := &config.AppConfig{WorktreeDir: t.TempDir()}
+	m := NewModel(cfg, "")
+
+	msg := openIssuesLoadedMsg{issues: []*models.IssueInfo{}, err: nil}
+	cmd := m.handleOpenIssuesLoaded(msg)
+
+	if m.infoScreen == nil {
+		t.Error("expected info screen to be shown for empty issues")
+	}
+	if cmd != nil {
+		t.Error("expected nil command")
+	}
+}
+
+func TestHandleOpenIssuesLoadedError(t *testing.T) {
+	cfg := &config.AppConfig{WorktreeDir: t.TempDir()}
+	m := NewModel(cfg, "")
+
+	msg := openIssuesLoadedMsg{issues: nil, err: os.ErrPermission}
+	cmd := m.handleOpenIssuesLoaded(msg)
+
+	if m.infoScreen == nil {
+		t.Error("expected info screen to be shown on error")
+	}
+	if cmd != nil {
+		t.Error("expected nil command")
+	}
+}

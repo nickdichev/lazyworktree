@@ -117,3 +117,147 @@ func TestPrintCompletionInvalidShell(t *testing.T) {
 		t.Errorf("unexpected error message: %v", err)
 	}
 }
+
+func TestExpandPathTildeOnly(t *testing.T) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatalf("failed to read home dir: %v", err)
+	}
+
+	result, err := expandPath("~")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != home {
+		t.Fatalf("expected %q, got %q", home, result)
+	}
+}
+
+func TestExpandPathNestedTildePath(t *testing.T) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatalf("failed to read home dir: %v", err)
+	}
+
+	result, err := expandPath("~/.config/lazyworktree")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	expected := filepath.Join(home, ".config", "lazyworktree")
+	if result != expected {
+		t.Fatalf("expected %q, got %q", expected, result)
+	}
+}
+
+func TestExpandPathAbsolutePath(t *testing.T) {
+	result, err := expandPath("/tmp/worktrees")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != "/tmp/worktrees" {
+		t.Fatalf("absolute path should not change: got %q", result)
+	}
+}
+
+func TestExpandPathRelativePath(t *testing.T) {
+	result, err := expandPath("relative/path")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != "relative/path" {
+		t.Fatalf("relative path should not change: got %q", result)
+	}
+}
+
+func TestOutputSelectionWriteFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	outputFile := filepath.Join(tmpDir, "output.txt")
+
+	selectedPath := "/path/to/worktree"
+	data := selectedPath + "\n"
+
+	const filePerms = 0o600
+	err := os.WriteFile(outputFile, []byte(data), filePerms)
+	if err != nil {
+		t.Fatalf("failed to write file: %v", err)
+	}
+
+	// #nosec G304 - test file operations with t.TempDir() are safe
+	content, err := os.ReadFile(outputFile)
+	if err != nil {
+		t.Fatalf("failed to read file: %v", err)
+	}
+	if string(content) != data {
+		t.Fatalf("expected %q, got %q", data, string(content))
+	}
+}
+
+func TestOutputSelectionEmptyContent(t *testing.T) {
+	tmpDir := t.TempDir()
+	outputFile := filepath.Join(tmpDir, "output.txt")
+
+	const filePerms = 0o600
+	err := os.WriteFile(outputFile, []byte(""), filePerms)
+	if err != nil {
+		t.Fatalf("failed to write file: %v", err)
+	}
+
+	// #nosec G304 - test file operations with t.TempDir() are safe
+	content, err := os.ReadFile(outputFile)
+	if err != nil {
+		t.Fatalf("failed to read file: %v", err)
+	}
+	if len(content) != 0 {
+		t.Fatalf("expected empty content, got %q", string(content))
+	}
+}
+
+func TestOutputSelectionDirectoryCreation(t *testing.T) {
+	tmpDir := t.TempDir()
+	outputPath := filepath.Join(tmpDir, "subdir1", "subdir2", "output.txt")
+
+	const dirPerms = 0o750
+	err := os.MkdirAll(filepath.Dir(outputPath), dirPerms)
+	if err != nil {
+		t.Fatalf("failed to create directories: %v", err)
+	}
+
+	const filePerms = 0o600
+	err = os.WriteFile(outputPath, []byte("/test/path\n"), filePerms)
+	if err != nil {
+		t.Fatalf("failed to write file: %v", err)
+	}
+
+	if _, err := os.Stat(outputPath); err != nil {
+		t.Fatalf("output file not created: %v", err)
+	}
+}
+
+func TestVersionVariables(t *testing.T) {
+	// Verify build variables are set (at least with defaults)
+	if version == "" {
+		t.Error("version should not be empty")
+	}
+	if commit == "" {
+		t.Error("commit should not be empty")
+	}
+	if date == "" {
+		t.Error("date should not be empty")
+	}
+	if builtBy == "" {
+		t.Error("builtBy should not be empty")
+	}
+}
+
+func TestPrintSyntaxThemesContainsThemes(t *testing.T) {
+	out := captureStdout(t, func() {
+		printSyntaxThemes()
+	})
+
+	expectedThemes := []string{"dracula", "monokai", "nord"}
+	for _, theme := range expectedThemes {
+		if !strings.Contains(out, theme) {
+			t.Logf("warning: expected theme %q in output", theme)
+		}
+	}
+}

@@ -2,12 +2,14 @@ package app
 
 import (
 	"bytes"
+	"os"
 	"testing"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/exp/teatest"
 	"github.com/chmouel/lazyworktree/internal/config"
+	"github.com/chmouel/lazyworktree/internal/models"
 )
 
 // TestModelInitialization verifies the model initializes correctly
@@ -565,5 +567,149 @@ func TestCommitScreenRawEscapeKey(t *testing.T) {
 
 	if updatedModel.commitScreen != nil {
 		t.Error("Expected commitScreen to be nil after pressing raw ESC")
+	}
+}
+
+// TestWorktreeLoadingFlow tests the complete flow from cache to loaded state
+func TestWorktreeLoadingFlow(t *testing.T) {
+	cfg := &config.AppConfig{
+		WorktreeDir: t.TempDir(),
+	}
+	m := NewModel(cfg, "")
+
+	// First, load cached worktrees
+	cachedMsg := cachedWorktreesMsg{worktrees: []*models.WorktreeInfo{
+		{Path: "/tmp/wt1", Branch: "main"},
+	}}
+	updated, _ := m.handleCachedWorktrees(cachedMsg)
+	m = updated.(*Model)
+
+	if len(m.worktrees) != 1 {
+		t.Fatalf("expected 1 cached worktree, got %d", len(m.worktrees))
+	}
+	if m.worktreesLoaded {
+		t.Error("expected worktreesLoaded to be false after cached load")
+	}
+
+	// Then load actual worktrees
+	loadedMsg := worktreesLoadedMsg{
+		worktrees: []*models.WorktreeInfo{
+			{Path: "/tmp/wt1", Branch: "main"},
+			{Path: "/tmp/wt2", Branch: "feat"},
+		},
+		err: nil,
+	}
+	updated, _ = m.handleWorktreesLoaded(loadedMsg)
+	m = updated.(*Model)
+
+	if !m.worktreesLoaded {
+		t.Error("expected worktreesLoaded to be true after load")
+	}
+	if len(m.worktrees) != 2 {
+		t.Fatalf("expected 2 worktrees after load, got %d", len(m.worktrees))
+	}
+}
+
+// TestPRFetchingFlow tests PR data loading flow
+func TestPRFetchingFlow(t *testing.T) {
+	cfg := &config.AppConfig{
+		WorktreeDir: t.TempDir(),
+	}
+	m := NewModel(cfg, "")
+	m.worktrees = []*models.WorktreeInfo{
+		{Path: "/tmp/pr-123", Branch: "pr-123", PR: nil},
+		{Path: "/tmp/main", Branch: "main", PR: nil},
+	}
+
+	prMap := map[string]*models.PRInfo{
+		"pr-123": {Number: 123, Title: "Test PR", Branch: "pr-123"},
+	}
+
+	msg := prDataLoadedMsg{prMap: prMap, worktreePRs: nil, err: nil}
+	updated, _ := m.handlePRDataLoaded(msg)
+	m = updated.(*Model)
+
+	if !m.prDataLoaded {
+		t.Error("expected prDataLoaded to be true")
+	}
+	if m.worktrees[0].PR == nil {
+		t.Error("expected PR data to be assigned to worktree")
+	}
+	if m.worktrees[0].PR.Number != 123 {
+		t.Errorf("expected PR number 123, got %d", m.worktrees[0].PR.Number)
+	}
+}
+
+// TestCIStatusCaching tests CI status loading and caching
+func TestCIStatusCaching(t *testing.T) {
+	cfg := &config.AppConfig{
+		WorktreeDir: t.TempDir(),
+	}
+	m := NewModel(cfg, "")
+	m.ciCache = make(map[string]*ciCacheEntry)
+
+	// Load CI status for a branch
+	checks := []*models.CICheck{
+		{Name: "build", Conclusion: "success"},
+		{Name: "test", Conclusion: "success"},
+	}
+	msg := ciStatusLoadedMsg{branch: "main", checks: checks, err: nil}
+	updated, _ := m.handleCIStatusLoaded(msg)
+	m = updated.(*Model)
+
+	// Verify it's cached
+	if cached, ok := m.ciCache["main"]; !ok {
+		t.Fatal("expected CI status to be cached for 'main' branch")
+	} else if len(cached.checks) != 2 {
+		t.Errorf("expected 2 checks, got %d", len(cached.checks))
+	}
+
+	// Load different branch and verify first one is still cached
+	checks2 := []*models.CICheck{
+		{Name: "build", Conclusion: "failure"},
+	}
+	msg2 := ciStatusLoadedMsg{branch: "dev", checks: checks2, err: nil}
+	updated, _ = m.handleCIStatusLoaded(msg2)
+	m = updated.(*Model)
+
+	if _, ok := m.ciCache["main"]; !ok {
+		t.Error("expected 'main' branch to still be cached")
+	}
+	if _, ok := m.ciCache["dev"]; !ok {
+		t.Error("expected 'dev' branch to be cached")
+	}
+}
+
+// TestMultipleErrorHandling tests proper error handling across message types
+func TestMultipleErrorHandling(t *testing.T) {
+	cfg := &config.AppConfig{
+		WorktreeDir: t.TempDir(),
+	}
+	m := NewModel(cfg, "")
+
+	// Test worktrees load error
+	loadMsg := worktreesLoadedMsg{worktrees: nil, err: os.ErrPermission}
+	updated, _ := m.handleWorktreesLoaded(loadMsg)
+	m = updated.(*Model)
+	if m.infoScreen == nil {
+		t.Error("expected error to show info screen")
+	}
+
+	// Test PR data error
+	m.infoScreen = nil
+	prMsg := prDataLoadedMsg{prMap: nil, worktreePRs: nil, err: os.ErrPermission}
+	updated, _ = m.handlePRDataLoaded(prMsg)
+	m = updated.(*Model)
+	if m.prDataLoaded {
+		t.Error("expected prDataLoaded to be false on error")
+	}
+
+	// Test CI status error
+	m.ciCache = make(map[string]*ciCacheEntry)
+	ciMsg := ciStatusLoadedMsg{branch: "main", checks: nil, err: os.ErrPermission}
+	updated, _ = m.handleCIStatusLoaded(ciMsg)
+	m = updated.(*Model)
+	if _, ok := m.ciCache["main"]; ok {
+		t.Error("expected CI cache to not be updated on error")
 	}
 }
