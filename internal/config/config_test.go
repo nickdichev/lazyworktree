@@ -18,8 +18,8 @@ func TestDefaultConfig(t *testing.T) {
 	assert.False(t, cfg.SearchAutoSelect)
 	assert.Equal(t, 10, cfg.MaxUntrackedDiffs)
 	assert.Equal(t, 200000, cfg.MaxDiffChars)
-	assert.Equal(t, []string{"--syntax-theme", "Dracula"}, cfg.DeltaArgs)
-	assert.Equal(t, "delta", cfg.DeltaPath)
+	assert.Equal(t, []string{"--syntax-theme", "Dracula"}, cfg.GitPagerArgs)
+	assert.Equal(t, "delta", cfg.GitPager)
 	assert.Equal(t, "tofu", cfg.TrustMode)
 	assert.Equal(t, "rebase", cfg.MergeMethod)
 	assert.True(t, cfg.ShowIcons)
@@ -423,7 +423,7 @@ func TestParseConfig(t *testing.T) {
 				assert.False(t, cfg.SearchAutoSelect)
 				assert.Equal(t, 10, cfg.MaxUntrackedDiffs)
 				assert.Equal(t, 200000, cfg.MaxDiffChars)
-				assert.Equal(t, []string{"--syntax-theme", "Dracula"}, cfg.DeltaArgs)
+				assert.Equal(t, []string{"--syntax-theme", "Dracula"}, cfg.GitPagerArgs)
 				assert.Equal(t, "tofu", cfg.TrustMode)
 			},
 		},
@@ -527,31 +527,52 @@ func TestParseConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "delta_args string",
+			name: "git_pager_args string",
+			data: map[string]interface{}{
+				"git_pager_args": "--syntax-theme Dracula",
+			},
+			validate: func(t *testing.T, cfg *AppConfig) {
+				assert.True(t, cfg.GitPagerArgsSet)
+				assert.Equal(t, []string{"--syntax-theme", "Dracula"}, cfg.GitPagerArgs)
+			},
+		},
+		{
+			name: "git_pager_args list",
+			data: map[string]interface{}{
+				"git_pager_args": []interface{}{"--syntax-theme", "Dracula"},
+			},
+			validate: func(t *testing.T, cfg *AppConfig) {
+				assert.Equal(t, []string{"--syntax-theme", "Dracula"}, cfg.GitPagerArgs)
+			},
+		},
+		{
+			name: "git_pager_args empty list",
+			data: map[string]interface{}{
+				"git_pager_args": []interface{}{},
+			},
+			validate: func(t *testing.T, cfg *AppConfig) {
+				assert.Empty(t, cfg.GitPagerArgs)
+			},
+		},
+		{
+			name: "delta_args legacy key",
 			data: map[string]interface{}{
 				"delta_args": "--syntax-theme Dracula",
 			},
 			validate: func(t *testing.T, cfg *AppConfig) {
-				assert.True(t, cfg.DeltaArgsSet)
-				assert.Equal(t, []string{"--syntax-theme", "Dracula"}, cfg.DeltaArgs)
+				assert.True(t, cfg.GitPagerArgsSet)
+				assert.Equal(t, []string{"--syntax-theme", "Dracula"}, cfg.GitPagerArgs)
 			},
 		},
 		{
-			name: "delta_args list",
+			name: "non-delta git_pager clears default args",
 			data: map[string]interface{}{
-				"delta_args": []interface{}{"--syntax-theme", "Dracula"},
+				"git_pager": "diff-so-fancy",
 			},
 			validate: func(t *testing.T, cfg *AppConfig) {
-				assert.Equal(t, []string{"--syntax-theme", "Dracula"}, cfg.DeltaArgs)
-			},
-		},
-		{
-			name: "delta_args empty list",
-			data: map[string]interface{}{
-				"delta_args": []interface{}{},
-			},
-			validate: func(t *testing.T, cfg *AppConfig) {
-				assert.Empty(t, cfg.DeltaArgs)
+				assert.Equal(t, "diff-so-fancy", cfg.GitPager)
+				assert.Empty(t, cfg.GitPagerArgs)
+				assert.False(t, cfg.GitPagerArgsSet)
 			},
 		},
 		{
@@ -561,7 +582,7 @@ func TestParseConfig(t *testing.T) {
 			},
 			validate: func(t *testing.T, cfg *AppConfig) {
 				assert.Equal(t, "narna", cfg.Theme)
-				assert.Equal(t, []string{"--syntax-theme", "\"OneHalfDark\""}, cfg.DeltaArgs)
+				assert.Equal(t, []string{"--syntax-theme", "\"OneHalfDark\""}, cfg.GitPagerArgs)
 			},
 		},
 		{
@@ -571,7 +592,7 @@ func TestParseConfig(t *testing.T) {
 			},
 			validate: func(t *testing.T, cfg *AppConfig) {
 				assert.Equal(t, "clean-light", cfg.Theme)
-				assert.Equal(t, []string{"--syntax-theme", "GitHub"}, cfg.DeltaArgs)
+				assert.Equal(t, []string{"--syntax-theme", "GitHub"}, cfg.GitPagerArgs)
 			},
 		},
 		{
@@ -581,7 +602,7 @@ func TestParseConfig(t *testing.T) {
 			},
 			validate: func(t *testing.T, cfg *AppConfig) {
 				assert.Equal(t, "solarized-dark", cfg.Theme)
-				assert.Equal(t, []string{"--syntax-theme", "\"Solarized (dark)\""}, cfg.DeltaArgs)
+				assert.Equal(t, []string{"--syntax-theme", "\"Solarized (dark)\""}, cfg.GitPagerArgs)
 			},
 		},
 		{
@@ -591,7 +612,7 @@ func TestParseConfig(t *testing.T) {
 			},
 			validate: func(t *testing.T, cfg *AppConfig) {
 				assert.Equal(t, "solarized-light", cfg.Theme)
-				assert.Equal(t, []string{"--syntax-theme", "\"Solarized (light)\""}, cfg.DeltaArgs)
+				assert.Equal(t, []string{"--syntax-theme", "\"Solarized (light)\""}, cfg.GitPagerArgs)
 			},
 		},
 		{
@@ -601,7 +622,7 @@ func TestParseConfig(t *testing.T) {
 			},
 			validate: func(t *testing.T, cfg *AppConfig) {
 				assert.Equal(t, "gruvbox-dark", cfg.Theme)
-				assert.Equal(t, []string{"--syntax-theme", "\"Gruvbox Dark\""}, cfg.DeltaArgs)
+				assert.Equal(t, []string{"--syntax-theme", "\"Gruvbox Dark\""}, cfg.GitPagerArgs)
 			},
 		},
 		{
@@ -611,7 +632,7 @@ func TestParseConfig(t *testing.T) {
 			},
 			validate: func(t *testing.T, cfg *AppConfig) {
 				assert.Equal(t, "gruvbox-light", cfg.Theme)
-				assert.Equal(t, []string{"--syntax-theme", "\"Gruvbox Light\""}, cfg.DeltaArgs)
+				assert.Equal(t, []string{"--syntax-theme", "\"Gruvbox Light\""}, cfg.GitPagerArgs)
 			},
 		},
 		{
@@ -621,7 +642,7 @@ func TestParseConfig(t *testing.T) {
 			},
 			validate: func(t *testing.T, cfg *AppConfig) {
 				assert.Equal(t, "nord", cfg.Theme)
-				assert.Equal(t, []string{"--syntax-theme", "\"Nord\""}, cfg.DeltaArgs)
+				assert.Equal(t, []string{"--syntax-theme", "\"Nord\""}, cfg.GitPagerArgs)
 			},
 		},
 		{
@@ -631,7 +652,7 @@ func TestParseConfig(t *testing.T) {
 			},
 			validate: func(t *testing.T, cfg *AppConfig) {
 				assert.Equal(t, "monokai", cfg.Theme)
-				assert.Equal(t, []string{"--syntax-theme", "\"Monokai Extended\""}, cfg.DeltaArgs)
+				assert.Equal(t, []string{"--syntax-theme", "\"Monokai Extended\""}, cfg.GitPagerArgs)
 			},
 		},
 		{
@@ -641,7 +662,7 @@ func TestParseConfig(t *testing.T) {
 			},
 			validate: func(t *testing.T, cfg *AppConfig) {
 				assert.Equal(t, "catppuccin-mocha", cfg.Theme)
-				assert.Equal(t, []string{"--syntax-theme", "\"Catppuccin Mocha\""}, cfg.DeltaArgs)
+				assert.Equal(t, []string{"--syntax-theme", "\"Catppuccin Mocha\""}, cfg.GitPagerArgs)
 			},
 		},
 		{
@@ -651,7 +672,7 @@ func TestParseConfig(t *testing.T) {
 			},
 			validate: func(t *testing.T, cfg *AppConfig) {
 				assert.Equal(t, "catppuccin-latte", cfg.Theme)
-				assert.Equal(t, []string{"--syntax-theme", "\"Catppuccin Latte\""}, cfg.DeltaArgs)
+				assert.Equal(t, []string{"--syntax-theme", "\"Catppuccin Latte\""}, cfg.GitPagerArgs)
 			},
 		},
 		{
@@ -661,7 +682,7 @@ func TestParseConfig(t *testing.T) {
 			},
 			validate: func(t *testing.T, cfg *AppConfig) {
 				assert.Equal(t, "rose-pine-dawn", cfg.Theme)
-				assert.Equal(t, []string{"--syntax-theme", "GitHub"}, cfg.DeltaArgs)
+				assert.Equal(t, []string{"--syntax-theme", "GitHub"}, cfg.GitPagerArgs)
 			},
 		},
 		{
@@ -671,7 +692,7 @@ func TestParseConfig(t *testing.T) {
 			},
 			validate: func(t *testing.T, cfg *AppConfig) {
 				assert.Equal(t, "one-light", cfg.Theme)
-				assert.Equal(t, []string{"--syntax-theme", "\"OneHalfLight\""}, cfg.DeltaArgs)
+				assert.Equal(t, []string{"--syntax-theme", "\"OneHalfLight\""}, cfg.GitPagerArgs)
 			},
 		},
 		{
@@ -681,18 +702,29 @@ func TestParseConfig(t *testing.T) {
 			},
 			validate: func(t *testing.T, cfg *AppConfig) {
 				assert.Equal(t, "everforest-light", cfg.Theme)
-				assert.Equal(t, []string{"--syntax-theme", "\"Gruvbox Light\""}, cfg.DeltaArgs)
+				assert.Equal(t, []string{"--syntax-theme", "\"Gruvbox Light\""}, cfg.GitPagerArgs)
 			},
 		},
 		{
-			name: "custom delta_args not overridden by theme",
+			name: "custom git_pager_args not overridden by theme",
+			data: map[string]interface{}{
+				"theme":          "narna",
+				"git_pager_args": "--syntax-theme Nord",
+			},
+			validate: func(t *testing.T, cfg *AppConfig) {
+				assert.Equal(t, "narna", cfg.Theme)
+				assert.Equal(t, []string{"--syntax-theme", "Nord"}, cfg.GitPagerArgs)
+			},
+		},
+		{
+			name: "custom delta_args legacy key not overridden by theme",
 			data: map[string]interface{}{
 				"theme":      "narna",
 				"delta_args": "--syntax-theme Nord",
 			},
 			validate: func(t *testing.T, cfg *AppConfig) {
 				assert.Equal(t, "narna", cfg.Theme)
-				assert.Equal(t, []string{"--syntax-theme", "Nord"}, cfg.DeltaArgs)
+				assert.Equal(t, []string{"--syntax-theme", "Nord"}, cfg.GitPagerArgs)
 			},
 		},
 		{
@@ -831,37 +863,69 @@ func TestParseConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "delta_path default",
+			name: "git_pager default",
 			data: map[string]interface{}{},
 			validate: func(t *testing.T, cfg *AppConfig) {
-				assert.Equal(t, "delta", cfg.DeltaPath)
+				assert.Equal(t, "delta", cfg.GitPager)
 			},
 		},
 		{
-			name: "delta_path custom",
+			name: "git_pager custom",
+			data: map[string]interface{}{
+				"git_pager": "/usr/local/bin/delta",
+			},
+			validate: func(t *testing.T, cfg *AppConfig) {
+				assert.Equal(t, "/usr/local/bin/delta", cfg.GitPager)
+			},
+		},
+		{
+			name: "git_pager empty disables",
+			data: map[string]interface{}{
+				"git_pager": "",
+			},
+			validate: func(t *testing.T, cfg *AppConfig) {
+				assert.Empty(t, cfg.GitPager)
+			},
+		},
+		{
+			name: "git_pager with whitespace is trimmed",
+			data: map[string]interface{}{
+				"git_pager": "  delta  ",
+			},
+			validate: func(t *testing.T, cfg *AppConfig) {
+				assert.Equal(t, "delta", cfg.GitPager)
+			},
+		},
+		{
+			name: "delta_path legacy key",
 			data: map[string]interface{}{
 				"delta_path": "/usr/local/bin/delta",
 			},
 			validate: func(t *testing.T, cfg *AppConfig) {
-				assert.Equal(t, "/usr/local/bin/delta", cfg.DeltaPath)
+				assert.Equal(t, "/usr/local/bin/delta", cfg.GitPager)
 			},
 		},
 		{
-			name: "delta_path empty disables delta",
+			name: "git_pager non-delta without args clears inherited delta args",
 			data: map[string]interface{}{
-				"delta_path": "",
+				"git_pager": "diff-so-fancy",
 			},
 			validate: func(t *testing.T, cfg *AppConfig) {
-				assert.Empty(t, cfg.DeltaPath)
+				assert.Equal(t, "diff-so-fancy", cfg.GitPager)
+				assert.Nil(t, cfg.GitPagerArgs)
+				assert.False(t, cfg.GitPagerArgsSet)
 			},
 		},
 		{
-			name: "delta_path with whitespace is trimmed",
+			name: "git_pager non-delta with explicit args uses those args",
 			data: map[string]interface{}{
-				"delta_path": "  delta  ",
+				"git_pager":      "diff-so-fancy",
+				"git_pager_args": "--color always",
 			},
 			validate: func(t *testing.T, cfg *AppConfig) {
-				assert.Equal(t, "delta", cfg.DeltaPath)
+				assert.Equal(t, "diff-so-fancy", cfg.GitPager)
+				assert.Equal(t, []string{"--color", "always"}, cfg.GitPagerArgs)
+				assert.True(t, cfg.GitPagerArgsSet)
 			},
 		},
 		{
@@ -1019,7 +1083,7 @@ func TestLoadConfig(t *testing.T) {
 		assert.NotNil(t, cfg)
 		assert.Equal(t, DefaultConfig().SortMode, cfg.SortMode)
 		assert.Equal(t, DefaultConfig().MaxUntrackedDiffs, cfg.MaxUntrackedDiffs)
-		assert.Equal(t, DefaultConfig().DeltaArgs, cfg.DeltaArgs)
+		assert.Equal(t, DefaultConfig().GitPagerArgs, cfg.GitPagerArgs)
 	})
 
 	t.Run("valid config file", func(t *testing.T) {
@@ -1033,7 +1097,8 @@ sort_by_active: false
 auto_fetch_prs: true
 max_untracked_diffs: 20
 max_diff_chars: 100000
-delta_args:
+git_pager: delta
+git_pager_args:
   - --syntax-theme
   - Dracula
 trust_mode: always
@@ -1054,10 +1119,28 @@ terminate_commands:
 		assert.True(t, cfg.AutoFetchPRs)
 		assert.Equal(t, 20, cfg.MaxUntrackedDiffs)
 		assert.Equal(t, 100000, cfg.MaxDiffChars)
-		assert.Equal(t, []string{"--syntax-theme", "Dracula"}, cfg.DeltaArgs)
+		assert.Equal(t, []string{"--syntax-theme", "Dracula"}, cfg.GitPagerArgs)
 		assert.Equal(t, "always", cfg.TrustMode)
 		assert.Equal(t, []string{"echo \"init\""}, cfg.InitCommands)
 		assert.Equal(t, []string{"echo \"cleanup\""}, cfg.TerminateCommands)
+	})
+
+	t.Run("non-delta git_pager uses no args", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		t.Setenv("XDG_CONFIG_HOME", tmpDir)
+		configDir := filepath.Join(tmpDir, "lazyworktree")
+		configPath := filepath.Join(configDir, "config.yaml")
+
+		yamlContent := `git_pager: diff-so-fancy`
+		require.NoError(t, os.MkdirAll(filepath.Dir(configPath), 0o750))
+		err := os.WriteFile(configPath, []byte(yamlContent), 0o600)
+		require.NoError(t, err)
+
+		cfg, err := LoadConfig(configPath)
+		require.NoError(t, err)
+		assert.NotNil(t, cfg)
+		assert.Equal(t, "diff-so-fancy", cfg.GitPager)
+		assert.Empty(t, cfg.GitPagerArgs)
 	})
 
 	t.Run("invalid YAML returns defaults", func(t *testing.T) {

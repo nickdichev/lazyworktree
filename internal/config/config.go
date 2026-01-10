@@ -61,9 +61,9 @@ type AppConfig struct {
 	SearchAutoSelect        bool // Start with filter focused and select first match on Enter.
 	MaxUntrackedDiffs       int
 	MaxDiffChars            int
-	DeltaArgs               []string
-	DeltaArgsSet            bool `yaml:"-"`
-	DeltaPath               string
+	GitPagerArgs            []string
+	GitPagerArgsSet         bool `yaml:"-"`
+	GitPager                string
 	TrustMode               string
 	DebugLog                string
 	Pager                   string
@@ -95,8 +95,8 @@ func DefaultConfig() *AppConfig {
 		SearchAutoSelect:        false,
 		MaxUntrackedDiffs:       10,
 		MaxDiffChars:            200000,
-		DeltaArgs:               DefaultDeltaArgsForTheme(theme.DraculaName),
-		DeltaPath:               "delta",
+		GitPagerArgs:            DefaultDeltaArgsForTheme(theme.DraculaName),
+		GitPager:                "delta",
 		TrustMode:               "tofu",
 		Theme:                   "",
 		MergeMethod:             "rebase",
@@ -186,12 +186,20 @@ func parseConfig(data map[string]any) *AppConfig {
 	cfg.ShowIcons = coerceBool(data["show_icons"], cfg.ShowIcons)
 	cfg.MaxUntrackedDiffs = coerceInt(data["max_untracked_diffs"], 10)
 	cfg.MaxDiffChars = coerceInt(data["max_diff_chars"], 200000)
-	if _, ok := data["delta_args"]; ok {
-		cfg.DeltaArgs = normalizeArgsList(data["delta_args"])
-		cfg.DeltaArgsSet = true
+	// Diff formatter/pager configuration (new keys: git_pager, git_pager_args)
+	if _, ok := data["git_pager_args"]; ok {
+		cfg.GitPagerArgs = normalizeArgsList(data["git_pager_args"])
+		cfg.GitPagerArgsSet = true
+	} else if _, ok := data["delta_args"]; ok {
+		// Backwards compatibility
+		cfg.GitPagerArgs = normalizeArgsList(data["delta_args"])
+		cfg.GitPagerArgsSet = true
 	}
-	if deltaPath, ok := data["delta_path"].(string); ok {
-		cfg.DeltaPath = strings.TrimSpace(deltaPath)
+	if gitPager, ok := data["git_pager"].(string); ok {
+		cfg.GitPager = strings.TrimSpace(gitPager)
+	} else if deltaPath, ok := data["delta_path"].(string); ok {
+		// Backwards compatibility
+		cfg.GitPager = strings.TrimSpace(deltaPath)
 	}
 
 	if trustMode, ok := data["trust_mode"].(string); ok {
@@ -207,8 +215,13 @@ func parseConfig(data map[string]any) *AppConfig {
 		}
 	}
 
-	if !cfg.DeltaArgsSet {
-		cfg.DeltaArgs = DefaultDeltaArgsForTheme(cfg.Theme)
+	if !cfg.GitPagerArgsSet {
+		if filepath.Base(cfg.GitPager) == "delta" {
+			cfg.GitPagerArgs = DefaultDeltaArgsForTheme(cfg.Theme)
+		} else {
+			// Clear delta args inherited from DefaultConfig when using non-delta pager
+			cfg.GitPagerArgs = nil
+		}
 	}
 
 	if branchNameScript, ok := data["branch_name_script"].(string); ok {
@@ -465,8 +478,12 @@ func LoadConfig(configPath string) (*AppConfig, error) {
 			cfg.Theme = theme.DefaultDark()
 		}
 
-		if !cfg.DeltaArgsSet {
-			cfg.DeltaArgs = DefaultDeltaArgsForTheme(cfg.Theme)
+		if !cfg.GitPagerArgsSet {
+			if filepath.Base(cfg.GitPager) == "delta" {
+				cfg.GitPagerArgs = DefaultDeltaArgsForTheme(cfg.Theme)
+			} else {
+				cfg.GitPagerArgs = nil
+			}
 		}
 	}
 

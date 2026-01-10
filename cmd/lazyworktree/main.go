@@ -90,8 +90,8 @@ func main() {
 			os.Exit(1)
 		}
 		cfg.Theme = normalized
-		if !cfg.DeltaArgsSet {
-			cfg.DeltaArgs = config.DefaultDeltaArgsForTheme(normalized)
+		if !cfg.GitPagerArgsSet && filepath.Base(cfg.GitPager) == "delta" {
+			cfg.GitPagerArgs = config.DefaultDeltaArgsForTheme(normalized)
 		}
 	}
 	if searchAutoSelect {

@@ -50,37 +50,37 @@ func TestNewService(t *testing.T) {
 	assert.Equal(t, expectedSlots, count)
 }
 
-func TestUseDelta(t *testing.T) {
+func TestUseGitPager(t *testing.T) {
 	notify := func(_ string, _ string) {}
 	notifyOnce := func(_ string, _ string, _ string) {}
 
 	service := NewService(notify, notifyOnce)
 
-	// UseDelta should return a boolean
-	useDelta := service.UseDelta()
-	assert.IsType(t, true, useDelta)
+	// UseGitPager should return a boolean
+	useGitPager := service.UseGitPager()
+	assert.IsType(t, true, useGitPager)
 }
 
-func TestSetDeltaPath(t *testing.T) {
+func TestSetGitPager(t *testing.T) {
 	notify := func(_ string, _ string) {}
 	notifyOnce := func(_ string, _ string, _ string) {}
 
 	service := NewService(notify, notifyOnce)
 
-	t.Run("empty path disables delta", func(t *testing.T) {
-		service.SetDeltaPath("")
-		assert.False(t, service.UseDelta())
-		assert.Empty(t, service.deltaPath)
+	t.Run("empty value disables git_pager", func(t *testing.T) {
+		service.SetGitPager("")
+		assert.False(t, service.UseGitPager())
+		assert.Empty(t, service.gitPager)
 	})
 
-	t.Run("custom delta path", func(t *testing.T) {
-		service.SetDeltaPath("/custom/path/to/delta")
-		assert.Equal(t, "/custom/path/to/delta", service.deltaPath)
+	t.Run("custom git_pager", func(t *testing.T) {
+		service.SetGitPager("/custom/path/to/delta")
+		assert.Equal(t, "/custom/path/to/delta", service.gitPager)
 	})
 
 	t.Run("whitespace trimmed from path", func(t *testing.T) {
-		service.SetDeltaPath("  delta  ")
-		assert.Equal(t, "delta", service.deltaPath)
+		service.SetGitPager("  delta  ")
+		assert.Equal(t, "delta", service.gitPager)
 	})
 }
 
@@ -95,50 +95,50 @@ func TestSetDebugLogger(t *testing.T) {
 	assert.Equal(t, logger, service.debugLogger)
 }
 
-func TestSetDeltaArgs(t *testing.T) {
+func TestSetGitPagerArgs(t *testing.T) {
 	notify := func(_ string, _ string) {}
 	notifyOnce := func(_ string, _ string, _ string) {}
 
 	service := NewService(notify, notifyOnce)
 
-	service.SetDeltaArgs([]string{"--color-only"})
-	assert.Equal(t, []string{"--color-only"}, service.deltaArgs)
+	service.SetGitPagerArgs([]string{"--color-only"})
+	assert.Equal(t, []string{"--color-only"}, service.gitPagerArgs)
 
 	args := []string{"--side-by-side"}
-	service.SetDeltaArgs(args)
+	service.SetGitPagerArgs(args)
 	args[0] = "--changed"
-	assert.Equal(t, []string{"--side-by-side"}, service.deltaArgs)
+	assert.Equal(t, []string{"--side-by-side"}, service.gitPagerArgs)
 
-	service.SetDeltaArgs(nil)
-	assert.Nil(t, service.deltaArgs)
+	service.SetGitPagerArgs(nil)
+	assert.Nil(t, service.gitPagerArgs)
 }
 
-func TestApplyDelta(t *testing.T) {
+func TestApplyGitPager(t *testing.T) {
 	notify := func(_ string, _ string) {}
 	notifyOnce := func(_ string, _ string, _ string) {}
 
 	service := NewService(notify, notifyOnce)
 
 	t.Run("empty diff returns empty", func(t *testing.T) {
-		result := service.ApplyDelta(context.Background(), "")
+		result := service.ApplyGitPager(context.Background(), "")
 		assert.Empty(t, result)
 	})
 
 	t.Run("diff without delta available", func(t *testing.T) {
 		// Temporarily disable delta
-		origUseDelta := service.useDelta
-		service.useDelta = false
-		defer func() { service.useDelta = origUseDelta }()
+		origUseDelta := service.useGitPager
+		service.useGitPager = false
+		defer func() { service.useGitPager = origUseDelta }()
 
 		diff := "diff --git a/file.txt b/file.txt\n"
-		result := service.ApplyDelta(context.Background(), diff)
+		result := service.ApplyGitPager(context.Background(), diff)
 		assert.Equal(t, diff, result)
 	})
 
 	t.Run("diff with delta available", func(t *testing.T) {
 		diff := "diff --git a/file.txt b/file.txt\n+added line\n"
 
-		result := service.ApplyDelta(context.Background(), diff)
+		result := service.ApplyGitPager(context.Background(), diff)
 		// Result should either be the diff (if delta not available) or transformed by delta
 		assert.NotEmpty(t, result)
 		assert.Contains(t, result, "file.txt")

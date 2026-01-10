@@ -46,16 +46,16 @@ type NotifyOnceFn func(key string, message string, severity string)
 
 // Service orchestrates git and helper commands for the UI.
 type Service struct {
-	notify      NotifyFn
-	notifyOnce  NotifyOnceFn
-	semaphore   chan struct{}
-	mainBranch  string
-	gitHost     string
-	notifiedSet map[string]bool
-	useDelta    bool
-	deltaArgs   []string
-	deltaPath   string
-	debugLogger *log.Logger
+	notify       NotifyFn
+	notifyOnce   NotifyOnceFn
+	semaphore    chan struct{}
+	mainBranch   string
+	gitHost      string
+	notifiedSet  map[string]bool
+	useGitPager  bool
+	gitPagerArgs []string
+	gitPager     string
+	debugLogger  *log.Logger
 }
 
 // NewService constructs a Service and sets up concurrency limits.
@@ -83,8 +83,8 @@ func NewService(notify NotifyFn, notifyOnce NotifyOnceFn) *Service {
 		notifiedSet: make(map[string]bool),
 	}
 
-	// Detect delta availability
-	s.detectDelta()
+	// Detect diff pager availability
+	s.detectGitPager()
 
 	return s
 }
@@ -94,28 +94,27 @@ func (s *Service) SetDebugLogger(logger *log.Logger) {
 	s.debugLogger = logger
 }
 
-// SetDeltaArgs sets additional delta arguments used when formatting diffs.
-func (s *Service) SetDeltaArgs(args []string) {
+// SetGitPagerArgs sets additional arguments used when formatting diffs.
+func (s *Service) SetGitPagerArgs(args []string) {
 	if len(args) == 0 {
-		s.deltaArgs = nil
+		s.gitPagerArgs = nil
 		return
 	}
-	s.deltaArgs = append([]string{}, args...)
+	s.gitPagerArgs = append([]string{}, args...)
 }
 
-// SetDeltaPath sets the path to delta executable and enables/disables based on empty string.
-func (s *Service) SetDeltaPath(path string) {
-	s.deltaPath = strings.TrimSpace(path)
-	s.detectDelta()
+// SetGitPager sets the diff formatter/pager command and enables/disables based on empty string.
+func (s *Service) SetGitPager(pager string) {
+	s.gitPager = strings.TrimSpace(pager)
+	s.detectGitPager()
 }
 
-func (s *Service) isDeltaAvailable() bool {
-	if s.deltaPath == "" {
+func (s *Service) isGitPagerAvailable() bool {
+	if s.gitPager == "" {
 		return false
 	}
-	// #nosec G204 -- delta_path comes from local config and is controlled by the user
-	cmd := exec.Command(s.deltaPath, "--version")
-	return cmd.Run() == nil
+	_, err := exec.LookPath(s.gitPager)
+	return err == nil
 }
 
 func (s *Service) debugf(format string, args ...any) {
@@ -145,28 +144,25 @@ func prepareAllowedCommand(ctx context.Context, args []string) (*exec.Cmd, error
 	}
 }
 
-func (s *Service) detectDelta() {
-	if s.deltaPath == "" {
-		return
-	}
-	if s.isDeltaAvailable() {
-		s.useDelta = true
-	}
+func (s *Service) detectGitPager() {
+	s.useGitPager = s.isGitPagerAvailable()
 }
 
-// ApplyDelta pipes diff output through delta if available
-// ApplyDelta pipes diff output through delta when available.
-func (s *Service) ApplyDelta(ctx context.Context, diff string) string {
-	if !s.useDelta || diff == "" {
+// ApplyGitPager pipes diff output through the configured git pager when available.
+func (s *Service) ApplyGitPager(ctx context.Context, diff string) string {
+	if !s.useGitPager || diff == "" {
 		return diff
 	}
 
-	args := []string{"--no-gitconfig", "--paging=never"}
-	if len(s.deltaArgs) > 0 {
-		args = append(args, s.deltaArgs...)
+	args := []string{}
+	if s.gitPager == "delta" {
+		args = append(args, "--no-gitconfig", "--paging=never")
 	}
-	// #nosec G204 -- delta_path comes from local config and is controlled by the user
-	cmd := exec.CommandContext(ctx, s.deltaPath, args...)
+	if len(s.gitPagerArgs) > 0 {
+		args = append(args, s.gitPagerArgs...)
+	}
+	// #nosec G204 -- git_pager comes from local config and is controlled by the user
+	cmd := exec.CommandContext(ctx, s.gitPager, args...)
 	cmd.Stdin = strings.NewReader(diff)
 	output, err := cmd.Output()
 	if err != nil {
@@ -176,9 +172,9 @@ func (s *Service) ApplyDelta(ctx context.Context, diff string) string {
 	return string(output)
 }
 
-// UseDelta reports whether delta integration is enabled.
-func (s *Service) UseDelta() bool {
-	return s.useDelta
+// UseGitPager reports whether diff pager integration is enabled.
+func (s *Service) UseGitPager() bool {
+	return s.useGitPager
 }
 
 // ExecuteCommands runs provided shell commands sequentially inside the given working directory.

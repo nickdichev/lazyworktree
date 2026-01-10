@@ -490,10 +490,10 @@ theme: ""       # Leave empty to auto-detect based on terminal background color
                 # Options: "dracula", "dracula-light", "narna", "clean-light",
                 #          "solarized-dark", "solarized-light", "gruvbox-dark",
                 #          "gruvbox-light", "nord", "monokai", "catppuccin-mocha"
-delta_path: delta
+git_pager: delta
 pager: "less --use-color --wordwrap -qcR -P 'Press q to exit..'"
 editor: nvim
-delta_args:
+git_pager_args:
   - --syntax-theme
   - Dracula
 trust_mode: "tofu" # Options: "tofu" (default), "never", "always"
@@ -539,8 +539,8 @@ Notes:
 - Use `max_untracked_diffs: 0` to conceal untracked diffs; `max_diff_chars: 0` disables truncation.
 - Execute `lazyworktree --show-syntax-themes` to display the default delta `--syntax-theme` values for each UI theme.
 - Use `lazyworktree --theme <name>` to select a UI theme directly; the supported names correspond to those listed above.
-- `delta_args` configures arguments passed to `delta` (defaults follow the UI theme: Dracula → `Dracula`, Dracula-Light → `Monokai Extended Light`, Narna → `OneHalfDark`, Clean-Light → `GitHub`, Catppuccin Latte → `Catppuccin Latte`, Rosé Pine Dawn → `GitHub`, One Light → `OneHalfLight`, Everforest Light → `Gruvbox Light`, Solarized Dark → `Solarized (dark)`, Solarized Light → `Solarized (light)`, Gruvbox Dark → `Gruvbox Dark`, Gruvbox Light → `Gruvbox Light`, Nord → `Nord`, Monokai → `Monokai Extended`, Catppuccin Mocha → `Catppuccin Mocha`, Modern → `Dracula`, Tokyo Night → `Dracula`, Rose Pine → `Dracula`, Ayu Mirage → `Dracula`, Everforest Dark → `Dracula`).
-- `delta_path` specifies the path to the delta executable (default: `delta`). Set to an empty string to disable delta and use plain git diff output.
+- `git_pager` specifies the diff formatter/pager command (default: `delta`). Set to an empty string to disable diff formatting and use plain git diff output. You may also use alternatives such as `diff-so-fancy`.
+- `git_pager_args` configures arguments passed to `git_pager`. If omitted and `git_pager` is `delta`, lazyworktree selects a `--syntax-theme` matching your UI theme (Dracula → `Dracula`, Dracula-Light → `Monokai Extended Light`, Narna → `OneHalfDark`, Clean-Light → `GitHub`, Catppuccin Latte → `Catppuccin Latte`, Rosé Pine Dawn → `GitHub`, One Light → `OneHalfLight`, Everforest Light → `Gruvbox Light`, Solarized Dark → `Solarized (dark)`, Solarized Light → `Solarized (light)`, Gruvbox Dark → `Gruvbox Dark`, Gruvbox Light → `Gruvbox Light`, Nord → `Nord`, Monokai → `Monokai Extended`, Catppuccin Mocha → `Catppuccin Mocha`).
 - `pager` designates the pager for `show_output` commands and the diff viewer (default: `$PAGER`, fallback `less --use-color --wordwrap -qcR -P 'Press q to exit..'`, then `more`, then `cat`). When the pager is `less`, lazyworktree configures `LESS=` and `LESSHISTFILE=-` to disregard user defaults.
 - `editor` sets the editor command for the Status pane `e` key (default: config value, then `$EDITOR`, then `nvim`, then `vi`).
 - `merge_method` controls how the "Absorb worktree" action integrates changes into main: `rebase` (default) rebases the feature branch onto main then fast-forwards; `merge` creates a merge commit.

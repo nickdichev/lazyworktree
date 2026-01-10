@@ -39,18 +39,23 @@ max_untracked_diffs: 10
 # Maximum characters to read from diff output (0 disables truncation)
 max_diff_chars: 200000
 
-# Path to delta executable for enhanced diffs
-# Set to empty string ("") to disable delta and use plain git diff output
-# Example: delta_path: ""  # disables delta
-# Example: delta_path: /usr/local/bin/delta  # custom path
-delta_path: delta
+# Diff formatter/pager used for rendering diffs (default: delta)
+# Set to empty string ("") to disable diff formatting and use plain git diff output.
+# Examples:
+#   git_pager: delta
+#   git_pager: diff-so-fancy
+#   git_pager: ""         # disables formatting
+#
+# If git_pager is delta and git_pager_args is omitted, lazyworktree automatically
+# selects a --syntax-theme matching your UI theme.
+git_pager: delta
 
-# Extra arguments passed to delta for diff rendering
-# If you omit this setting, lazyworktree will automatically choose a syntax theme
-# that matches your UI theme (e.g., Dracula for dark themes)
-# delta_args:
-#   - --syntax-theme
-#   - Dracula
+# Extra arguments passed to git_pager.
+# If you omit this setting and git_pager is delta, lazyworktree selects a syntax
+# theme matching your UI theme (e.g., Dracula for dark themes).
+git_pager_args:
+  - --syntax-theme
+  - Dracula
 
 # Pager used for show_output custom commands
 # Default: $PAGER environment variable or less if unset

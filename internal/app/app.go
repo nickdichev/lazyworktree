@@ -426,8 +426,8 @@ func NewModel(cfg *config.AppConfig, initialFilter string) *Model {
 
 	gitService := git.NewService(notify, notifyOnce)
 	gitService.SetDebugLogger(debugLogger)
-	gitService.SetDeltaPath(cfg.DeltaPath)
-	gitService.SetDeltaArgs(cfg.DeltaArgs)
+	gitService.SetGitPager(cfg.GitPager)
+	gitService.SetGitPagerArgs(cfg.GitPagerArgs)
 	trustManager := security.NewTrustManager()
 
 	columns := []table.Column{
@@ -1676,11 +1676,11 @@ if [ -n "$untracked" ]; then
 fi
 `, maxUntracked, maxUntracked)
 
-	// Pipe through delta if configured, then through pager
+	// Pipe through git_pager if configured, then through pager
 	var cmdStr string
-	if m.git.UseDelta() {
-		deltaArgs := strings.Join(m.config.DeltaArgs, " ")
-		cmdStr = fmt.Sprintf("set -o pipefail; (%s) | %s %s | %s", script, m.config.DeltaPath, deltaArgs, pagerCmd)
+	if m.git.UseGitPager() {
+		gitPagerArgs := strings.Join(m.config.GitPagerArgs, " ")
+		cmdStr = fmt.Sprintf("set -o pipefail; (%s) | %s %s | %s", script, m.config.GitPager, gitPagerArgs, pagerCmd)
 	} else {
 		cmdStr = fmt.Sprintf("set -o pipefail; (%s) | %s", script, pagerCmd)
 	}
@@ -1755,11 +1755,11 @@ fi
 `, escapedFilename, escapedFilename, escapedFilename, escapedFilename)
 	}
 
-	// Pipe through delta if configured, then through pager
+	// Pipe through git_pager if configured, then through pager
 	var cmdStr string
-	if m.git.UseDelta() {
-		deltaArgs := strings.Join(m.config.DeltaArgs, " ")
-		cmdStr = fmt.Sprintf("set -o pipefail; (%s) | %s %s | %s", script, m.config.DeltaPath, deltaArgs, pagerCmd)
+	if m.git.UseGitPager() {
+		gitPagerArgs := strings.Join(m.config.GitPagerArgs, " ")
+		cmdStr = fmt.Sprintf("set -o pipefail; (%s) | %s %s | %s", script, m.config.GitPager, gitPagerArgs, pagerCmd)
 	} else {
 		cmdStr = fmt.Sprintf("set -o pipefail; (%s) | %s", script, pagerCmd)
 	}
@@ -2889,13 +2889,13 @@ func (m *Model) showCommitDiff(commitSHA string, wt *models.WorktreeInfo) tea.Cm
 	// --color=always: ensure color codes are passed to delta/pager
 	gitCmd := fmt.Sprintf("git show --color=always %s", commitSHA)
 
-	// Pipe through delta if configured, then through pager
+	// Pipe through git_pager if configured, then through pager
 	// Note: delta only processes the diff part, so our colorized commit message will pass through
 	// Don't use pipefail here as awk might not always match (e.g., if commit format is different)
 	var cmdStr string
-	if m.git.UseDelta() {
-		deltaArgs := strings.Join(m.config.DeltaArgs, " ")
-		cmdStr = fmt.Sprintf("%s | %s %s | %s", gitCmd, m.config.DeltaPath, deltaArgs, pagerCmd)
+	if m.git.UseGitPager() {
+		gitPagerArgs := strings.Join(m.config.GitPagerArgs, " ")
+		cmdStr = fmt.Sprintf("%s | %s %s | %s", gitCmd, m.config.GitPager, gitPagerArgs, pagerCmd)
 	} else {
 		cmdStr = fmt.Sprintf("%s | %s", gitCmd, pagerCmd)
 	}
@@ -2929,11 +2929,11 @@ func (m *Model) showCommitFileDiff(commitSHA, filename, worktreePath string) tea
 	// Build git show command for specific file with colorization
 	gitCmd := fmt.Sprintf("git show --color=always %s -- %q", commitSHA, filename)
 
-	// Pipe through delta if configured, then through pager
+	// Pipe through git_pager if configured, then through pager
 	var cmdStr string
-	if m.git.UseDelta() {
-		deltaArgs := strings.Join(m.config.DeltaArgs, " ")
-		cmdStr = fmt.Sprintf("%s | %s %s | %s", gitCmd, m.config.DeltaPath, deltaArgs, pagerCmd)
+	if m.git.UseGitPager() {
+		gitPagerArgs := strings.Join(m.config.GitPagerArgs, " ")
+		cmdStr = fmt.Sprintf("%s | %s %s | %s", gitCmd, m.config.GitPager, gitPagerArgs, pagerCmd)
 	} else {
 		cmdStr = fmt.Sprintf("%s | %s", gitCmd, pagerCmd)
 	}
@@ -3405,7 +3405,7 @@ func (m *Model) renderScreen() string {
 	switch m.currentScreen {
 	case screenCommit:
 		if m.commitScreen == nil {
-			m.commitScreen = NewCommitScreen(commitMeta{}, "", "", m.git.UseDelta(), m.theme)
+			m.commitScreen = NewCommitScreen(commitMeta{}, "", "", m.git.UseGitPager(), m.theme)
 		}
 		return m.commitScreen.View()
 	case screenConfirm:
