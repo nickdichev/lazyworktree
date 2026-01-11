@@ -38,6 +38,12 @@ const (
 	RosePineDawnName    = "rose-pine-dawn"
 	OneLightName        = "one-light"
 	EverforestLightName = "everforest-light"
+	EverforestDarkName  = "everforest-dark"
+	ModernName          = "modern"
+	TokyoNightName      = "tokyo-night"
+	OneDarkName         = "one-dark"
+	RosePineName        = "rose-pine"
+	AyuMirageName       = "ayu-mirage"
 )
 
 // Dracula returns the Dracula theme (dark background, vibrant colors).
@@ -47,8 +53,8 @@ func Dracula() *Theme {
 		Accent:     lipgloss.Color("#BD93F9"), // Purple (primary accent)
 		AccentFg:   lipgloss.Color("#282A36"), // Dark text on accent
 		AccentDim:  lipgloss.Color("#44475A"), // Current Line / Selection
-		Border:     lipgloss.Color("#6272A4"), // Comment (subtle borders)
-		BorderDim:  lipgloss.Color("#44475A"), // Darker borders
+		Border:     lipgloss.Color("#44475A"), // Use selection color for subtle borders
+		BorderDim:  lipgloss.Color("#343746"), // Slightly darker for inactive
 		MutedFg:    lipgloss.Color("#6272A4"), // Comment (muted text)
 		TextFg:     lipgloss.Color("#F8F8F2"), // Foreground (primary text)
 		SuccessFg:  lipgloss.Color("#50FA7B"), // Green (success)
@@ -197,6 +203,126 @@ func EverforestLight() *Theme {
 		Cyan:       lipgloss.Color("#3A94C5"), // Blue
 		Pink:       lipgloss.Color("#D3869B"), // Purple
 		Yellow:     lipgloss.Color("#DFA000"), // Yellow
+	}
+}
+
+// EverforestDark returns the Everforest Dark theme (Medium).
+func EverforestDark() *Theme {
+	return &Theme{
+		Background: lipgloss.Color("#2D353B"),
+		Accent:     lipgloss.Color("#A7C080"), // Green
+		AccentFg:   lipgloss.Color("#2D353B"), // Dark text on accent
+		AccentDim:  lipgloss.Color("#3D484D"), // Selection
+		Border:     lipgloss.Color("#3D484D"), // Border
+		BorderDim:  lipgloss.Color("#343F44"), // Darker
+		MutedFg:    lipgloss.Color("#859289"), // Grey
+		TextFg:     lipgloss.Color("#D3C6AA"), // Foreground
+		SuccessFg:  lipgloss.Color("#A7C080"), // Green
+		WarnFg:     lipgloss.Color("#DBBC7F"), // Yellow
+		ErrorFg:    lipgloss.Color("#E67E80"), // Red
+		Cyan:       lipgloss.Color("#7FBBB3"), // Blue
+		Pink:       lipgloss.Color("#D699B6"), // Purple
+		Yellow:     lipgloss.Color("#DBBC7F"), // Yellow
+	}
+}
+
+// TokyoNight returns the Tokyo Night theme (Storm).
+func TokyoNight() *Theme {
+	return &Theme{
+		Background: lipgloss.Color("#24283B"), // Storm background
+		Accent:     lipgloss.Color("#7AA2F7"), // Blue
+		AccentFg:   lipgloss.Color("#1A1B26"), // Dark text on accent
+		AccentDim:  lipgloss.Color("#2F3549"), // Selection
+		Border:     lipgloss.Color("#363D59"), // Border
+		BorderDim:  lipgloss.Color("#2F3549"), // Selection
+		MutedFg:    lipgloss.Color("#565F89"), // Comments
+		TextFg:     lipgloss.Color("#C0CAF5"), // Foreground
+		SuccessFg:  lipgloss.Color("#9ECE6A"), // Green
+		WarnFg:     lipgloss.Color("#E0AF68"), // Orange
+		ErrorFg:    lipgloss.Color("#F7768E"), // Red
+		Cyan:       lipgloss.Color("#7DCFFF"), // Cyan
+		Pink:       lipgloss.Color("#BB9AF7"), // Purple
+		Yellow:     lipgloss.Color("#E0AF68"), // Yellow
+	}
+}
+
+// OneDark returns the One Dark theme.
+func OneDark() *Theme {
+	return &Theme{
+		Background: lipgloss.Color("#282C34"),
+		Accent:     lipgloss.Color("#61AFEF"), // Blue
+		AccentFg:   lipgloss.Color("#282C34"), // Dark text on accent
+		AccentDim:  lipgloss.Color("#3E4452"), // Selection
+		Border:     lipgloss.Color("#3E4452"), // Border
+		BorderDim:  lipgloss.Color("#353B45"), // Darker
+		MutedFg:    lipgloss.Color("#5C6370"), // Comments
+		TextFg:     lipgloss.Color("#ABB2BF"), // Foreground
+		SuccessFg:  lipgloss.Color("#98C379"), // Green
+		WarnFg:     lipgloss.Color("#D19A66"), // Orange
+		ErrorFg:    lipgloss.Color("#E06C75"), // Red
+		Cyan:       lipgloss.Color("#56B6C2"), // Cyan
+		Pink:       lipgloss.Color("#C678DD"), // Purple
+		Yellow:     lipgloss.Color("#E5C07B"), // Yellow
+	}
+}
+
+// RosePine returns the Rosé Pine theme (Dark).
+func RosePine() *Theme {
+	return &Theme{
+		Background: lipgloss.Color("#191724"),
+		Accent:     lipgloss.Color("#C4A7E7"), // Iris
+		AccentFg:   lipgloss.Color("#191724"), // Dark text on accent
+		AccentDim:  lipgloss.Color("#26233A"), // Selection
+		Border:     lipgloss.Color("#403D52"), // Border
+		BorderDim:  lipgloss.Color("#26233A"), // Selection
+		MutedFg:    lipgloss.Color("#6E6A86"), // Muted
+		TextFg:     lipgloss.Color("#E0DEF4"), // Foreground
+		SuccessFg:  lipgloss.Color("#9CCFD8"), // Foam
+		WarnFg:     lipgloss.Color("#F6C177"), // Gold
+		ErrorFg:    lipgloss.Color("#EB6F92"), // Love
+		Cyan:       lipgloss.Color("#31748F"), // Pine
+		Pink:       lipgloss.Color("#EB6F92"), // Love
+		Yellow:     lipgloss.Color("#F6C177"), // Gold
+	}
+}
+
+// AyuMirage returns the Ayu Mirage theme.
+func AyuMirage() *Theme {
+	return &Theme{
+		Background: lipgloss.Color("#212733"),
+		Accent:     lipgloss.Color("#FFCC66"), // Orange
+		AccentFg:   lipgloss.Color("#212733"), // Dark text on accent
+		AccentDim:  lipgloss.Color("#2D333F"), // Selection (slightly lighter than bg)
+		Border:     lipgloss.Color("#3E4B59"), // Border
+		BorderDim:  lipgloss.Color("#2D333F"), // Selection
+		MutedFg:    lipgloss.Color("#5C6773"), // Comments
+		TextFg:     lipgloss.Color("#D9D7CE"), // Foreground
+		SuccessFg:  lipgloss.Color("#BAE67E"), // Green
+		WarnFg:     lipgloss.Color("#FFAE57"), // Orange
+		ErrorFg:    lipgloss.Color("#FF3333"), // Red
+		Cyan:       lipgloss.Color("#5CCFE6"), // Cyan
+		Pink:       lipgloss.Color("#D4BFFF"), // Purple
+		Yellow:     lipgloss.Color("#FFCC66"), // Yellow
+	}
+}
+
+// Modern returns a sleek, modern dark theme with vibrant accents.
+func Modern() *Theme {
+	return &Theme{
+		Background: lipgloss.Color("#18181B"), // Zinc 900
+		Accent:     lipgloss.Color("#8B5CF6"), // Violet 500
+		AccentFg:   lipgloss.Color("#FFFFFF"),
+		AccentDim:  lipgloss.Color("#27272A"), // Zinc 800
+		Border:     lipgloss.Color("#3F3F46"), // Zinc 700
+		BorderDim:  lipgloss.Color("#27272A"), // Zinc 800
+		MutedFg:    lipgloss.Color("#71717A"), // Zinc 500
+		TextFg:     lipgloss.Color("#FAFAFA"), // Zinc 50
+		SuccessFg:  lipgloss.Color("#10B981"), // Emerald 500
+		WarnFg:     lipgloss.Color("#F59E0B"), // Amber 500
+		ErrorFg:    lipgloss.Color("#EF4444"), // Red 500
+		Cyan:       lipgloss.Color("#06B6D4"), // Cyan 500
+		Pink:       lipgloss.Color("#EC4899"), // Pink 500
+		Yellow:     lipgloss.Color("#EAB308"), // Yellow 500
 	}
 }
 
@@ -357,6 +483,8 @@ func GetTheme(name string) *Theme {
 		return OneLight()
 	case EverforestLightName:
 		return EverforestLight()
+	case EverforestDarkName:
+		return EverforestDark()
 	case SolarizedDarkName:
 		return SolarizedDark()
 	case SolarizedLightName:
@@ -371,6 +499,16 @@ func GetTheme(name string) *Theme {
 		return Monokai()
 	case CatppuccinMochaName:
 		return CatppuccinMocha()
+	case ModernName:
+		return Modern()
+	case TokyoNightName:
+		return TokyoNight()
+	case OneDarkName:
+		return OneDark()
+	case RosePineName:
+		return RosePine()
+	case AyuMirageName:
+		return AyuMirage()
 	default:
 		return Dracula()
 	}
@@ -397,6 +535,7 @@ func AvailableThemes() []string {
 		RosePineDawnName,
 		OneLightName,
 		EverforestLightName,
+		EverforestDarkName,
 		SolarizedDarkName,
 		SolarizedLightName,
 		GruvboxDarkName,
@@ -404,5 +543,10 @@ func AvailableThemes() []string {
 		NordName,
 		MonokaiName,
 		CatppuccinMochaName,
+		ModernName,
+		TokyoNightName,
+		OneDarkName,
+		RosePineName,
+		AyuMirageName,
 	}
 }

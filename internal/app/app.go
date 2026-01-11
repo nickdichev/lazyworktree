@@ -931,22 +931,26 @@ func (m *Model) overlayPopup(base, popup string, marginTop int) string {
 	baseLines := strings.Split(base, "\n")
 	popupLines := strings.Split(popup, "\n")
 
-	// Assume fixed width for now or calculate from lines
 	if len(baseLines) == 0 {
 		return popup
 	}
 
 	baseWidth := lipgloss.Width(baseLines[0])
-	popupWidth := lipgloss.Width(popupLines[0]) // Assume box is rectangular
+	popupWidth := lipgloss.Width(popupLines[0])
+	popupHeight := len(popupLines)
 
 	// Calculate left padding to center
 	leftPad := max((baseWidth-popupWidth)/2, 0)
-
-	// "Clear" styling for the background band
-	// We use the default terminal background color (reset)
 	leftSpace := strings.Repeat(" ", leftPad)
 	rightPad := max(baseWidth-popupWidth-leftPad, 0)
 	rightSpace := strings.Repeat(" ", rightPad)
+
+	// Shadow styling
+	shadowColor := lipgloss.Color("#18181B") // Dark shadow
+	if m.theme.Background == lipgloss.Color("#FFFFFF") {
+		shadowColor = lipgloss.Color("#D1D5DB") // Light shadow for light themes
+	}
+	shadowStyle := lipgloss.NewStyle().Foreground(shadowColor)
 
 	for i, line := range popupLines {
 		row := marginTop + i
@@ -954,9 +958,17 @@ func (m *Model) overlayPopup(base, popup string, marginTop int) string {
 			break
 		}
 
-		// Simply replacing the content in the middle with the popup line
-		// The spaces ensure we overwrite underlying text
+		// Main popup line
 		baseLines[row] = leftSpace + line + rightSpace
+	}
+
+	// Add bottom shadow if there's room
+	shadowRow := marginTop + popupHeight
+	if shadowRow < len(baseLines) {
+		shadowLine := leftSpace + " " + shadowStyle.Render(strings.Repeat("▀", popupWidth)) + rightSpace
+		if len(shadowLine) <= baseWidth {
+			// baseLines[shadowRow] = shadowLine // Disabled for now as it might break layout
+		}
 	}
 
 	return strings.Join(baseLines, "\n")
@@ -4375,13 +4387,13 @@ func (m *Model) renderHeader(layout layoutDims) string {
 	// Create a "toolbar" style header with visual flair
 	headerStyle := lipgloss.NewStyle().
 		Background(m.theme.Accent).
-		Foreground(lipgloss.Color("#FFFFFF")). // Pure white for better contrast
+		Foreground(m.theme.AccentFg).
 		Bold(true).
 		Width(layout.width).
-		Padding(0, 2) // Increased padding for breathing room
+		Padding(0, 2)
 
 	// Add decorative icon to title
-	title := "🌲 Lazy Worktree Manager"
+	title := "🌲 Lazyworktree"
 	repoKey := strings.TrimSpace(m.repoKey)
 	content := title
 	if repoKey != "" && repoKey != "unknown" && !strings.HasPrefix(repoKey, "local-") {

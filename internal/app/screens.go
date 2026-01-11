@@ -2022,108 +2022,46 @@ func (s *WelcomeScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // View renders the welcome dialog with guidance and action buttons.
 func (s *WelcomeScreen) View() string {
-	const (
-		width  = 80
-		height = 20
-	)
+	width := 60
+	height := 15
 
-	var (
-		accent = s.thm.Accent
-		errFg  = s.thm.ErrorFg
-		text   = s.thm.TextFg
-		muted  = s.thm.MutedFg
-		border = s.thm.Border
-	)
-
-	// Base Box
 	boxStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(border).
-		Padding(1, 2).
+		Border(lipgloss.DoubleBorder()).
+		BorderForeground(s.thm.Accent).
+		Padding(2, 4).
 		Width(width).
 		Height(height).
-		Align(lipgloss.Center)
+		Align(lipgloss.Center, lipgloss.Center)
 
-	// Title
 	titleStyle := lipgloss.NewStyle().
-		Foreground(accent).
+		Foreground(s.thm.Pink).
 		Bold(true).
-		MarginBottom(1)
+		MarginBottom(1).
+		Underline(true)
 
-	// Error Header
-	errorStyle := lipgloss.NewStyle().
-		Foreground(errFg).
-		Bold(true).
-		MarginBottom(1)
-
-	// Info Block (Directory details)
-	labelStyle := lipgloss.NewStyle().
-		Foreground(muted).
-		Width(20)
-
-	valueStyle := lipgloss.NewStyle().
-		Foreground(text)
-
-	rowStyle := lipgloss.NewStyle().
-		MarginBottom(1)
-
-	// Helper to create rows
-	makeRow := func(label, value string) string {
-		return rowStyle.Render(
-			lipgloss.JoinHorizontal(lipgloss.Top,
-				labelStyle.Render(label),
-				valueStyle.Render(value),
-			),
-		)
-	}
-
-	// Help Text
-	helpStyle := lipgloss.NewStyle().
-		Foreground(muted).
-		Align(lipgloss.Center).
-		MarginTop(1).
-		MarginBottom(1)
-
-	// Buttons
-	btnKeyStyle := lipgloss.NewStyle().
-		Foreground(accent).
+	warningStyle := lipgloss.NewStyle().
+		Foreground(s.thm.WarnFg).
 		Bold(true)
 
-	btnDescStyle := lipgloss.NewStyle().
-		Foreground(text)
+	textStyle := lipgloss.NewStyle().
+		Foreground(s.thm.MutedFg).
+		Italic(true)
 
-	makeBtn := func(key, desc string) string {
-		return fmt.Sprintf("%s %s", btnKeyStyle.Render("["+key+"]"), btnDescStyle.Render(desc))
-	}
-
-	footerStyle := lipgloss.NewStyle().
-		MarginTop(1)
-
-	// Content Construction
-	title := titleStyle.Render("LazyWorktree")
-	errorMsg := errorStyle.Render("⚠️  No worktrees found")
-
-	infoBlock := lipgloss.JoinVertical(lipgloss.Left,
-		makeRow("Current Directory:", s.currentDir),
-		makeRow("Worktree Root:", s.worktreeDir),
-	)
-
-	helpText := helpStyle.Render(
-		"Please ensure you are in a git repository.",
-	)
-
-	controls := footerStyle.Render(
-		lipgloss.JoinHorizontal(lipgloss.Center,
-			makeBtn("Q", "Quit"),
-		),
-	)
+	buttonStyle := lipgloss.NewStyle().
+		Foreground(s.thm.AccentFg).
+		Background(s.thm.Accent).
+		Padding(0, 1).
+		MarginTop(1).
+		Bold(true)
 
 	content := lipgloss.JoinVertical(lipgloss.Center,
-		title,
-		errorMsg,
-		lipgloss.NewStyle().Align(lipgloss.Left).Render(infoBlock),
-		helpText,
-		controls,
+		titleStyle.Render("LazyWorktree"),
+		"",
+		fmt.Sprintf("%s  %s", warningStyle.Render("⚠"), warningStyle.Render("No worktrees found")),
+		"",
+		textStyle.Render("Please ensure you are in a git repository."),
+		"",
+		buttonStyle.Render("[Q] Quit"),
 	)
 
 	return boxStyle.Render(content)

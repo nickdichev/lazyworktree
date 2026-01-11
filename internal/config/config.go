@@ -669,6 +669,18 @@ func DefaultDeltaArgsForTheme(themeName string) []string {
 		return []string{"--syntax-theme", "\"OneHalfLight\""}
 	case theme.EverforestLightName:
 		return []string{"--syntax-theme", "\"Gruvbox Light\""}
+	case theme.EverforestDarkName:
+		return []string{"--syntax-theme", "\"Everforest Dark\""}
+	case theme.TokyoNightName:
+		return []string{"--syntax-theme", "\"Tokyo Night\""}
+	case theme.OneDarkName:
+		return []string{"--syntax-theme", "\"Atom One Dark\""}
+	case theme.RosePineName:
+		return []string{"--syntax-theme", "\"Rose Pine\""}
+	case theme.AyuMirageName:
+		return []string{"--syntax-theme", "\"Ayu Mirage\""}
+	case theme.ModernName:
+		return []string{"--syntax-theme", "Dracula"}
 	default:
 		return []string{"--syntax-theme", "Dracula"}
 	}
@@ -697,13 +709,19 @@ func NormalizeThemeName(name string) string {
 		theme.RosePineDawnName,
 		theme.OneLightName,
 		theme.EverforestLightName,
+		theme.EverforestDarkName,
 		theme.SolarizedDarkName,
 		theme.SolarizedLightName,
 		theme.GruvboxDarkName,
 		theme.GruvboxLightName,
 		theme.NordName,
 		theme.MonokaiName,
-		theme.CatppuccinMochaName:
+		theme.CatppuccinMochaName,
+		theme.ModernName,
+		theme.TokyoNightName,
+		theme.OneDarkName,
+		theme.RosePineName,
+		theme.AyuMirageName:
 		return name
 	default:
 		return ""

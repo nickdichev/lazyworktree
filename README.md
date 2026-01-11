@@ -528,7 +528,7 @@ custom_create_menus:
 Notes:
 
 - `--worktree-dir` overrides the `worktree_dir` setting.
-- `theme` selects the colour theme. Available themes: `dracula`, `dracula-light`, `narna`, `clean-light`, `catppuccin-latte`, `rose-pine-dawn`, `one-light`, `everforest-light`, `solarized-dark`, `solarized-light`, `gruvbox-dark`, `gruvbox-light`, `nord`, `monokai`, `catppuccin-mocha`. Default: auto-detected (`dracula` for dark, `dracula-light` for light).
+- `theme` selects the colour theme. Available themes: `dracula`, `dracula-light`, `narna`, `clean-light`, `catppuccin-latte`, `rose-pine-dawn`, `one-light`, `everforest-light`, `everforest-dark`, `solarized-dark`, `solarized-light`, `gruvbox-dark`, `gruvbox-light`, `nord`, `monokai`, `catppuccin-mocha`, `modern`, `tokyo-night`, `one-dark`, `rose-pine`, `ayu-mirage`. Default: auto-detected (`dracula` for dark, `dracula-light` for light).
 - `init_commands` and `terminate_commands` execute prior to any repository-specific `.wt` commands (if present).
 - `sort_mode` controls the default sort order: `"switched"` (last accessed, default), `"active"` (last commit date), or `"path"` (alphabetical). The old `sort_by_active` option is still supported for backwards compatibility.
 - Set `auto_fetch_prs` to `true` to fetch PR data upon startup.
@@ -569,6 +569,12 @@ lazyworktree includes built-in themes:
 | **nord** | Midnight blue (#2E3440) | Nord calm cyan accents |
 | **monokai** | Olive black (#272822) | Monokai bright neon accents |
 | **catppuccin-mocha** | Mocha (#1E1E2E) | Catppuccin Mocha pastels |
+| **modern** | Zinc (#18181B) | Sleek modern dark theme with violet accents |
+| **tokyo-night** | Storm (#24283B) | Tokyo Night Storm with blue highlights |
+| **one-dark** | Dark (#282C34) | Atom One Dark classic palette |
+| **rose-pine** | Midnight (#191724) | Rosé Pine dark and moody |
+| **ayu-mirage** | Mirage (#212733) | Ayu Mirage modern look |
+| **everforest-dark** | Dark (#2D353B) | Everforest nature dark |
 
 To select a theme, configure it in your configuration file:
 
