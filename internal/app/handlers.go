@@ -403,6 +403,19 @@ func (m *Model) handleBuiltInKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, m.showDeleteWorktree()
 
 	case "d":
+		// If in log pane (bottom right), show commit diff
+		if m.focusedPane == 2 {
+			cursor := m.logTable.Cursor()
+			if len(m.logEntries) > 0 && cursor >= 0 && cursor < len(m.logEntries) {
+				if m.selectedIndex >= 0 && m.selectedIndex < len(m.filteredWts) {
+					commitSHA := m.logEntries[cursor].sha
+					wt := m.filteredWts[m.selectedIndex]
+					return m, m.showCommitDiff(commitSHA, wt)
+				}
+			}
+			return m, nil
+		}
+		// Otherwise show worktree diff
 		return m, m.showDiff()
 
 	case "e":

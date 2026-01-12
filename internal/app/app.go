@@ -1694,6 +1694,12 @@ func (m *Model) showDiffNonInteractive() tea.Cmd {
 	}
 	wt := m.filteredWts[m.selectedIndex]
 
+	// Check if there are any changes to show
+	if len(m.statusFilesAll) == 0 {
+		m.showInfo("No diff to show.", nil)
+		return nil
+	}
+
 	// Build environment variables
 	env := m.buildCommandEnv(wt.Branch, wt.Path)
 	envVars := os.Environ()

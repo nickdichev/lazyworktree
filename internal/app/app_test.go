@@ -1941,17 +1941,24 @@ func TestShowDiffNoDiff(t *testing.T) {
 	m := NewModel(cfg, "")
 	m.filteredWts = []*models.WorktreeInfo{{Path: cfg.WorktreeDir, Branch: featureBranch}}
 	m.selectedIndex = 0
+	// statusFilesAll is empty by default, simulating no changes
 
-	// showDiff now uses execProcess (like custom commands) which returns an execMsg
-	// This is consistent with how custom commands and arbitrary commands work
+	// showDiff with no changes should now show an info screen
 	cmd := m.showDiff()
-	if cmd == nil {
-		t.Fatal("expected diff command")
+	if cmd != nil {
+		t.Fatal("expected no command when there are no changes")
 	}
 
-	// The command now returns an execMsg (via execProcess), not nil
-	// It will spawn the pager even if diff is empty (consistent with custom commands)
-	// We don't test the actual execution here as it would spawn a real process
+	// Verify info screen is shown
+	if m.currentScreen != screenInfo {
+		t.Fatalf("expected screenInfo, got %v", m.currentScreen)
+	}
+	if m.infoScreen == nil {
+		t.Fatal("expected infoScreen to be set")
+	}
+	if m.infoScreen.message != "No diff to show." {
+		t.Fatalf("expected message 'No diff to show.', got %q", m.infoScreen.message)
+	}
 }
 
 func TestHandleOpenPRsLoaded(t *testing.T) {
