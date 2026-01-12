@@ -929,6 +929,31 @@ func TestParseConfig(t *testing.T) {
 			},
 		},
 		{
+			name: "git_pager_interactive true",
+			data: map[string]interface{}{
+				"git_pager_interactive": true,
+			},
+			validate: func(t *testing.T, cfg *AppConfig) {
+				assert.True(t, cfg.GitPagerInteractive)
+			},
+		},
+		{
+			name: "git_pager_interactive false",
+			data: map[string]interface{}{
+				"git_pager_interactive": false,
+			},
+			validate: func(t *testing.T, cfg *AppConfig) {
+				assert.False(t, cfg.GitPagerInteractive)
+			},
+		},
+		{
+			name: "git_pager_interactive defaults to false",
+			data: map[string]interface{}{},
+			validate: func(t *testing.T, cfg *AppConfig) {
+				assert.False(t, cfg.GitPagerInteractive)
+			},
+		},
+		{
 			name: "custom_create_menus parsing",
 			data: map[string]interface{}{
 				"custom_create_menus": []interface{}{

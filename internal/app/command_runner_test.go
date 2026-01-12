@@ -1,7 +1,9 @@
 package app
 
 import (
+	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
@@ -324,4 +326,193 @@ func TestExecuteArbitraryCommandNoSelection(t *testing.T) {
 	if cmd != nil {
 		t.Fatal("expected nil command when no worktree selected")
 	}
+}
+
+func TestShowCommitDiffInteractiveUsesConfiguredPager(t *testing.T) {
+	cfg := &config.AppConfig{
+		WorktreeDir:         t.TempDir(),
+		GitPager:            "tig",
+		GitPagerArgs:        []string{"--foo"},
+		GitPagerInteractive: true,
+	}
+	m := NewModel(cfg, "")
+	wt := &models.WorktreeInfo{Path: testWorktreePath, Branch: "feat"}
+
+	capture := &commandCapture{}
+	m.commandRunner = capture.runner
+	m.execProcess = capture.exec
+
+	if cmd := m.showCommitDiff("abc123", wt); cmd == nil {
+		t.Fatal("expected diff command")
+	}
+
+	if capture.name != testBashCmd {
+		t.Fatalf("expected bash command, got %q", capture.name)
+	}
+	if len(capture.args) != 2 || capture.args[0] != "-c" {
+		t.Fatalf("expected bash -c args, got %v", capture.args)
+	}
+	cmdStr := capture.args[1]
+	if !strings.Contains(cmdStr, "git show --patch --no-color abc123") {
+		t.Fatalf("expected git show in command, got %q", cmdStr)
+	}
+	if !strings.Contains(cmdStr, "| tig --foo") {
+		t.Fatalf("expected interactive pager in command, got %q", cmdStr)
+	}
+	if strings.Contains(cmdStr, "less") {
+		t.Fatalf("did not expect non-interactive pager in command, got %q", cmdStr)
+	}
+	if capture.dir != testWorktreePath {
+		t.Fatalf("expected worktree dir, got %q", capture.dir)
+	}
+	if value, ok := envValue(capture.env, "WORKTREE_PATH"); !ok || value != testWorktreePath {
+		t.Fatalf("expected WORKTREE_PATH in env, got %q (present=%v)", value, ok)
+	}
+}
+
+func TestShowCommitFileDiffInteractiveUsesConfiguredPager(t *testing.T) {
+	cfg := &config.AppConfig{
+		WorktreeDir:         t.TempDir(),
+		GitPager:            "tig",
+		GitPagerArgs:        []string{"--foo"},
+		GitPagerInteractive: true,
+	}
+	m := NewModel(cfg, "")
+
+	capture := &commandCapture{}
+	m.commandRunner = capture.runner
+	m.execProcess = capture.exec
+
+	if cmd := m.showCommitFileDiff("abc123", "file.txt", testWorktreePath); cmd == nil {
+		t.Fatal("expected file diff command")
+	}
+
+	if capture.name != testBashCmd {
+		t.Fatalf("expected bash command, got %q", capture.name)
+	}
+	if len(capture.args) != 2 || capture.args[0] != "-c" {
+		t.Fatalf("expected bash -c args, got %v", capture.args)
+	}
+	cmdStr := capture.args[1]
+	if !strings.Contains(cmdStr, "git show --patch --no-color abc123 -- \"file.txt\"") {
+		t.Fatalf("expected git show file diff, got %q", cmdStr)
+	}
+	if !strings.Contains(cmdStr, "| tig --foo") {
+		t.Fatalf("expected interactive pager in file diff command, got %q", cmdStr)
+	}
+	if capture.dir != testWorktreePath {
+		t.Fatalf("expected worktree dir, got %q", capture.dir)
+	}
+}
+
+func TestShowCommitDiffVSCodeUsesGitDifftool(t *testing.T) {
+	repoDir, branch := setupCommitDiffRepo(t)
+	cfg := &config.AppConfig{
+		WorktreeDir: repoDir,
+		GitPager:    "code",
+	}
+	m := NewModel(cfg, "")
+	wt := &models.WorktreeInfo{Path: repoDir, Branch: branch}
+
+	capture := &commandCapture{}
+	m.commandRunner = capture.runner
+	m.execProcess = capture.exec
+
+	cmd := m.showCommitDiff("abc123", wt)
+	if cmd == nil {
+		t.Fatal("expected diff command")
+	}
+
+	if capture.name != testBashCmd {
+		t.Fatalf("expected bash command, got %q", capture.name)
+	}
+	if len(capture.args) != 2 || capture.args[0] != "-c" {
+		t.Fatalf("expected bash -c args, got %v", capture.args)
+	}
+	cmdStr := capture.args[1]
+	if !strings.Contains(cmdStr, "git difftool abc123^..abc123") {
+		t.Fatalf("expected git difftool with commit range, got %q", cmdStr)
+	}
+	if !strings.Contains(cmdStr, "--no-prompt") {
+		t.Fatalf("expected --no-prompt flag, got %q", cmdStr)
+	}
+	if !strings.Contains(cmdStr, "--extcmd='code --wait --diff'") {
+		t.Fatalf("expected extcmd with code --wait --diff, got %q", cmdStr)
+	}
+	if capture.dir != repoDir {
+		t.Fatalf("expected worktree dir, got %q", capture.dir)
+	}
+	if value, ok := envValue(capture.env, "WORKTREE_PATH"); !ok || value != repoDir {
+		t.Fatalf("expected WORKTREE_PATH in env, got %q (present=%v)", value, ok)
+	}
+}
+
+func TestShowCommitFileDiffVSCodeUsesGitDifftool(t *testing.T) {
+	repoDir, _ := setupCommitDiffRepo(t)
+	cfg := &config.AppConfig{
+		WorktreeDir: repoDir,
+		GitPager:    "code",
+	}
+	m := NewModel(cfg, "")
+
+	capture := &commandCapture{}
+	m.commandRunner = capture.runner
+	m.execProcess = capture.exec
+
+	cmd := m.showCommitFileDiff("abc123", "file.txt", repoDir)
+	if cmd == nil {
+		t.Fatal("expected file diff command")
+	}
+
+	if capture.name != testBashCmd {
+		t.Fatalf("expected bash command, got %q", capture.name)
+	}
+	if len(capture.args) != 2 || capture.args[0] != "-c" {
+		t.Fatalf("expected bash -c args, got %v", capture.args)
+	}
+	cmdStr := capture.args[1]
+	if !strings.Contains(cmdStr, "git difftool abc123^..abc123") {
+		t.Fatalf("expected git difftool with commit range, got %q", cmdStr)
+	}
+	if !strings.Contains(cmdStr, "--no-prompt") {
+		t.Fatalf("expected --no-prompt flag, got %q", cmdStr)
+	}
+	if !strings.Contains(cmdStr, "--extcmd='code --wait --diff'") {
+		t.Fatalf("expected extcmd with code --wait --diff, got %q", cmdStr)
+	}
+	if !strings.Contains(cmdStr, "-- 'file.txt'") {
+		t.Fatalf("expected file specifier, got %q", cmdStr)
+	}
+	if capture.dir != repoDir {
+		t.Fatalf("expected worktree dir, got %q", capture.dir)
+	}
+	if value, ok := envValue(capture.env, "WORKTREE_PATH"); !ok || value != repoDir {
+		t.Fatalf("expected WORKTREE_PATH in env, got %q (present=%v)", value, ok)
+	}
+}
+
+func setupCommitDiffRepo(t *testing.T) (string, string) {
+	t.Helper()
+	repoDir := t.TempDir()
+	runGitCommand(t, repoDir, "init")
+	runGitCommand(t, repoDir, "config", "user.email", "test@example.com")
+	runGitCommand(t, repoDir, "config", "user.name", "lazyworktree")
+	if err := os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("line\n"), 0o600); err != nil {
+		t.Fatalf("failed to write file: %v", err)
+	}
+	runGitCommand(t, repoDir, "add", "file.txt")
+	runGitCommand(t, repoDir, "-c", "commit.gpgsign=false", "commit", "-m", "initial")
+	branch := strings.TrimSpace(runGitCommand(t, repoDir, "rev-parse", "--abbrev-ref", "HEAD"))
+	return repoDir, branch
+}
+
+func runGitCommand(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %v failed: %v\n%s", args, err, out)
+	}
+	return string(out)
 }

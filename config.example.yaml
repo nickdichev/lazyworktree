@@ -57,6 +57,23 @@ git_pager_args:
   - --syntax-theme
   - Dracula
 
+# Set to true for interactive diff viewers that need terminal control (default: false)
+# Interactive tools like diffnav (https://github.com/dlvhdr/diffnav), ftdv
+# (https://terminaltrove.com/ftdv/), or tig require direct terminal access
+# and
+# cannot be piped through less. When true, only unstaged changes (git diff) are shown.
+#
+# Examples:
+#   For interactive TUI diff navigators:
+#     git_pager: diffnav
+#     git_pager_interactive: true
+#
+#   For VS Code (uses git difftool for proper side-by-side comparison):
+#     git_pager: code
+#     # Opens one VS Code window per changed file via git difftool
+#
+git_pager_interactive: false
+
 # Pager used for show_output custom commands
 # Default: $PAGER environment variable or less if unset
 pager: "less --use-color --wordwrap -qcR -P 'Press q to exit..'"

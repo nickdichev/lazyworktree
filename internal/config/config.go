@@ -64,6 +64,7 @@ type AppConfig struct {
 	GitPagerArgs            []string
 	GitPagerArgsSet         bool `yaml:"-"`
 	GitPager                string
+	GitPagerInteractive     bool // Interactive tools need terminal control, skip piping to less
 	TrustMode               string
 	DebugLog                string
 	Pager                   string
@@ -97,6 +98,7 @@ func DefaultConfig() *AppConfig {
 		MaxDiffChars:            200000,
 		GitPagerArgs:            DefaultDeltaArgsForTheme(theme.DraculaName),
 		GitPager:                "delta",
+		GitPagerInteractive:     false,
 		TrustMode:               "tofu",
 		Theme:                   "",
 		MergeMethod:             "rebase",
@@ -223,6 +225,8 @@ func parseConfig(data map[string]any) *AppConfig {
 			cfg.GitPagerArgs = nil
 		}
 	}
+
+	cfg.GitPagerInteractive = coerceBool(data["git_pager_interactive"], false)
 
 	if branchNameScript, ok := data["branch_name_script"].(string); ok {
 		branchNameScript = strings.TrimSpace(branchNameScript)

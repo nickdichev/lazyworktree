@@ -1615,6 +1615,80 @@ func (m *Model) deleteFilesCmd(wt *models.WorktreeInfo, files []*StatusFile) fun
 }
 
 func (m *Model) showDiff() tea.Cmd {
+	// Route to appropriate diff viewer based on configuration
+	if strings.Contains(m.config.GitPager, "code") {
+		return m.showDiffVSCode()
+	}
+	if m.config.GitPagerInteractive {
+		return m.showDiffInteractive()
+	}
+	return m.showDiffNonInteractive()
+}
+
+func (m *Model) showDiffInteractive() tea.Cmd {
+	if m.selectedIndex < 0 || m.selectedIndex >= len(m.filteredWts) {
+		return nil
+	}
+	wt := m.filteredWts[m.selectedIndex]
+
+	// Build environment variables
+	env := m.buildCommandEnv(wt.Branch, wt.Path)
+	envVars := os.Environ()
+	for k, v := range env {
+		envVars = append(envVars, fmt.Sprintf("%s=%s", k, v))
+	}
+
+	// For interactive mode, just pipe git diff directly to the interactive tool
+	// NO piping to less - the interactive tool needs terminal control
+	gitPagerArgs := ""
+	if len(m.config.GitPagerArgs) > 0 {
+		gitPagerArgs = " " + strings.Join(m.config.GitPagerArgs, " ")
+	}
+	cmdStr := fmt.Sprintf("git diff --patch --no-color | %s%s", m.config.GitPager, gitPagerArgs)
+
+	// #nosec G204 -- command constructed from config and controlled inputs
+	c := m.commandRunner("bash", "-c", cmdStr)
+	c.Dir = wt.Path
+	c.Env = envVars
+
+	return m.execProcess(c, func(err error) tea.Msg {
+		if err != nil {
+			return errMsg{err: err}
+		}
+		return refreshCompleteMsg{}
+	})
+}
+
+func (m *Model) showDiffVSCode() tea.Cmd {
+	if m.selectedIndex < 0 || m.selectedIndex >= len(m.filteredWts) {
+		return nil
+	}
+	wt := m.filteredWts[m.selectedIndex]
+
+	// Build environment variables
+	env := m.buildCommandEnv(wt.Branch, wt.Path)
+	envVars := os.Environ()
+	for k, v := range env {
+		envVars = append(envVars, fmt.Sprintf("%s=%s", k, v))
+	}
+
+	// Use git difftool with VS Code - git handles before/after file extraction
+	cmdStr := "git difftool --no-prompt --extcmd='code --wait --diff'"
+
+	// #nosec G204 -- command constructed from controlled input
+	c := m.commandRunner("bash", "-c", cmdStr)
+	c.Dir = wt.Path
+	c.Env = envVars
+
+	return m.execProcess(c, func(err error) tea.Msg {
+		if err != nil {
+			return errMsg{err: err}
+		}
+		return refreshCompleteMsg{}
+	})
+}
+
+func (m *Model) showDiffNonInteractive() tea.Cmd {
 	if m.selectedIndex < 0 || m.selectedIndex >= len(m.filteredWts) {
 		return nil
 	}
@@ -2870,6 +2944,12 @@ func (m *Model) showCommitFilesScreen(commitSHA, worktreePath string) tea.Cmd {
 }
 
 func (m *Model) showCommitDiff(commitSHA string, wt *models.WorktreeInfo) tea.Cmd {
+	if strings.Contains(m.config.GitPager, "code") {
+		return m.showCommitDiffVSCode(commitSHA, wt)
+	}
+	if m.config.GitPagerInteractive {
+		return m.showCommitDiffInteractive(commitSHA, wt)
+	}
 	// Build environment variables
 	env := m.buildCommandEnv(wt.Branch, wt.Path)
 	envVars := os.Environ()
@@ -2915,6 +2995,12 @@ func (m *Model) showCommitDiff(commitSHA string, wt *models.WorktreeInfo) tea.Cm
 }
 
 func (m *Model) showCommitFileDiff(commitSHA, filename, worktreePath string) tea.Cmd {
+	if strings.Contains(m.config.GitPager, "code") {
+		return m.showCommitFileDiffVSCode(commitSHA, filename, worktreePath)
+	}
+	if m.config.GitPagerInteractive {
+		return m.showCommitFileDiffInteractive(commitSHA, filename, worktreePath)
+	}
 	// Build environment variables for pager
 	envVars := os.Environ()
 
@@ -2940,6 +3026,101 @@ func (m *Model) showCommitFileDiff(commitSHA, filename, worktreePath string) tea
 
 	// Create command
 	// #nosec G204 -- command is constructed from config and controlled inputs
+	c := m.commandRunner("bash", "-c", cmdStr)
+	c.Dir = worktreePath
+	c.Env = envVars
+
+	return m.execProcess(c, func(err error) tea.Msg {
+		if err != nil {
+			return errMsg{err: err}
+		}
+		return refreshCompleteMsg{}
+	})
+}
+
+func (m *Model) showCommitDiffInteractive(commitSHA string, wt *models.WorktreeInfo) tea.Cmd {
+	// Build environment variables
+	env := m.buildCommandEnv(wt.Branch, wt.Path)
+	envVars := os.Environ()
+	for k, v := range env {
+		envVars = append(envVars, fmt.Sprintf("%s=%s", k, v))
+	}
+
+	gitPagerArgs := ""
+	if len(m.config.GitPagerArgs) > 0 {
+		gitPagerArgs = " " + strings.Join(m.config.GitPagerArgs, " ")
+	}
+	gitCmd := fmt.Sprintf("git show --patch --no-color %s", commitSHA)
+	cmdStr := fmt.Sprintf("%s | %s%s", gitCmd, m.config.GitPager, gitPagerArgs)
+
+	c := m.commandRunner("bash", "-c", cmdStr)
+	c.Dir = wt.Path
+	c.Env = envVars
+
+	return m.execProcess(c, func(err error) tea.Msg {
+		if err != nil {
+			return errMsg{err: err}
+		}
+		return refreshCompleteMsg{}
+	})
+}
+
+func (m *Model) showCommitFileDiffInteractive(commitSHA, filename, worktreePath string) tea.Cmd {
+	// Build environment variables for pager
+	envVars := os.Environ()
+
+	gitPagerArgs := ""
+	if len(m.config.GitPagerArgs) > 0 {
+		gitPagerArgs = " " + strings.Join(m.config.GitPagerArgs, " ")
+	}
+	gitCmd := fmt.Sprintf("git show --patch --no-color %s -- %q", commitSHA, filename)
+	cmdStr := fmt.Sprintf("%s | %s%s", gitCmd, m.config.GitPager, gitPagerArgs)
+
+	c := m.commandRunner("bash", "-c", cmdStr)
+	c.Dir = worktreePath
+	c.Env = envVars
+
+	return m.execProcess(c, func(err error) tea.Msg {
+		if err != nil {
+			return errMsg{err: err}
+		}
+		return refreshCompleteMsg{}
+	})
+}
+
+func (m *Model) showCommitDiffVSCode(commitSHA string, wt *models.WorktreeInfo) tea.Cmd {
+	// Build environment variables
+	env := m.buildCommandEnv(wt.Branch, wt.Path)
+	envVars := os.Environ()
+	for k, v := range env {
+		envVars = append(envVars, fmt.Sprintf("%s=%s", k, v))
+	}
+
+	// Use git difftool to compare parent commit with this commit
+	cmdStr := fmt.Sprintf("git difftool %s^..%s --no-prompt --extcmd='code --wait --diff'", commitSHA, commitSHA)
+
+	// #nosec G204 -- command constructed from controlled input
+	c := m.commandRunner("bash", "-c", cmdStr)
+	c.Dir = wt.Path
+	c.Env = envVars
+
+	return m.execProcess(c, func(err error) tea.Msg {
+		if err != nil {
+			return errMsg{err: err}
+		}
+		return refreshCompleteMsg{}
+	})
+}
+
+func (m *Model) showCommitFileDiffVSCode(commitSHA, filename, worktreePath string) tea.Cmd {
+	envVars := os.Environ()
+	envVars = append(envVars, fmt.Sprintf("WORKTREE_PATH=%s", worktreePath))
+
+	// Use git difftool to compare the specific file between parent and this commit
+	cmdStr := fmt.Sprintf("git difftool %s^..%s --no-prompt --extcmd='code --wait --diff' -- %s",
+		commitSHA, commitSHA, shellQuote(filename))
+
+	// #nosec G204 -- command constructed from controlled input
 	c := m.commandRunner("bash", "-c", cmdStr)
 	c.Dir = worktreePath
 	c.Env = envVars
