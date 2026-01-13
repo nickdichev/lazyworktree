@@ -110,13 +110,34 @@ issue_branch_name_template: "issue-{number}-{title}"
 #   pr_branch_name_template: "{number}-{title}"       # 123-fix-login-bug
 pr_branch_name_template: "pr-{number}-{title}"
 
-# Script to generate branch name suggestions when creating worktrees from changes or issues
-# The script receives the git diff (for changes) or issue title+body (for issues) on stdin
-# and should output a suggested branch name
-# Useful for AI-powered branch name generation
+# Script to generate branch name suggestions when creating worktrees from changes, issues, or PRs
+#
+# For PRs/issues: The script should output a TITLE (e.g., "feat-ai-session-manager")
+#                 The template (pr_branch_name_template or issue_branch_name_template) is always applied
+#                 Example: Title "feat-ai-session-manager" + template "pr-{number}-{title}" = "pr-2-feat-ai-session-manager"
+#
+# For diffs: The script should output a complete branch name
+#
+# The script receives content on stdin (git diff for changes, issue/PR title+body for issues/PRs)
+#
+# Environment variables available to the script:
+#   LAZYWORKTREE_TYPE: The type of creation (pr/issue/diff)
+#   LAZYWORKTREE_NUMBER: The PR/issue number (empty for diff-based creation)
+#   LAZYWORKTREE_TEMPLATE: The configured template (e.g., "pr-{number}-{title}")
+#   LAZYWORKTREE_SUGGESTED_NAME: The template-generated branch name using original PR/issue title
+#
 # Examples:
-#   branch_name_script: "aichat -m gemini:gemini-2.5-flash 'Generate a short git branch name for this diff'"
-#   branch_name_script: "claude 'Suggest a branch name based on this diff'"
+#   # Generate a title for PRs/issues, complete name for diffs
+#   branch_name_script: |
+#     if [ "$LAZYWORKTREE_TYPE" = "diff" ]; then
+#       aichat -m gemini:gemini-2.5-flash-lite 'Generate a complete branch name for this diff'
+#     else
+#       aichat -m gemini:gemini-2.5-flash-lite 'Generate a short title (no pr- prefix) for this PR/issue. Output only the title.'
+#     fi
+#
+#   # Simple title generation for PRs/issues
+#   branch_name_script: "aichat -m gemini:gemini-2.5-flash-lite 'Generate a short title for this PR or issue. Output only the title, nothing else.'"
+#
 # branch_name_script: ""
 
 # ============================================================================

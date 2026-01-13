@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -130,6 +131,81 @@ func TestGeneratePRWorktreeName(t *testing.T) {
 			t.Errorf("generatePRWorktreeName() with custom prefix = %q, want %q", result, expected)
 		}
 	})
+}
+
+func TestGenerateIssueWorktreeName(t *testing.T) {
+	tests := []struct {
+		name     string
+		issue    *models.IssueInfo
+		template string
+		expected string
+	}{
+		{
+			name: "simple title with default template",
+			issue: &models.IssueInfo{
+				Number: 123,
+				Title:  "Fix login bug",
+			},
+			template: "issue-{number}-{title}",
+			expected: "issue-123-fix-login-bug",
+		},
+		{
+			name: "title with special characters",
+			issue: &models.IssueInfo{
+				Number: 456,
+				Title:  "Bug: Application crashes on startup!",
+			},
+			template: "issue-{number}-{title}",
+			expected: "issue-456-bug-application-crashes-on-startup",
+		},
+		{
+			name: "custom template format",
+			issue: &models.IssueInfo{
+				Number: 789,
+				Title:  "Add new feature",
+			},
+			template: "{number}-{title}",
+			expected: "789-add-new-feature",
+		},
+		{
+			name: "empty title",
+			issue: &models.IssueInfo{
+				Number: 100,
+				Title:  "",
+			},
+			template: "issue-{number}-{title}",
+			expected: "issue-100",
+		},
+		{
+			name: "long title gets truncated",
+			issue: &models.IssueInfo{
+				Number: 999,
+				Title:  "This is a very long issue title that should be truncated because it exceeds the maximum length limit of one hundred characters",
+			},
+			template: "issue-{number}-{title}",
+			expected: "issue-999-this-is-a-very-long-issue-title-that-should-be-truncated-because-it-exceeds-the-maxi",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := generateIssueWorktreeName(tt.issue, tt.template)
+			if tt.name == "long title gets truncated" {
+				if len(result) > 100 {
+					t.Errorf("generateIssueWorktreeName() result length = %d, want <= 100", len(result))
+				}
+				if strings.HasSuffix(result, "-") {
+					t.Errorf("generateIssueWorktreeName() result ends with hyphen: %q", result)
+				}
+			} else if result != tt.expected {
+				t.Errorf("generateIssueWorktreeName() = %q, want %q", result, tt.expected)
+			}
+			// Ensure result is max 100 chars
+			if len(result) > 100 {
+				t.Errorf("generateIssueWorktreeName() result length = %d, want <= 100", len(result))
+			}
+		})
+	}
 }
 
 func TestFuzzyScoreLower(t *testing.T) {
@@ -539,13 +615,78 @@ func TestRunBranchNameScript(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := runBranchNameScript(ctx, tt.script, tt.diff)
+			got, err := runBranchNameScript(ctx, tt.script, tt.diff, "diff", "", "", "")
 			if (err != nil) != tt.wantErr {
 				t.Errorf("runBranchNameScript() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
 				t.Errorf("runBranchNameScript() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestRunBranchNameScriptWithEnvironmentVariables(t *testing.T) {
+	ctx := context.Background()
+
+	tests := []struct {
+		name           string
+		scriptType     string
+		number         string
+		template       string
+		suggestedName  string
+		expectedOutput string
+	}{
+		{
+			name:           "PR context with all variables",
+			scriptType:     "pr",
+			number:         "123",
+			template:       "pr-{number}-{title}",
+			suggestedName:  "pr-123-fix-bug",
+			expectedOutput: "pr|123|pr-{number}-{title}|pr-123-fix-bug",
+		},
+		{
+			name:           "issue context with all variables",
+			scriptType:     "issue",
+			number:         "456",
+			template:       "issue-{number}-{title}",
+			suggestedName:  "issue-456-add-feature",
+			expectedOutput: "issue|456|issue-{number}-{title}|issue-456-add-feature",
+		},
+		{
+			name:           "diff context with empty variables",
+			scriptType:     "diff",
+			number:         "",
+			template:       "",
+			suggestedName:  "",
+			expectedOutput: "diff|||",
+		},
+		{
+			name:           "script uses suggested name directly",
+			scriptType:     "pr",
+			number:         "789",
+			template:       "pr-{number}-{title}",
+			suggestedName:  "pr-789-update-docs",
+			expectedOutput: "pr-789-update-docs",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Test script that echoes environment variables
+			script := `echo "$LAZYWORKTREE_TYPE|$LAZYWORKTREE_NUMBER|$LAZYWORKTREE_TEMPLATE|$LAZYWORKTREE_SUGGESTED_NAME"`
+			if tt.name == "script uses suggested name directly" {
+				script = "echo $LAZYWORKTREE_SUGGESTED_NAME"
+			}
+
+			got, err := runBranchNameScript(ctx, script, "test content", tt.scriptType, tt.number, tt.template, tt.suggestedName)
+			if err != nil {
+				t.Errorf("runBranchNameScript() error = %v", err)
+				return
+			}
+			if got != tt.expectedOutput {
+				t.Errorf("runBranchNameScript() = %q, want %q", got, tt.expectedOutput)
 			}
 		})
 	}

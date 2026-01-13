@@ -183,7 +183,7 @@ func (m *Model) showCommitSelection(baseBranch string) tea.Cmd {
 		defaultName := ""
 		scriptErr := ""
 		if strings.TrimSpace(m.config.BranchNameScript) != "" && commitMessage != "" {
-			if generatedName, err := runBranchNameScript(m.ctx, m.config.BranchNameScript, commitMessage); err != nil {
+			if generatedName, err := runBranchNameScript(m.ctx, m.config.BranchNameScript, commitMessage, "diff", "", "", ""); err != nil {
 				scriptErr = fmt.Sprintf("Branch name script error: %v", err)
 			} else if generatedName != "" {
 				defaultName = generatedName

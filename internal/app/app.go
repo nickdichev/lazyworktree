@@ -1454,7 +1454,7 @@ func (m *Model) showCreateFromCurrent() tea.Cmd {
 		// Run AI script if changes exist and configured
 		if hasChanges && m.config.BranchNameScript != "" {
 			diff = m.git.RunGit(m.ctx, []string{"git", "diff", "HEAD"}, currentWt.Path, []int{0}, false, true)
-			if generatedName, err := runBranchNameScript(m.ctx, m.config.BranchNameScript, diff); err == nil && generatedName != "" {
+			if generatedName, err := runBranchNameScript(m.ctx, m.config.BranchNameScript, diff, "diff", "", "", ""); err == nil && generatedName != "" {
 				defaultName = generatedName
 			}
 		}

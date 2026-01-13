@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"regexp"
 	"sort"
@@ -13,9 +14,11 @@ import (
 	"github.com/chmouel/lazyworktree/internal/models"
 )
 
-// runBranchNameScript executes the configured branch_name_script with the diff as stdin.
+// runBranchNameScript executes the configured branch_name_script with the content as stdin.
 // It returns the generated branch name or an error.
-func runBranchNameScript(ctx context.Context, script, diff string) (string, error) {
+// The scriptType indicates the context: "pr", "issue", or "diff".
+// For PRs and issues, number, template, and suggestedName provide additional context.
+func runBranchNameScript(ctx context.Context, script, content, scriptType, number, template, suggestedName string) (string, error) {
 	if script == "" {
 		return "", nil
 	}
@@ -27,7 +30,15 @@ func runBranchNameScript(ctx context.Context, script, diff string) (string, erro
 
 	// #nosec G204 -- script is user-configured and trusted
 	cmd := exec.CommandContext(ctx, "bash", "-c", script)
-	cmd.Stdin = strings.NewReader(diff)
+	cmd.Stdin = strings.NewReader(content)
+
+	// Set environment variables to provide context to the script
+	cmd.Env = append(os.Environ(),
+		fmt.Sprintf("LAZYWORKTREE_TYPE=%s", scriptType),
+		fmt.Sprintf("LAZYWORKTREE_NUMBER=%s", number),
+		fmt.Sprintf("LAZYWORKTREE_TEMPLATE=%s", template),
+		fmt.Sprintf("LAZYWORKTREE_SUGGESTED_NAME=%s", suggestedName),
+	)
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout

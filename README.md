@@ -600,43 +600,83 @@ CI status is retrieved lazily (only for the selected worktree) and cached for 30
 
 ## AI-Powered Branch Names
 
-When creating a worktree from changes (via the command palette), issues, or PRs, you may configure an external script to suggest branch names. The script receives the git diff (for changes), issue title+body (for issues), or PR title+body (for PRs) on stdin and should output a single branch name.
+When creating a worktree from changes (via the command palette), issues, or PRs, you may configure an external script to suggest branch names or titles.
+
+**For PRs and issues:** The script should output a **title** that will be sanitized and used in your configured template (e.g., `pr-{number}-{title}`). The template is always applied.
+
+**For diffs:** The script should output a complete branch name.
 
 This proves useful for integrating AI tools such as [aichat](https://github.com/sigoden/aichat/), [claude code](https://claude.com/product/claude-code), or any other command-line tool capable of generating meaningful branch names from code changes.
 
 > [!NOTE]
-> There’s no need for a large or cutting-edge model for branch generation. Smaller models are usually cheaper and much faster. Google’s `gemini-2.5-flash-lite` is currently the fastest and most reliable choice.
+> There's no need for a large or cutting-edge model for branch generation. Smaller models are usually cheaper and much faster. Google's `gemini-2.5-flash-lite` is currently the fastest and most reliable choice.
 
 ### Configuration
 
 Add `branch_name_script` to your `~/.config/lazyworktree/config.yaml`:
 
 ```yaml
-# Using aichat with Gemini
-branch_name_script: "aichat -m gemini:gemini-2.5-flash-lite 'Generate a short git branch name (no spaces, use hyphens) for this diff. Output only the branch name, nothing else.'"
-# Using gemini with Gemini cli
-branch_name_script: "gemini --model gemini-2.5-flash-lite -p "Generate a short git branch name (no spaces, use hyphens) for this diff. Output only the branch name, nothing else."
+# For PRs/issues: generate a title (template will be applied)
+branch_name_script: "aichat -m gemini:gemini-2.5-flash-lite 'Generate a short title for this PR or issue. Output only the title (like feat-ai-session-manager), nothing else.'"
+
+# For diffs: generate a complete branch name
+# branch_name_script: "aichat -m gemini:gemini-2.5-flash-lite 'Generate a short git branch name (no spaces, use hyphens) for this diff. Output only the branch name, nothing else.'"
 ```
 
 ### How It Works
 
 1. When you press `c` (or open the command palette) and choose "Create from current branch", the base picker highlights that option; if the selected worktree contains uncommitted modifications, the branch-name prompt surfaces an "Include current file changes" checkbox so you can decide whether to stash and move them into the new worktree. Tab/Shift+Tab cycle focus between the input and checkbox, while Space toggles the box when it is focused.
 2. Should `branch_name_script` be configured:
-   - For current-branch creations where the checkbox is enabled (or the prior “changes” path), the current diff is piped to the script.
-   - For issues: the issue title and body are piped to the script.
-   - For PRs: the PR title and body are piped to the script.
-3. The script's output (first line only) serves as the suggested branch name.
+   - **For PRs:** The PR title and body are piped to the script. The script outputs a title, which is sanitized and used in `pr_branch_name_template` to create the final branch name.
+   - **For issues:** The issue title and body are piped to the script. The script outputs a title, which is sanitized and used in `issue_branch_name_template` to create the final branch name.
+   - **For diffs:** The git diff is piped to the script. The script outputs a complete branch name.
+3. The final branch name is suggested to you.
 4. You may edit the suggestion prior to confirmation.
+
+**Example for PR #2:**
+- AI script generates title: `feat-ai-session-manager`
+- Template: `pr-{number}-{title}`
+- Result: `pr-2-feat-ai-session-manager`
 
 ### Script Requirements
 
-- The script receives the git diff (for changes), issue title+body (for issues), or PR title+body (for PRs) on stdin
-- It should output only the branch name (first line is used)
+- The script receives content on stdin:
+  - Git diff for changes
+  - Issue title+body for issues
+  - PR title+body for PRs
+- Output requirements:
+  - **For PRs/issues:** Output only a title (e.g., `feat-ai-session-manager`). First line is used.
+  - **For diffs:** Output a complete branch name (e.g., `feature/add-caching`). First line is used.
 - Should the script fail or return empty output:
   - For changes: the default name (`{current-branch}-changes`) is employed
-  - For issues: the template-based name (using `issue_branch_name_template`) is employed
-  - For PRs: the template-based name (using `pr_branch_name_template`) is employed
+  - For issues: the issue's actual title is used in the template
+  - For PRs: the PR's actual title is used in the template
 - The script operates under a 30-second timeout to prevent hanging.
+
+### Environment Variables
+
+The script receives additional context via environment variables:
+
+- `LAZYWORKTREE_TYPE`: The type of creation (`"pr"`, `"issue"`, or `"diff"`)
+- `LAZYWORKTREE_NUMBER`: The PR/issue number (empty for diff-based creation)
+- `LAZYWORKTREE_TEMPLATE`: The configured template (e.g., `"pr-{number}-{title}"`)
+- `LAZYWORKTREE_SUGGESTED_NAME`: The template-generated branch name using the original PR/issue title
+
+These variables allow scripts to adapt behaviour based on context. Examples:
+
+```yaml
+# Different prompts for different types
+branch_name_script: |
+  if [ "$LAZYWORKTREE_TYPE" = "diff" ]; then
+    aichat -m gemini:gemini-2.5-flash-lite 'Generate a complete branch name for this diff'
+  else
+    aichat -m gemini:gemini-2.5-flash-lite 'Generate a short title (no pr- prefix) for this PR/issue'
+  fi
+
+# Use PR/issue number in the prompt
+branch_name_script: |
+  aichat -m gemini:gemini-2.5-flash-lite "Generate a title for PR #$LAZYWORKTREE_NUMBER. Output only the title."
+```
 
 ## Screenshots
 

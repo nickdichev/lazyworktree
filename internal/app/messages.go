@@ -208,28 +208,47 @@ func (m *Model) handleOpenPRsLoaded(msg openPRsLoadedMsg) tea.Cmd {
 	// Show PR selection screen
 	m.prSelectionScreen = NewPRSelectionScreen(msg.prs, m.windowWidth, m.windowHeight, m.theme, m.config.ShowIcons)
 	m.prSelectionSubmit = func(pr *models.PRInfo) tea.Cmd {
-		// Generate branch name
-		defaultName := ""
+		// Determine which title to use for the template
+		titleForTemplate := pr.Title
 		scriptErr := ""
 
-		// If branch_name_script is configured, run it with PR title and body
+		// If branch_name_script is configured, run it to get AI-generated title
 		if m.config.BranchNameScript != "" {
 			prContent := fmt.Sprintf("%s\n\n%s", pr.Title, pr.Body)
-			if generatedName, err := runBranchNameScript(m.ctx, m.config.BranchNameScript, prContent); err != nil {
-				scriptErr = fmt.Sprintf("Branch name script error: %v", err)
-			} else if generatedName != "" {
-				defaultName = generatedName
-			}
-		}
-
-		// If no script or script returned empty, use default generation
-		if defaultName == "" {
 			template := m.config.PRBranchNameTemplate
 			if template == "" {
 				template = "pr-{number}-{title}"
 			}
-			defaultName = generatePRWorktreeName(pr, template)
+			suggestedName := generatePRWorktreeName(pr, template)
+
+			if generatedTitle, err := runBranchNameScript(
+				m.ctx,
+				m.config.BranchNameScript,
+				prContent,
+				"pr",
+				fmt.Sprintf("%d", pr.Number),
+				template,
+				suggestedName,
+			); err != nil {
+				scriptErr = fmt.Sprintf("Branch name script error: %v", err)
+			} else if generatedTitle != "" {
+				// Use AI-generated title instead of PR title
+				titleForTemplate = generatedTitle
+			}
 		}
+
+		// Always apply template with chosen title (AI-generated or PR title)
+		template := m.config.PRBranchNameTemplate
+		if template == "" {
+			template = "pr-{number}-{title}"
+		}
+
+		// Create a modified PR object with the chosen title for sanitization
+		prForTemplate := &models.PRInfo{
+			Number: pr.Number,
+			Title:  titleForTemplate,
+		}
+		defaultName := generatePRWorktreeName(prForTemplate, template)
 
 		// Suggest branch name (check for duplicates)
 		suggested := strings.TrimSpace(defaultName)
@@ -395,28 +414,47 @@ func (m *Model) handleOpenIssuesLoaded(msg openIssuesLoadedMsg) tea.Cmd {
 			"No branches found.",
 			defaultBase,
 			func(baseBranch string) tea.Cmd {
-				// Generate branch name
-				defaultName := ""
+				// Determine which title to use for the template
+				titleForTemplate := issue.Title
 				scriptErr := ""
 
-				// If branch_name_script is configured, run it with issue title and body
+				// If branch_name_script is configured, run it to get AI-generated title
 				if m.config.BranchNameScript != "" {
 					issueContent := fmt.Sprintf("%s\n\n%s", issue.Title, issue.Body)
-					if generatedName, err := runBranchNameScript(m.ctx, m.config.BranchNameScript, issueContent); err != nil {
-						scriptErr = fmt.Sprintf("Branch name script error: %v", err)
-					} else if generatedName != "" {
-						defaultName = generatedName
-					}
-				}
-
-				// If no script or script returned empty, use default generation
-				if defaultName == "" {
 					template := m.config.IssueBranchNameTemplate
 					if template == "" {
 						template = "issue-{number}-{title}"
 					}
-					defaultName = generateIssueWorktreeName(issue, template)
+					suggestedName := generateIssueWorktreeName(issue, template)
+
+					if generatedTitle, err := runBranchNameScript(
+						m.ctx,
+						m.config.BranchNameScript,
+						issueContent,
+						"issue",
+						fmt.Sprintf("%d", issue.Number),
+						template,
+						suggestedName,
+					); err != nil {
+						scriptErr = fmt.Sprintf("Branch name script error: %v", err)
+					} else if generatedTitle != "" {
+						// Use AI-generated title instead of issue title
+						titleForTemplate = generatedTitle
+					}
 				}
+
+				// Always apply template with chosen title (AI-generated or issue title)
+				template := m.config.IssueBranchNameTemplate
+				if template == "" {
+					template = "issue-{number}-{title}"
+				}
+
+				// Create a modified issue object with the chosen title for sanitization
+				issueForTemplate := &models.IssueInfo{
+					Number: issue.Number,
+					Title:  titleForTemplate,
+				}
+				defaultName := generateIssueWorktreeName(issueForTemplate, template)
 
 				// Suggest branch name (check for duplicates)
 				suggested := strings.TrimSpace(defaultName)
@@ -512,7 +550,15 @@ func (m *Model) handleCreateFromChangesReady(msg createFromChangesReadyMsg) tea.
 	// If branch_name_script is configured, run it to generate a suggested name
 	scriptErr := ""
 	if m.config.BranchNameScript != "" && msg.diff != "" {
-		if generatedName, err := runBranchNameScript(m.ctx, m.config.BranchNameScript, msg.diff); err != nil {
+		if generatedName, err := runBranchNameScript(
+			m.ctx,
+			m.config.BranchNameScript,
+			msg.diff,
+			"diff",
+			"",
+			"",
+			"",
+		); err != nil {
 			// Log error but continue with default name
 			scriptErr = fmt.Sprintf("Branch name script error: %v", err)
 		} else if generatedName != "" {

@@ -475,7 +475,9 @@ Options: \fBrebase\fR (default - rebases onto main then fast-forwards), \fBmerge
 .SS Automation
 .TP
 .B branch_name_script
-Script to generate branch name suggestions when creating worktrees from changes. The script receives the git diff on stdin and should output a branch name (first line is used). Useful for AI-powered branch name generation.
+Script to generate branch name suggestions when creating worktrees from changes, issues, or PRs. For PRs/issues, the script should output a title (e.g., "feat-ai-session-manager") which will be sanitized and used in the configured template. For diffs, the script should output a complete branch name. The script receives content on stdin (git diff for changes, issue/PR title and body for issues/PRs). First line of output is used. Useful for AI-powered branch name generation.
+.br
+Available environment variables: LAZYWORKTREE_TYPE (pr/issue/diff), LAZYWORKTREE_NUMBER (PR/issue number), LAZYWORKTREE_TEMPLATE (configured template), LAZYWORKTREE_SUGGESTED_NAME (template-generated name using original PR/issue title).
 .br
 Script operates under a 30-second timeout.
 .
