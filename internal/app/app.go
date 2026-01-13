@@ -2097,42 +2097,42 @@ func (m *Model) showDiffNonInteractive() tea.Cmd {
 	// This shows: 1) Staged changes, 2) Unstaged changes, 3) Untracked files (limited)
 	maxUntracked := m.config.MaxUntrackedDiffs
 	script := fmt.Sprintf(`
-set -e
-# Part 1: Staged changes
-staged=$(git diff --cached --patch --no-color 2>/dev/null || true)
-if [ -n "$staged" ]; then
-  echo "=== Staged Changes ==="
-  echo "$staged"
-  echo
-fi
-
-# Part 2: Unstaged changes
-unstaged=$(git diff --patch --no-color 2>/dev/null || true)
-if [ -n "$unstaged" ]; then
-  echo "=== Unstaged Changes ==="
-  echo "$unstaged"
-  echo
-fi
-
-# Part 3: Untracked files (limited to %d)
-untracked=$(git status --porcelain 2>/dev/null | grep '^?? ' | cut -d' ' -f2- || true)
-if [ -n "$untracked" ]; then
-  count=0
-  max_count=%d
-  total=$(echo "$untracked" | wc -l)
-  while IFS= read -r file; do
-    [ $count -ge $max_count ] && break
-    echo "=== Untracked: $file ==="
-    git diff --no-index /dev/null "$file" 2>/dev/null || true
-    echo
-    count=$((count + 1))
-  done <<< "$untracked"
-
-  if [ $total -gt $max_count ]; then
-    echo "[...showing $count of $total untracked files]"
-  fi
-fi
-`, maxUntracked, maxUntracked)
+	set -e
+	# Part 1: Staged changes
+	staged=$(git diff --cached --patch --no-color 2>/dev/null || true)
+	if [ -n "$staged" ]; then
+	  echo "=== Staged Changes ==="
+	  echo "$staged"
+	  echo
+	fi
+	
+	# Part 2: Unstaged changes
+	unstaged=$(git diff --patch --no-color 2>/dev/null || true)
+	if [ -n "$unstaged" ]; then
+	  echo "=== Unstaged Changes ==="
+	  echo "$unstaged"
+	  echo
+	fi
+	
+	# Part 3: Untracked files (limited to %d)
+	untracked=$(git status --porcelain 2>/dev/null | grep '^?? ' | cut -d' ' -f2- || true)
+	if [ -n "$untracked" ]; then
+	  count=0
+	  max_count=%d
+	  total=$(echo "$untracked" | wc -l)
+	  while IFS= read -r file; do
+	    [ $count -ge $max_count ] && break
+	    echo "=== Untracked: $file ==="
+	    git diff --no-index /dev/null "$file" 2>/dev/null || true
+	    echo
+	    count=$((count + 1))
+	  done <<< "$untracked"
+	
+	  if [ $total -gt $max_count ]; then
+	    echo "[...showing $count of $total untracked files]"
+	  fi
+	fi
+	`, maxUntracked, maxUntracked)
 
 	// Pipe through git_pager if configured, then through pager
 	var cmdStr string
@@ -2151,6 +2151,10 @@ fi
 
 	return m.execProcess(c, func(err error) tea.Msg {
 		if err != nil {
+			// Ignore exit status 141 (SIGPIPE) which happens when the pager is closed early
+			if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 141 {
+				return refreshCompleteMsg{}
+			}
 			return errMsg{err: err}
 		}
 		return refreshCompleteMsg{}
@@ -2230,6 +2234,10 @@ fi
 
 	return m.execProcess(c, func(err error) tea.Msg {
 		if err != nil {
+			// Ignore exit status 141 (SIGPIPE) which happens when the pager is closed early
+			if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 141 {
+				return refreshCompleteMsg{}
+			}
 			return errMsg{err: err}
 		}
 		return refreshCompleteMsg{}
@@ -3105,6 +3113,10 @@ func (m *Model) executeCustomCommandWithPager(customCmd *config.CustomCommand, w
 
 	return m.execProcess(c, func(err error) tea.Msg {
 		if err != nil {
+			// Ignore exit status 141 (SIGPIPE) which happens when the pager is closed early
+			if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 141 {
+				return refreshCompleteMsg{}
+			}
 			return errMsg{err: err}
 		}
 		return refreshCompleteMsg{}
@@ -3144,6 +3156,10 @@ func (m *Model) executeArbitraryCommand(cmdStr string) tea.Cmd {
 
 	return m.execProcess(c, func(err error) tea.Msg {
 		if err != nil {
+			// Ignore exit status 141 (SIGPIPE) which happens when the pager is closed early
+			if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 141 {
+				return refreshCompleteMsg{}
+			}
 			return errMsg{err: err}
 		}
 		return refreshCompleteMsg{}
