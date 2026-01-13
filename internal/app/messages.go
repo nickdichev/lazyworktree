@@ -208,20 +208,20 @@ func (m *Model) handleOpenPRsLoaded(msg openPRsLoadedMsg) tea.Cmd {
 	// Show PR selection screen
 	m.prSelectionScreen = NewPRSelectionScreen(msg.prs, m.windowWidth, m.windowHeight, m.theme, m.config.ShowIcons)
 	m.prSelectionSubmit = func(pr *models.PRInfo) tea.Cmd {
-		// Determine which title to use for the template
-		titleForTemplate := pr.Title
+		// Get AI-generated title (if configured)
+		generatedTitle := ""
 		scriptErr := ""
 
-		// If branch_name_script is configured, run it to get AI-generated title
 		if m.config.BranchNameScript != "" {
 			prContent := fmt.Sprintf("%s\n\n%s", pr.Title, pr.Body)
 			template := m.config.PRBranchNameTemplate
 			if template == "" {
 				template = "pr-{number}-{title}"
 			}
-			suggestedName := generatePRWorktreeName(pr, template)
+			// Pass empty string for generatedTitle since we're getting it now
+			suggestedName := generatePRWorktreeName(pr, template, "")
 
-			if generatedTitle, err := runBranchNameScript(
+			if aiTitle, err := runBranchNameScript(
 				m.ctx,
 				m.config.BranchNameScript,
 				prContent,
@@ -231,24 +231,18 @@ func (m *Model) handleOpenPRsLoaded(msg openPRsLoadedMsg) tea.Cmd {
 				suggestedName,
 			); err != nil {
 				scriptErr = fmt.Sprintf("Branch name script error: %v", err)
-			} else if generatedTitle != "" {
-				// Use AI-generated title instead of PR title
-				titleForTemplate = generatedTitle
+			} else if aiTitle != "" {
+				generatedTitle = aiTitle
 			}
 		}
 
-		// Always apply template with chosen title (AI-generated or PR title)
+		// Apply template with both original and generated titles
 		template := m.config.PRBranchNameTemplate
 		if template == "" {
 			template = "pr-{number}-{title}"
 		}
 
-		// Create a modified PR object with the chosen title for sanitization
-		prForTemplate := &models.PRInfo{
-			Number: pr.Number,
-			Title:  titleForTemplate,
-		}
-		defaultName := generatePRWorktreeName(prForTemplate, template)
+		defaultName := generatePRWorktreeName(pr, template, generatedTitle)
 
 		// Suggest branch name (check for duplicates)
 		suggested := strings.TrimSpace(defaultName)
@@ -414,20 +408,20 @@ func (m *Model) handleOpenIssuesLoaded(msg openIssuesLoadedMsg) tea.Cmd {
 			"No branches found.",
 			defaultBase,
 			func(baseBranch string) tea.Cmd {
-				// Determine which title to use for the template
-				titleForTemplate := issue.Title
+				// Get AI-generated title (if configured)
+				generatedTitle := ""
 				scriptErr := ""
 
-				// If branch_name_script is configured, run it to get AI-generated title
 				if m.config.BranchNameScript != "" {
 					issueContent := fmt.Sprintf("%s\n\n%s", issue.Title, issue.Body)
 					template := m.config.IssueBranchNameTemplate
 					if template == "" {
 						template = "issue-{number}-{title}"
 					}
-					suggestedName := generateIssueWorktreeName(issue, template)
+					// Pass empty string for generatedTitle since we're getting it now
+					suggestedName := generateIssueWorktreeName(issue, template, "")
 
-					if generatedTitle, err := runBranchNameScript(
+					if aiTitle, err := runBranchNameScript(
 						m.ctx,
 						m.config.BranchNameScript,
 						issueContent,
@@ -437,24 +431,18 @@ func (m *Model) handleOpenIssuesLoaded(msg openIssuesLoadedMsg) tea.Cmd {
 						suggestedName,
 					); err != nil {
 						scriptErr = fmt.Sprintf("Branch name script error: %v", err)
-					} else if generatedTitle != "" {
-						// Use AI-generated title instead of issue title
-						titleForTemplate = generatedTitle
+					} else if aiTitle != "" {
+						generatedTitle = aiTitle
 					}
 				}
 
-				// Always apply template with chosen title (AI-generated or issue title)
+				// Apply template with both original and generated titles
 				template := m.config.IssueBranchNameTemplate
 				if template == "" {
 					template = "issue-{number}-{title}"
 				}
 
-				// Create a modified issue object with the chosen title for sanitization
-				issueForTemplate := &models.IssueInfo{
-					Number: issue.Number,
-					Title:  titleForTemplate,
-				}
-				defaultName := generateIssueWorktreeName(issueForTemplate, template)
+				defaultName := generateIssueWorktreeName(issue, template, generatedTitle)
 
 				// Suggest branch name (check for duplicates)
 				suggested := strings.TrimSpace(defaultName)

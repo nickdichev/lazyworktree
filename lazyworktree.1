@@ -445,19 +445,19 @@ Default: false
 .
 .TP
 .B issue_branch_name_template
-Template for branch names created from GitHub/GitLab issues. Available placeholders: \fB{number}\fR (issue number) and \fB{title}\fR (sanitised issue title).
+Template for branch names created from GitHub/GitLab issues. Available placeholders: \fB{number}\fR (issue number), \fB{title}\fR (sanitised issue title), and \fB{generated}\fR (AI-generated title from branch_name_script, falls back to {title} if unavailable).
 .br
 Default: issue-{number}-{title}
 .br
-Example: With template "fix-{number}-{title}", issue #42 titled "Memory Leak" becomes branch "fix-42-memory-leak".
+Example: With template "fix-{number}-{title}", issue #42 titled "Memory Leak" becomes branch "fix-42-memory-leak". With template "issue-{number}-{generated}" and AI script configured, the AI-generated title is used instead.
 .
 .TP
 .B pr_branch_name_template
-Template for branch names created from pull/merge requests. Available placeholders: \fB{number}\fR (PR/MR number) and \fB{title}\fR (sanitised PR/MR title).
+Template for branch names created from pull/merge requests. Available placeholders: \fB{number}\fR (PR/MR number), \fB{title}\fR (sanitised PR/MR title), and \fB{generated}\fR (AI-generated title from branch_name_script, falls back to {title} if unavailable).
 .br
 Default: pr-{number}-{title}
 .br
-Example: With template "review-{number}", PR #123 becomes branch "review-123".
+Example: With template "review-{number}", PR #123 becomes branch "review-123". With template "pr-{number}-{generated}" and AI script configured, the AI-generated title is used instead.
 .
 .SS Security and Behaviour
 .TP
@@ -475,7 +475,7 @@ Options: \fBrebase\fR (default - rebases onto main then fast-forwards), \fBmerge
 .SS Automation
 .TP
 .B branch_name_script
-Script to generate branch name suggestions when creating worktrees from changes, issues, or PRs. For PRs/issues, the script should output a title (e.g., "feat-ai-session-manager") which will be sanitized and used in the configured template. For diffs, the script should output a complete branch name. The script receives content on stdin (git diff for changes, issue/PR title and body for issues/PRs). First line of output is used. Useful for AI-powered branch name generation.
+Script to generate branch name suggestions when creating worktrees from changes, issues, or PRs. For PRs/issues, the script should output a title (e.g., "feat-ai-session-manager") which will be sanitized and made available via the \fB{generated}\fR placeholder in your configured template. For diffs, the script should output a complete branch name. The script receives content on stdin (git diff for changes, issue/PR title and body for issues/PRs). First line of output is used. Useful for AI-powered branch name generation.
 .br
 Available environment variables: LAZYWORKTREE_TYPE (pr/issue/diff), LAZYWORKTREE_NUMBER (PR/issue number), LAZYWORKTREE_TEMPLATE (configured template), LAZYWORKTREE_SUGGESTED_NAME (template-generated name using original PR/issue title).
 .br

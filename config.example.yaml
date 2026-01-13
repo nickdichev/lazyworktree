@@ -93,30 +93,32 @@ editor: nvim
 # Template for issue branch names when creating worktrees from issues
 # Available placeholders:
 #   {number} - The issue number
-#   {title}  - The sanitised issue title
+#   {title}  - The sanitised issue title (original)
+#   {generated} - The AI-generated title (falls back to {title} if not available)
 # Examples:
-#   issue_branch_name_template: "issue-{number}-{title}"  # issue-123-fix-login-bug
-#   issue_branch_name_template: "{number}-{title}"        # 123-fix-login-bug
-#   issue_branch_name_template: "fix/{number}-{title}"    # fix/123-fix-login-bug
+#   issue_branch_name_template: "issue-{number}-{title}"      # issue-123-fix-login-bug
+#   issue_branch_name_template: "issue-{number}-{generated}"  # issue-123-fix-auth-bug (AI title)
+#   issue_branch_name_template: "{number}-{title}"            # 123-fix-login-bug
 issue_branch_name_template: "issue-{number}-{title}"
 
 # Template for PR branch names when creating worktrees from pull requests
 # Available placeholders:
 #   {number} - The PR number
-#   {title}  - The sanitised PR title
+#   {title}  - The sanitised PR title (original)
+#   {generated} - The AI-generated title (falls back to {title} if not available)
 # Examples:
-#   pr_branch_name_template: "pr-{number}-{title}"    # pr-123-fix-login-bug
-#   pr_branch_name_template: "pr{number}-{title}"     # pr123-fix-login-bug
-#   pr_branch_name_template: "{number}-{title}"       # 123-fix-login-bug
+#   pr_branch_name_template: "pr-{number}-{title}"              # pr-123-fix-login-bug (original title)
+#   pr_branch_name_template: "pr-{number}-{generated}"          # pr-123-feat-session-manager (AI title)
+#   pr_branch_name_template: "pr-{number}-{generated}-{title}"  # pr-123-feat-session-manager-fix-login-bug (both)
 pr_branch_name_template: "pr-{number}-{title}"
 
 # Script to generate branch name suggestions when creating worktrees from changes, issues, or PRs
 #
-# For PRs/issues: The script should output a TITLE (e.g., "feat-ai-session-manager")
-#                 The template (pr_branch_name_template or issue_branch_name_template) is always applied
-#                 Example: Title "feat-ai-session-manager" + template "pr-{number}-{title}" = "pr-2-feat-ai-session-manager"
+# For PRs/issues: The script outputs a title that is used in the {generated} placeholder
+#                 Use {generated} in your template to use the AI-generated title
+#                 Example: pr_branch_name_template: "pr-{number}-{generated}"
 #
-# For diffs: The script should output a complete branch name
+# For diffs: The script outputs a complete branch name
 #
 # The script receives content on stdin (git diff for changes, issue/PR title+body for issues/PRs)
 #
@@ -127,16 +129,17 @@ pr_branch_name_template: "pr-{number}-{title}"
 #   LAZYWORKTREE_SUGGESTED_NAME: The template-generated branch name using original PR/issue title
 #
 # Examples:
-#   # Generate a title for PRs/issues, complete name for diffs
+#   # Simple title generation for PRs/issues
+#   # Use with pr_branch_name_template: "pr-{number}-{generated}"
+#   branch_name_script: "aichat -m gemini:gemini-2.5-flash-lite 'Generate a short title for this PR or issue. Output only the title.'"
+#
+#   # Different behaviour for diffs vs PRs/issues
 #   branch_name_script: |
 #     if [ "$LAZYWORKTREE_TYPE" = "diff" ]; then
 #       aichat -m gemini:gemini-2.5-flash-lite 'Generate a complete branch name for this diff'
 #     else
-#       aichat -m gemini:gemini-2.5-flash-lite 'Generate a short title (no pr- prefix) for this PR/issue. Output only the title.'
+#       aichat -m gemini:gemini-2.5-flash-lite 'Generate a short title (no pr- prefix). Output only the title.'
 #     fi
-#
-#   # Simple title generation for PRs/issues
-#   branch_name_script: "aichat -m gemini:gemini-2.5-flash-lite 'Generate a short title for this PR or issue. Output only the title, nothing else.'"
 #
 # branch_name_script: ""
 

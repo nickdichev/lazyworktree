@@ -500,8 +500,8 @@ git_pager_args:
 trust_mode: "tofu" # Options: "tofu" (default), "never", "always"
 merge_method: "rebase" # Options: "rebase" (default), "merge"
 # Branch name generation for issues and PRs
-issue_branch_name_template: "issue-{number}-{title}" # Template with {number}, {title} placeholders
-pr_branch_name_template: "pr-{number}-{title}" # Template with {number}, {title} placeholders
+issue_branch_name_template: "issue-{number}-{title}" # Placeholders: {number}, {title}, {generated}
+pr_branch_name_template: "pr-{number}-{title}" # Placeholders: {number}, {title}, {generated}
 # AI-powered branch name generation (works for changes, issues, and PRs)
 branch_name_script: "" # Script to generate branch names from diff/issue/PR content
 init_commands:
@@ -547,9 +547,9 @@ Notes:
 - `pager` designates the pager for `show_output` commands and the diff viewer (default: `$PAGER`, fallback `less --use-color --wordwrap -qcR -P 'Press q to exit..'`, then `more`, then `cat`). When the pager is `less`, lazyworktree configures `LESS=` and `LESSHISTFILE=-` to disregard user defaults.
 - `editor` sets the editor command for the Status pane `e` key (default: config value, then `$EDITOR`, then `nvim`, then `vi`).
 - `merge_method` controls how the "Absorb worktree" action integrates changes into main: `rebase` (default) rebases the feature branch onto main then fast-forwards; `merge` creates a merge commit.
-- `branch_name_script` executes a script to generate branch name suggestions when creating worktrees from changes, issues, or PRs. The script receives the git diff (for changes), issue title+body (for issues), or PR title+body (for PRs) on stdin and should output a branch name. Refer to [AI-powered branch names](#ai-powered-branch-names) below.
-- `issue_branch_name_template` defines the template for issue branch names with placeholders: `{number}`, `{title}` (default: `"issue-{number}-{title}"`). Examples: `issue-123-fix-bug-in-login`, `123-fix-bug-in-login`, `fix/123-fix-bug-in-login`.
-- `pr_branch_name_template` defines the template for PR branch names with placeholders: `{number}`, `{title}` (default: `"pr-{number}-{title}"`). Examples: `pr-123-fix-bug`, `pr123-fix-bug`, `123-fix-bug`.
+- `branch_name_script` executes a script to generate branch name suggestions when creating worktrees from changes, issues, or PRs. The script receives the git diff (for changes), issue title+body (for issues), or PR title+body (for PRs) on stdin and should output a title (for PRs/issues) or branch name (for diffs). The output is available via the `{generated}` placeholder in templates. Refer to [AI-powered branch names](#ai-powered-branch-names) below.
+- `issue_branch_name_template` defines the template for issue branch names with placeholders: `{number}`, `{title}` (original title), `{generated}` (AI-generated title, falls back to `{title}`) (default: `"issue-{number}-{title}"`). Examples: `issue-123-fix-bug-in-login`, `issue-123-fix-auth-bug` (using `{generated}`), `fix/123-fix-bug-in-login`.
+- `pr_branch_name_template` defines the template for PR branch names with placeholders: `{number}`, `{title}` (original title), `{generated}` (AI-generated title, falls back to `{title}`) (default: `"pr-{number}-{title}"`). Examples: `pr-123-fix-bug`, `pr-123-feat-session-manager` (using `{generated}`), `123-fix-bug`.
 - `custom_create_menus` adds custom items to the worktree creation menu (`c` key). Each entry requires a `label` and `command`; `description` is optional. The workflow: you first select a base branch, then the command runs to generate a branch name. By default, commands run non-interactively with a 30-second timeout and their stdout is captured directly. Set `interactive: true` for TUI-based commands (like `jayrah browse` or `fzf`); this suspends lazyworktree, runs the command in the terminal with no timeout, and captures stdout via a temp file. The command output (first line only, whitespace trimmed, case preserved) is used as the suggested branch name. Optionally, specify `post_command` to run a command in the new worktree directory after creation (runs after global/repo `init_commands`); non-interactive post-commands have a 30-second timeout, whilst `post_interactive: true` suspends the TUI with no timeout for interactive post-commands. Post-commands have access to environment variables like `WORKTREE_BRANCH`, `WORKTREE_PATH`, etc. If a post-command fails, the error is shown but the worktree is kept.
 
 ## Themes
@@ -600,9 +600,9 @@ CI status is retrieved lazily (only for the selected worktree) and cached for 30
 
 ## AI-Powered Branch Names
 
-When creating a worktree from changes (via the command palette), issues, or PRs, you may configure an external script to suggest branch names or titles.
+When creating a worktree from changes (via the command palette), issues, or PRs, you may configure an external script to suggest branch names or titles using AI.
 
-**For PRs and issues:** The script should output a **title** that will be sanitized and used in your configured template (e.g., `pr-{number}-{title}`). The template is always applied.
+**For PRs and issues:** The script should output a **title** (e.g., `feat-ai-session-manager`) that will be sanitized and available via the `{generated}` placeholder in your template. You can choose whether to use the AI-generated title, the original title, or both.
 
 **For diffs:** The script should output a complete branch name.
 
@@ -616,26 +616,51 @@ This proves useful for integrating AI tools such as [aichat](https://github.com/
 Add `branch_name_script` to your `~/.config/lazyworktree/config.yaml`:
 
 ```yaml
-# For PRs/issues: generate a title (template will be applied)
+# For PRs/issues: generate a title (available via {generated} placeholder)
 branch_name_script: "aichat -m gemini:gemini-2.5-flash-lite 'Generate a short title for this PR or issue. Output only the title (like feat-ai-session-manager), nothing else.'"
+
+# Choose which template to use:
+pr_branch_name_template: "pr-{number}-{generated}"  # Use AI-generated title
+# pr_branch_name_template: "pr-{number}-{title}"    # Use original PR title
+# pr_branch_name_template: "pr-{number}-{generated}-{title}"  # Use both!
 
 # For diffs: generate a complete branch name
 # branch_name_script: "aichat -m gemini:gemini-2.5-flash-lite 'Generate a short git branch name (no spaces, use hyphens) for this diff. Output only the branch name, nothing else.'"
 ```
 
+### Template Placeholders
+
+When creating worktrees from PRs or issues, the following placeholders are available:
+
+- `{number}` - The PR/issue number
+- `{title}` - The original sanitized PR/issue title (always available)
+- `{generated}` - The AI-generated title (falls back to `{title}` if script not configured or returns empty)
+
+**Examples:**
+
+| Template | Result (PR #2: "Add AI session management") | AI generates: `feat-ai-session-manager` |
+|----------|---------------------------------------------|----------------------------------------|
+| `pr-{number}-{title}` | `pr-2-add-ai-session-management` | Not used |
+| `pr-{number}-{generated}` | `pr-2-feat-ai-session-manager` | Used |
+| `pr-{number}-{generated}-{title}` | `pr-2-feat-ai-session-manager-add-ai-session-management` | Both used |
+
+If the AI script fails or returns empty output, `{generated}` automatically falls back to the sanitized original title.
+
 ### How It Works
 
 1. When you press `c` (or open the command palette) and choose "Create from current branch", the base picker highlights that option; if the selected worktree contains uncommitted modifications, the branch-name prompt surfaces an "Include current file changes" checkbox so you can decide whether to stash and move them into the new worktree. Tab/Shift+Tab cycle focus between the input and checkbox, while Space toggles the box when it is focused.
 2. Should `branch_name_script` be configured:
-   - **For PRs:** The PR title and body are piped to the script. The script outputs a title, which is sanitized and used in `pr_branch_name_template` to create the final branch name.
-   - **For issues:** The issue title and body are piped to the script. The script outputs a title, which is sanitized and used in `issue_branch_name_template` to create the final branch name.
+   - **For PRs:** The PR title and body are piped to the script. The script outputs a title, which is sanitized and made available via the `{generated}` placeholder. Your `pr_branch_name_template` determines how it's used.
+   - **For issues:** The issue title and body are piped to the script. The script outputs a title, which is sanitized and made available via the `{generated}` placeholder. Your `issue_branch_name_template` determines how it's used.
    - **For diffs:** The git diff is piped to the script. The script outputs a complete branch name.
 3. The final branch name is suggested to you.
 4. You may edit the suggestion prior to confirmation.
 
-**Example for PR #2:**
-- AI script generates title: `feat-ai-session-manager`
-- Template: `pr-{number}-{title}`
+**Example for PR #2 with AI script:**
+- Original PR title: "Add AI session management"
+- AI script generates: `feat-ai-session-manager`
+- Template: `pr-{number}-{generated}`
+- Placeholders replaced: `{number}` → `2`, `{generated}` → `feat-ai-session-manager`
 - Result: `pr-2-feat-ai-session-manager`
 
 ### Script Requirements

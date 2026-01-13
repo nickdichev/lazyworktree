@@ -176,10 +176,11 @@ func minInt(a, b int) int {
 }
 
 // generatePRWorktreeName creates a worktree name from a PR using a template.
-// The template supports placeholders: {number}, {title}
+// The template supports placeholders: {number}, {title}, {generated}
 // The name is sanitized to be a valid git branch name and truncated to 100 characters.
-func generatePRWorktreeName(pr *models.PRInfo, template string) string {
-	// Sanitize the title
+// generatedTitle is the AI-generated title (optional). If empty, {generated} falls back to {title}.
+func generatePRWorktreeName(pr *models.PRInfo, template, generatedTitle string) string {
+	// Sanitize the original title
 	title := strings.ToLower(pr.Title)
 
 	// Replace spaces and special characters with hyphens
@@ -191,10 +192,20 @@ func generatePRWorktreeName(pr *models.PRInfo, template string) string {
 	re2 := regexp.MustCompile(`-+`)
 	title = re2.ReplaceAllString(title, "-")
 
+	// Sanitize the generated title (same process)
+	generated := title // fallback to original title
+	if generatedTitle != "" {
+		generated = strings.ToLower(generatedTitle)
+		generated = re.ReplaceAllString(generated, "-")
+		generated = strings.Trim(generated, "-")
+		generated = re2.ReplaceAllString(generated, "-")
+	}
+
 	// Replace placeholders in template
 	name := template
 	name = strings.ReplaceAll(name, "{number}", fmt.Sprintf("%d", pr.Number))
 	name = strings.ReplaceAll(name, "{title}", title)
+	name = strings.ReplaceAll(name, "{generated}", generated)
 
 	// Remove trailing hyphens that might result from empty title
 	// This handles cases like "{prefix}{number}-{title}" when title is empty
@@ -211,10 +222,11 @@ func generatePRWorktreeName(pr *models.PRInfo, template string) string {
 }
 
 // generateIssueWorktreeName creates a worktree name from an issue using a template.
-// The template supports placeholders: {number}, {title}
+// The template supports placeholders: {number}, {title}, {generated}
 // The name is sanitized to be a valid git branch name and truncated to 100 characters.
-func generateIssueWorktreeName(issue *models.IssueInfo, template string) string {
-	// Sanitize the title
+// generatedTitle is the AI-generated title (optional). If empty, {generated} falls back to {title}.
+func generateIssueWorktreeName(issue *models.IssueInfo, template, generatedTitle string) string {
+	// Sanitize the original title
 	title := strings.ToLower(issue.Title)
 
 	// Replace spaces and special characters with hyphens
@@ -226,10 +238,20 @@ func generateIssueWorktreeName(issue *models.IssueInfo, template string) string 
 	re2 := regexp.MustCompile(`-+`)
 	title = re2.ReplaceAllString(title, "-")
 
+	// Sanitize the generated title (same process)
+	generated := title // fallback to original title
+	if generatedTitle != "" {
+		generated = strings.ToLower(generatedTitle)
+		generated = re.ReplaceAllString(generated, "-")
+		generated = strings.Trim(generated, "-")
+		generated = re2.ReplaceAllString(generated, "-")
+	}
+
 	// Replace placeholders in template
 	name := template
 	name = strings.ReplaceAll(name, "{number}", fmt.Sprintf("%d", issue.Number))
 	name = strings.ReplaceAll(name, "{title}", title)
+	name = strings.ReplaceAll(name, "{generated}", generated)
 
 	// Remove trailing hyphens that might result from empty title
 	// This handles cases like "{prefix}{number}-{title}" when title is empty

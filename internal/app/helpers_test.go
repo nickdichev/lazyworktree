@@ -76,7 +76,7 @@ func TestGeneratePRWorktreeName(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Use default template format
-			result := generatePRWorktreeName(tt.pr, "pr-{number}-{title}")
+			result := generatePRWorktreeName(tt.pr, "pr-{number}-{title}", "")
 			// For the long title test, just verify it's <= 100 chars and doesn't end with hyphen
 			if tt.name == "long title gets truncated" {
 				if len(result) > 100 {
@@ -101,7 +101,7 @@ func TestGeneratePRWorktreeName(t *testing.T) {
 			Number: 123,
 			Title:  "Add feature",
 		}
-		result := generatePRWorktreeName(pr, "pr{number}-{title}")
+		result := generatePRWorktreeName(pr, "pr{number}-{title}", "")
 		expected := "pr123-add-feature"
 		if result != expected {
 			t.Errorf("generatePRWorktreeName() with custom template = %q, want %q", result, expected)
@@ -113,7 +113,7 @@ func TestGeneratePRWorktreeName(t *testing.T) {
 			Number: 456,
 			Title:  "Fix bug",
 		}
-		result := generatePRWorktreeName(pr, "{number}-{title}")
+		result := generatePRWorktreeName(pr, "{number}-{title}", "")
 		expected := "456-fix-bug"
 		if result != expected {
 			t.Errorf("generatePRWorktreeName() with custom template = %q, want %q", result, expected)
@@ -125,7 +125,7 @@ func TestGeneratePRWorktreeName(t *testing.T) {
 			Number: 789,
 			Title:  "Update docs",
 		}
-		result := generatePRWorktreeName(pr, "pull{number}-{title}")
+		result := generatePRWorktreeName(pr, "pull{number}-{title}", "")
 		expected := "pull789-update-docs"
 		if result != expected {
 			t.Errorf("generatePRWorktreeName() with custom prefix = %q, want %q", result, expected)
@@ -189,7 +189,7 @@ func TestGenerateIssueWorktreeName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := generateIssueWorktreeName(tt.issue, tt.template)
+			result := generateIssueWorktreeName(tt.issue, tt.template, "")
 			if tt.name == "long title gets truncated" {
 				if len(result) > 100 {
 					t.Errorf("generateIssueWorktreeName() result length = %d, want <= 100", len(result))
@@ -198,6 +198,151 @@ func TestGenerateIssueWorktreeName(t *testing.T) {
 					t.Errorf("generateIssueWorktreeName() result ends with hyphen: %q", result)
 				}
 			} else if result != tt.expected {
+				t.Errorf("generateIssueWorktreeName() = %q, want %q", result, tt.expected)
+			}
+			// Ensure result is max 100 chars
+			if len(result) > 100 {
+				t.Errorf("generateIssueWorktreeName() result length = %d, want <= 100", len(result))
+			}
+		})
+	}
+}
+
+func TestGeneratePRWorktreeNameWithGenerated(t *testing.T) {
+	tests := []struct {
+		name           string
+		pr             *models.PRInfo
+		template       string
+		generatedTitle string
+		expected       string
+	}{
+		{
+			name: "{generated} with AI title provided",
+			pr: &models.PRInfo{
+				Number: 123,
+				Title:  "Add new feature",
+			},
+			template:       "pr-{number}-{generated}",
+			generatedTitle: "feat-session-manager",
+			expected:       "pr-123-feat-session-manager",
+		},
+		{
+			name: "{generated} falls back to {title} when empty",
+			pr: &models.PRInfo{
+				Number: 456,
+				Title:  "Fix login bug",
+			},
+			template:       "pr-{number}-{generated}",
+			generatedTitle: "",
+			expected:       "pr-456-fix-login-bug",
+		},
+		{
+			name: "both {title} and {generated} in template",
+			pr: &models.PRInfo{
+				Number: 789,
+				Title:  "Update documentation",
+			},
+			template:       "pr-{number}-{generated}-from-{title}",
+			generatedTitle: "docs-update",
+			expected:       "pr-789-docs-update-from-update-documentation",
+		},
+		{
+			name: "{title} still works without {generated}",
+			pr: &models.PRInfo{
+				Number: 100,
+				Title:  "Refactor code",
+			},
+			template:       "pr-{number}-{title}",
+			generatedTitle: "refactor-core",
+			expected:       "pr-100-refactor-code",
+		},
+		{
+			name: "{generated} with special characters",
+			pr: &models.PRInfo{
+				Number: 200,
+				Title:  "Original Title!",
+			},
+			template:       "pr-{number}-{generated}",
+			generatedTitle: "Feat: Add AI Support!",
+			expected:       "pr-200-feat-add-ai-support",
+		},
+		{
+			name: "long {generated} title gets truncated",
+			pr: &models.PRInfo{
+				Number: 999,
+				Title:  "Short",
+			},
+			template:       "pr-{number}-{generated}",
+			generatedTitle: "This is a very long generated title that should be truncated because it exceeds the maximum length",
+			expected:       "pr-999-this-is-a-very-long-generated-title-that-should-be-truncated-because-it-exceeds-the",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := generatePRWorktreeName(tt.pr, tt.template, tt.generatedTitle)
+			if tt.name == "long {generated} title gets truncated" {
+				if len(result) > 100 {
+					t.Errorf("generatePRWorktreeName() result length = %d, want <= 100", len(result))
+				}
+				if strings.HasSuffix(result, "-") {
+					t.Errorf("generatePRWorktreeName() result ends with hyphen: %q", result)
+				}
+			} else if result != tt.expected {
+				t.Errorf("generatePRWorktreeName() = %q, want %q", result, tt.expected)
+			}
+			// Ensure result is max 100 chars
+			if len(result) > 100 {
+				t.Errorf("generatePRWorktreeName() result length = %d, want <= 100", len(result))
+			}
+		})
+	}
+}
+
+func TestGenerateIssueWorktreeNameWithGenerated(t *testing.T) {
+	tests := []struct {
+		name           string
+		issue          *models.IssueInfo
+		template       string
+		generatedTitle string
+		expected       string
+	}{
+		{
+			name: "{generated} with AI title provided",
+			issue: &models.IssueInfo{
+				Number: 123,
+				Title:  "Bug in login system",
+			},
+			template:       "issue-{number}-{generated}",
+			generatedTitle: "fix-auth-bug",
+			expected:       "issue-123-fix-auth-bug",
+		},
+		{
+			name: "{generated} falls back to {title} when empty",
+			issue: &models.IssueInfo{
+				Number: 456,
+				Title:  "Feature request",
+			},
+			template:       "issue-{number}-{generated}",
+			generatedTitle: "",
+			expected:       "issue-456-feature-request",
+		},
+		{
+			name: "both {title} and {generated} in template",
+			issue: &models.IssueInfo{
+				Number: 789,
+				Title:  "Performance issue",
+			},
+			template:       "issue-{number}-{generated}-{title}",
+			generatedTitle: "perf-opt",
+			expected:       "issue-789-perf-opt-performance-issue",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := generateIssueWorktreeName(tt.issue, tt.template, tt.generatedTitle)
+			if result != tt.expected {
 				t.Errorf("generateIssueWorktreeName() = %q, want %q", result, tt.expected)
 			}
 			// Ensure result is max 100 chars
