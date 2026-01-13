@@ -459,7 +459,7 @@ When running arbitrary commands with `!`, command history is persisted per repos
 **Command Palette Actions:**
 
 - **Select theme**: Change the application theme with live preview. Available themes: `dracula`, `dracula-light`, `narna`, `clean-light`, `catppuccin-latte`, `rose-pine-dawn`, `one-light`, `everforest-light`, `everforest-dark`, `solarized-dark`, `solarized-light`, `gruvbox-dark`, `gruvbox-light`, `nord`, `monokai`, `catppuccin-mocha`, `modern`, `tokyo-night`, `one-dark`, `rose-pine`, `ayu-mirage`.
-- **Create from current branch**: Choose this option after pressing `c` (or opening the palette) to copy the branch you are currently on. When uncommitted changes exist, an “Include current file changes” checkbox appears beside the name prompt; Tab switches focus to the checkbox, Space toggles it, and enabling it stashes the work and reapplies it inside the new worktree. With the checkbox ticked, any configured `branch_name_script` receives the diff to generate the suggested branch name, so the AI helpers run just as before.
+- **Create from current branch**: Choose this option after pressing `c` (or opening the palette) to copy the branch you are currently on. A friendly random name is suggested for the new branch (you may edit it), and when uncommitted changes exist an “Include current file changes” checkbox appears beside the name prompt; Tab switches focus to the checkbox, Space toggles it, and enabling it stashes the work and reapplies it inside the new worktree. With the checkbox ticked, any configured `branch_name_script` receives the diff to generate the suggested branch name, so the AI helpers run just as before.
 
 ### Mouse Controls
 

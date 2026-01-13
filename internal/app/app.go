@@ -1421,25 +1421,48 @@ func (m *Model) showCreateWorktree() tea.Cmd {
 	return m.showBaseSelection(defaultBase)
 }
 
-func (m *Model) showCreateFromCurrent() tea.Cmd {
-	return func() tea.Msg {
-		// Find current worktree (check cwd, fallback to main worktree)
-		var currentWt *models.WorktreeInfo
-		cwd, _ := os.Getwd()
+func (m *Model) determineCurrentWorktree() *models.WorktreeInfo {
+	if wt := m.selectedWorktree(); wt != nil {
+		return wt
+	}
+
+	if cwd, err := os.Getwd(); err == nil {
 		for _, wt := range m.worktrees {
 			if strings.HasPrefix(cwd, wt.Path) {
-				currentWt = wt
-				break
+				return wt
 			}
 		}
-		if currentWt == nil {
-			for _, wt := range m.worktrees {
-				if wt.IsMain {
-					currentWt = wt
-					break
-				}
-			}
+	}
+
+	for _, wt := range m.worktrees {
+		if wt.IsMain {
+			return wt
 		}
+	}
+
+	return nil
+}
+
+func (m *Model) selectedWorktree() *models.WorktreeInfo {
+	indices := []int{m.worktreeTable.Cursor(), m.selectedIndex}
+	for _, idx := range indices {
+		if wt := m.worktreeAtIndex(idx); wt != nil {
+			return wt
+		}
+	}
+	return nil
+}
+
+func (m *Model) worktreeAtIndex(idx int) *models.WorktreeInfo {
+	if idx < 0 || idx >= len(m.filteredWts) {
+		return nil
+	}
+	return m.filteredWts[idx]
+}
+
+func (m *Model) showCreateFromCurrent() tea.Cmd {
+	return func() tea.Msg {
+		currentWt := m.determineCurrentWorktree()
 		if currentWt == nil {
 			return errMsg{err: fmt.Errorf("could not determine current worktree")}
 		}
@@ -1456,7 +1479,7 @@ func (m *Model) showCreateFromCurrent() tea.Cmd {
 		currentBranch = strings.TrimSpace(currentBranch)
 
 		// Generate default name
-		defaultName := fmt.Sprintf("%s-copy", currentBranch)
+		defaultName := fmt.Sprintf("%s-%s", currentBranch, randomBranchName())
 		var diff string
 
 		// Run AI script if changes exist and configured
@@ -1480,30 +1503,11 @@ func (m *Model) showCreateFromCurrent() tea.Cmd {
 // getCurrentBranchForMenu returns the current branch name for menu display.
 // Returns empty string on error (caller should fallback to static label).
 func (m *Model) getCurrentBranchForMenu() string {
-	// Find current worktree (same logic as showCreateFromCurrent)
-	var currentWt *models.WorktreeInfo
-	cwd, err := os.Getwd()
-	if err == nil {
-		for _, wt := range m.worktrees {
-			if strings.HasPrefix(cwd, wt.Path) {
-				currentWt = wt
-				break
-			}
-		}
-	}
-	if currentWt == nil {
-		for _, wt := range m.worktrees {
-			if wt.IsMain {
-				currentWt = wt
-				break
-			}
-		}
-	}
+	currentWt := m.determineCurrentWorktree()
 	if currentWt == nil {
 		return ""
 	}
 
-	// Get current branch
 	branch := m.git.RunGit(
 		m.ctx,
 		[]string{"git", "rev-parse", "--abbrev-ref", "HEAD"},
@@ -1680,9 +1684,11 @@ func (m *Model) handleCreateFromCurrentReady(msg createFromCurrentReadyMsg) tea.
 		return nil
 	}
 
-	// Show input screen with checkbox
+	// Show input screen; display checkbox when there are changes
 	m.inputScreen = NewInputScreen("Create from current: branch name", "feature/my-branch", msg.defaultBranchName, m.theme)
-	m.inputScreen.SetCheckbox("Include current file changes", msg.hasChanges)
+	if msg.hasChanges {
+		m.inputScreen.SetCheckbox("Include current file changes", true)
+	}
 
 	// Capture context for closure
 	wt := msg.currentWorktree

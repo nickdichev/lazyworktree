@@ -164,6 +164,71 @@ func TestShowCreateWorktreeStartsWithBasePicker(t *testing.T) {
 	}
 }
 
+func TestDetermineCurrentWorktreePrefersSelection(t *testing.T) {
+	cfg := &config.AppConfig{
+		WorktreeDir: t.TempDir(),
+	}
+	m := NewModel(cfg, "")
+
+	main := &models.WorktreeInfo{Path: "/tmp/main", Branch: "main", IsMain: true}
+	feature := &models.WorktreeInfo{Path: "/tmp/feature", Branch: "feature"}
+	m.worktrees = []*models.WorktreeInfo{main, feature}
+	m.filteredWts = m.worktrees
+
+	rows := []table.Row{
+		{"main"},
+		{"feature"},
+	}
+	m.worktreeTable.SetRows(rows)
+	m.worktreeTable.SetCursor(1)
+
+	got := m.determineCurrentWorktree()
+	if got != feature {
+		t.Fatalf("expected selected worktree, got %v", got)
+	}
+}
+
+func TestHandleCreateFromCurrentReadyCheckboxVisibility(t *testing.T) {
+	cfg := &config.AppConfig{
+		WorktreeDir: t.TempDir(),
+	}
+	m := NewModel(cfg, "")
+
+	worktree := &models.WorktreeInfo{Path: "/tmp/branch", Branch: "feature/x"}
+
+	cases := []struct {
+		name           string
+		hasChanges     bool
+		expectCheckbox bool
+		expectChecked  bool
+	}{
+		{name: "no changes", hasChanges: false, expectCheckbox: false},
+		{name: "with changes", hasChanges: true, expectCheckbox: true, expectChecked: true},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			msg := createFromCurrentReadyMsg{
+				currentWorktree:   worktree,
+				currentBranch:     "feature/x",
+				hasChanges:        tt.hasChanges,
+				defaultBranchName: "feature-x",
+			}
+			m.handleCreateFromCurrentReady(msg)
+
+			if m.inputScreen == nil {
+				t.Fatalf("input screen should be initialized")
+			}
+			if m.inputScreen.checkboxEnabled != tt.expectCheckbox {
+				t.Fatalf("expected checkbox enabled=%v, got %v", tt.expectCheckbox, m.inputScreen.checkboxEnabled)
+			}
+			if tt.expectCheckbox && m.inputScreen.checkboxChecked != tt.expectChecked {
+				t.Fatalf("expected checkbox checked=%v, got %v", tt.expectChecked, m.inputScreen.checkboxChecked)
+			}
+		})
+	}
+}
+
 func TestShowBranchNameInputUsesDefaultName(t *testing.T) {
 	cfg := &config.AppConfig{
 		WorktreeDir: t.TempDir(),
@@ -2354,4 +2419,30 @@ func TestShowThemeSelection(t *testing.T) {
 	if len(m.listScreen.items) != len(available) {
 		t.Fatalf("expected %d themes in list, got %d", len(available), len(m.listScreen.items))
 	}
+}
+
+func TestRandomBranchName(t *testing.T) {
+	name := randomBranchName()
+	if name == "" {
+		t.Fatal("expected non-empty random branch name")
+	}
+	parts := strings.Split(name, "-")
+	if len(parts) != 2 {
+		t.Fatalf("expected a single hyphen, got %q", name)
+	}
+	if !stringInSlice(randomAdjectives, parts[0]) {
+		t.Fatalf("unexpected adjective %q", parts[0])
+	}
+	if !stringInSlice(randomNouns, parts[1]) {
+		t.Fatalf("unexpected noun %q", parts[1])
+	}
+}
+
+func stringInSlice(list []string, value string) bool {
+	for _, item := range list {
+		if item == value {
+			return true
+		}
+	}
+	return false
 }
