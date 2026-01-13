@@ -167,6 +167,10 @@ type (
 		targetWorktree *models.WorktreeInfo
 		err            error
 	}
+	aiBranchNameGeneratedMsg struct {
+		name string
+		err  error
+	}
 	commitFilesLoadedMsg struct {
 		sha          string
 		worktreePath string
@@ -330,6 +334,12 @@ type Model struct {
 	ciCache         map[string]*ciCacheEntry // branch -> CI checks cache
 	detailsCache    map[string]*detailsCacheEntry
 	worktreesLoaded bool
+
+	// Create from current state
+	createFromCurrentDiff       string // Cached diff for AI script
+	createFromCurrentRandomName string // Random branch name
+	createFromCurrentAIName     string // AI-generated name (cached)
+	createFromCurrentBranch     string // Current branch name
 
 	// Services
 	trustManager *security.TrustManager
@@ -729,6 +739,28 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case createFromCurrentReadyMsg:
 		return m, m.handleCreateFromCurrentReady(msg)
+
+	case aiBranchNameGeneratedMsg:
+		if msg.err != nil || msg.name == "" {
+			// Failed to generate, keep current value
+			return m, nil
+		}
+
+		// CRITICAL: Sanitize AI-generated name to remove invalid characters like '/'
+		// This prevents creating nested directories in worktree path
+		sanitizedName := sanitizeBranchNameFromTitle(msg.name, m.createFromCurrentRandomName)
+
+		// Cache the generated name
+		suggestedName := m.suggestBranchName(sanitizedName)
+		m.createFromCurrentAIName = suggestedName
+
+		// Update input field if checkbox is still checked
+		if m.inputScreen != nil && m.inputScreen.checkboxChecked {
+			m.inputScreen.input.SetValue(suggestedName)
+			m.inputScreen.input.CursorEnd()
+		}
+
+		return m, nil
 
 	case prDataLoadedMsg, ciStatusLoadedMsg:
 		return m.handlePRMessages(msg)
@@ -1478,16 +1510,13 @@ func (m *Model) showCreateFromCurrent() tea.Cmd {
 		}
 		currentBranch = strings.TrimSpace(currentBranch)
 
-		// Generate default name
+		// Always generate random name as default
 		defaultName := fmt.Sprintf("%s-%s", currentBranch, randomBranchName())
-		var diff string
 
-		// Run AI script if changes exist and configured
+		// Get diff if changes exist (for later AI generation)
+		var diff string
 		if hasChanges && m.config.BranchNameScript != "" {
 			diff = m.git.RunGit(m.ctx, []string{"git", "diff", "HEAD"}, currentWt.Path, []int{0}, false, true)
-			if generatedName, err := runBranchNameScript(m.ctx, m.config.BranchNameScript, diff, "diff", "", "", ""); err == nil && generatedName != "" {
-				defaultName = generatedName
-			}
 		}
 
 		return createFromCurrentReadyMsg{
@@ -1495,7 +1524,7 @@ func (m *Model) showCreateFromCurrent() tea.Cmd {
 			currentBranch:     currentBranch,
 			diff:              diff,
 			hasChanges:        hasChanges,
-			defaultBranchName: m.suggestBranchName(defaultName),
+			defaultBranchName: m.suggestBranchName(defaultName), // Use random name
 		}
 	}
 }
@@ -1678,16 +1707,67 @@ func (m *Model) showCreateFromChangesInput(wt *models.WorktreeInfo, currentBranc
 	return textinput.Blink
 }
 
+func (m *Model) generateAIBranchName() tea.Cmd {
+	return func() tea.Msg {
+		name, err := runBranchNameScript(
+			m.ctx,
+			m.config.BranchNameScript,
+			m.createFromCurrentDiff,
+			"diff",
+			"",
+			"",
+			"",
+		)
+		return aiBranchNameGeneratedMsg{name: name, err: err}
+	}
+}
+
+func (m *Model) handleCheckboxToggle() tea.Cmd {
+	if m.createFromCurrentDiff == "" {
+		// Not in "create from current" flow, ignore
+		return nil
+	}
+
+	if m.inputScreen.checkboxChecked {
+		// Checkbox was checked: switch to AI name
+		if m.createFromCurrentAIName != "" {
+			// Use cached AI name
+			m.inputScreen.input.SetValue(m.createFromCurrentAIName)
+			m.inputScreen.input.CursorEnd()
+			return nil
+		}
+
+		// Generate AI name if not cached
+		if m.config.BranchNameScript != "" && m.createFromCurrentDiff != "" {
+			return m.generateAIBranchName()
+		}
+
+		// No script configured, keep random name
+		return nil
+	}
+
+	// Checkbox was unchecked: restore random name
+	m.inputScreen.input.SetValue(m.createFromCurrentRandomName)
+	m.inputScreen.input.CursorEnd()
+	return nil
+}
+
 func (m *Model) handleCreateFromCurrentReady(msg createFromCurrentReadyMsg) tea.Cmd {
 	if msg.currentWorktree == nil {
 		m.showInfo("Could not determine current worktree", nil)
 		return nil
 	}
 
-	// Show input screen; display checkbox when there are changes
+	// Store context for checkbox toggling
+	m.createFromCurrentDiff = msg.diff
+	m.createFromCurrentRandomName = msg.defaultBranchName
+	m.createFromCurrentBranch = msg.currentBranch
+	m.createFromCurrentAIName = "" // Reset cached AI name
+
+	// Show input screen with random name
 	m.inputScreen = NewInputScreen("Create from current: branch name", "feature/my-branch", msg.defaultBranchName, m.theme)
 	if msg.hasChanges {
-		m.inputScreen.SetCheckbox("Include current file changes", true)
+		m.inputScreen.SetCheckbox("Include current file changes", false)
 	}
 
 	// Capture context for closure
@@ -1722,6 +1802,12 @@ func (m *Model) handleCreateFromCurrentReady(msg createFromCurrentReadyMsg) tea.
 			m.inputScreen.errorMsg = fmt.Sprintf("Path already exists: %s", targetPath)
 			return nil, false
 		}
+
+		// Clear cached state
+		m.createFromCurrentDiff = ""
+		m.createFromCurrentRandomName = ""
+		m.createFromCurrentAIName = ""
+		m.createFromCurrentBranch = ""
 
 		includeChanges := m.inputScreen.checkboxChecked
 		// Only attempt to move changes if checkbox is checked AND there are actual changes
@@ -3966,6 +4052,12 @@ func (m *Model) handleScreenKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 		keyStr := msg.String()
 		if isEscKey(keyStr) {
+			// Clear cached state on exit
+			m.createFromCurrentDiff = ""
+			m.createFromCurrentRandomName = ""
+			m.createFromCurrentAIName = ""
+			m.createFromCurrentBranch = ""
+
 			m.inputScreen = nil
 			m.inputSubmit = nil
 			m.currentScreen = screenNone
@@ -4028,8 +4120,17 @@ func (m *Model) handleScreenKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.inputScreen.historyIndex = -1
 		}
 
+		// Store previous checkbox state before update
+		prevCheckboxState := m.inputScreen.checkboxChecked
+
 		var cmd tea.Cmd
 		_, cmd = m.inputScreen.Update(msg)
+
+		// Detect checkbox state change
+		if m.inputScreen.checkboxEnabled && prevCheckboxState != m.inputScreen.checkboxChecked {
+			return m, tea.Batch(cmd, m.handleCheckboxToggle())
+		}
+
 		return m, cmd
 	}
 	return m, nil

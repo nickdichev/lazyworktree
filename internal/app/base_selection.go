@@ -44,8 +44,22 @@ func (m *Model) showBaseSelection(defaultBase string) tea.Cmd {
 	// Format label with ellipsis if needed
 	fromCurrentLabel := formatCreateFromCurrentLabel(currentBranch)
 
+	// Check for changes in current worktree
+	hasChanges := false
+	currentWt := m.determineCurrentWorktree()
+	if currentWt != nil {
+		statusRaw := m.git.RunGit(m.ctx, []string{"git", "status", "--porcelain"}, currentWt.Path, []int{0}, true, false)
+		hasChanges = strings.TrimSpace(statusRaw) != ""
+	}
+
+	// Set description based on whether changes exist
+	fromCurrentDesc := "Create from current branch"
+	if hasChanges {
+		fromCurrentDesc += " (with or without changes)"
+	}
+
 	items := []selectionItem{
-		{id: "from-current", label: fromCurrentLabel, description: "Create from current branch (with or without changes)"},
+		{id: "from-current", label: fromCurrentLabel, description: fromCurrentDesc},
 		{id: "branch-list", label: "Pick a base branch or tag", description: "Branches, tags, and remotes"},
 		{id: "commit-list", label: "Pick a base commit", description: "Choose a branch, then a commit"},
 		{id: "from-pr", label: "Create from PR/MR", description: "Create from a pull/merge request"},

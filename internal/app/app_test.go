@@ -20,7 +20,12 @@ import (
 	"github.com/chmouel/lazyworktree/internal/theme"
 )
 
-const randomSHA = "abc123"
+const (
+	randomSHA      = "abc123"
+	testRandomName = "main-random123"
+	testDiff       = "diff"
+	testFallback   = "fallback"
+)
 
 func TestFilterPaletteItemsEmptyQueryReturnsAll(t *testing.T) {
 	items := []paletteItem{
@@ -203,7 +208,7 @@ func TestHandleCreateFromCurrentReadyCheckboxVisibility(t *testing.T) {
 		expectChecked  bool
 	}{
 		{name: "no changes", hasChanges: false, expectCheckbox: false},
-		{name: "with changes", hasChanges: true, expectCheckbox: true, expectChecked: true},
+		{name: "with changes", hasChanges: true, expectCheckbox: true, expectChecked: false},
 	}
 
 	for _, tt := range cases {
@@ -226,6 +231,315 @@ func TestHandleCreateFromCurrentReadyCheckboxVisibility(t *testing.T) {
 				t.Fatalf("expected checkbox checked=%v, got %v", tt.expectChecked, m.inputScreen.checkboxChecked)
 			}
 		})
+	}
+}
+
+func TestHandleCreateFromCurrentUsesRandomNameByDefault(t *testing.T) {
+	const testDiffContent = "some diff content"
+
+	cfg := &config.AppConfig{
+		WorktreeDir:      t.TempDir(),
+		BranchNameScript: "echo ai-generated-name", // Script is configured but shouldn't run
+	}
+	m := NewModel(cfg, "")
+
+	msg := createFromCurrentReadyMsg{
+		currentWorktree:   &models.WorktreeInfo{Path: "/tmp/branch", Branch: mainWorktreeName},
+		currentBranch:     mainWorktreeName,
+		diff:              testDiffContent,
+		hasChanges:        true,
+		defaultBranchName: testRandomName,
+	}
+
+	m.handleCreateFromCurrentReady(msg)
+
+	if m.inputScreen == nil {
+		t.Fatal("input screen should be initialized")
+	}
+
+	// Should use random name, not AI-generated
+	got := m.inputScreen.input.Value()
+	if got != testRandomName {
+		t.Errorf("expected random name %q, got %q", testRandomName, got)
+	}
+
+	// Verify context is stored for checkbox toggling
+	if m.createFromCurrentDiff != testDiffContent {
+		t.Errorf("expected diff to be cached, got %q", m.createFromCurrentDiff)
+	}
+	if m.createFromCurrentRandomName != testRandomName {
+		t.Errorf("expected random name to be cached, got %q", m.createFromCurrentRandomName)
+	}
+	if m.createFromCurrentBranch != mainWorktreeName {
+		t.Errorf("expected branch to be cached, got %q", m.createFromCurrentBranch)
+	}
+	if m.createFromCurrentAIName != "" {
+		t.Errorf("expected AI name cache to be empty, got %q", m.createFromCurrentAIName)
+	}
+}
+
+func TestHandleCheckboxToggleWithAIScript(t *testing.T) {
+	cfg := &config.AppConfig{
+		WorktreeDir:      t.TempDir(),
+		BranchNameScript: "echo feature/ai-branch", // Will be sanitized to feature-ai-branch
+	}
+	m := NewModel(cfg, "")
+
+	// Setup the create from current state
+	m.createFromCurrentDiff = testDiff
+	m.createFromCurrentRandomName = testRandomName
+	m.createFromCurrentBranch = mainWorktreeName
+	m.createFromCurrentAIName = ""
+
+	m.inputScreen = NewInputScreen("test", "placeholder", testRandomName, m.theme)
+	m.inputScreen.SetCheckbox("Include changes", false)
+	m.inputScreen.checkboxFocused = true // Simulate tab to checkbox
+
+	// Simulate checking the checkbox
+	m.inputScreen.checkboxChecked = true
+
+	// Call handleCheckboxToggle
+	cmd := m.handleCheckboxToggle()
+	if cmd == nil {
+		t.Fatal("expected command to generate AI name, got nil")
+	}
+
+	// Execute the command to generate AI name
+	msg := cmd()
+	if aiBranchMsg, ok := msg.(aiBranchNameGeneratedMsg); ok {
+		if aiBranchMsg.err != nil {
+			t.Fatalf("AI generation failed: %v", aiBranchMsg.err)
+		}
+		if aiBranchMsg.name == "" {
+			t.Fatal("AI generation returned empty name")
+		}
+
+		// Now handle the message to update the model
+		updated, _ := m.Update(aiBranchMsg)
+		m = updated.(*Model)
+
+		// Verify AI name was sanitized and cached
+		if m.createFromCurrentAIName == "" {
+			t.Error("expected AI name to be cached")
+		}
+		if strings.Contains(m.createFromCurrentAIName, "/") {
+			t.Errorf("AI name should be sanitized (no slashes), got %q", m.createFromCurrentAIName)
+		}
+
+		// Input should be updated to AI name
+		got := m.inputScreen.input.Value()
+		if got == testRandomName {
+			t.Error("expected input to be updated from random name to AI name")
+		}
+		if strings.Contains(got, "/") {
+			t.Errorf("input should not contain slashes, got %q", got)
+		}
+	} else {
+		t.Fatalf("expected aiBranchNameGeneratedMsg, got %T", msg)
+	}
+}
+
+func TestHandleCheckboxToggleBackToUnchecked(t *testing.T) {
+	cfg := &config.AppConfig{
+		WorktreeDir:      t.TempDir(),
+		BranchNameScript: "echo ai-name",
+	}
+	m := NewModel(cfg, "")
+
+	// Setup state with AI name cached
+	m.createFromCurrentDiff = testDiff
+	m.createFromCurrentRandomName = testRandomName
+	m.createFromCurrentBranch = mainWorktreeName
+	m.createFromCurrentAIName = "ai-name-cached"
+
+	m.inputScreen = NewInputScreen("test", "placeholder", "ai-name-cached", m.theme)
+	m.inputScreen.SetCheckbox("Include changes", true) // Start checked
+
+	// Uncheck the checkbox
+	m.inputScreen.checkboxChecked = false
+
+	// Call handleCheckboxToggle
+	cmd := m.handleCheckboxToggle()
+	if cmd != nil {
+		t.Error("expected nil command when unchecking (uses cached random name), got command")
+	}
+
+	// Input should be restored to random name
+	got := m.inputScreen.input.Value()
+	if got != testRandomName {
+		t.Errorf("expected input to be restored to random name %q, got %q", testRandomName, got)
+	}
+}
+
+func TestHandleCheckboxToggleUsesCachedAIName(t *testing.T) {
+	cfg := &config.AppConfig{
+		WorktreeDir:      t.TempDir(),
+		BranchNameScript: "echo new-ai-name",
+	}
+	m := NewModel(cfg, "")
+
+	// Setup state with AI name already cached
+	m.createFromCurrentDiff = testDiff
+	m.createFromCurrentRandomName = testRandomName
+	m.createFromCurrentBranch = mainWorktreeName
+	m.createFromCurrentAIName = "cached-ai-name"
+
+	m.inputScreen = NewInputScreen("test", "placeholder", testRandomName, m.theme)
+	m.inputScreen.SetCheckbox("Include changes", false)
+
+	// Check the checkbox (should use cached AI name, not run script again)
+	m.inputScreen.checkboxChecked = true
+
+	// Call handleCheckboxToggle
+	cmd := m.handleCheckboxToggle()
+	if cmd != nil {
+		t.Error("expected nil command when using cached AI name, got command to generate new name")
+	}
+
+	// Input should be updated to cached AI name
+	got := m.inputScreen.input.Value()
+	if got != "cached-ai-name" {
+		t.Errorf("expected cached AI name 'cached-ai-name', got %q", got)
+	}
+}
+
+func TestHandleCheckboxToggleNoScriptConfigured(t *testing.T) {
+	cfg := &config.AppConfig{
+		WorktreeDir: t.TempDir(),
+		// No BranchNameScript configured
+	}
+	m := NewModel(cfg, "")
+
+	m.createFromCurrentDiff = testDiff
+	m.createFromCurrentRandomName = testRandomName
+	m.createFromCurrentBranch = mainWorktreeName
+
+	m.inputScreen = NewInputScreen("test", "placeholder", testRandomName, m.theme)
+	m.inputScreen.SetCheckbox("Include changes", false)
+
+	// Check the checkbox
+	m.inputScreen.checkboxChecked = true
+
+	// Call handleCheckboxToggle
+	cmd := m.handleCheckboxToggle()
+	if cmd != nil {
+		t.Error("expected nil command when no script configured, got command")
+	}
+
+	// Input should remain unchanged (random name)
+	got := m.inputScreen.input.Value()
+	if got != testRandomName {
+		t.Errorf("expected random name to remain %q, got %q", testRandomName, got)
+	}
+}
+
+func TestAIBranchNameSanitization(t *testing.T) {
+	tests := []struct {
+		name     string
+		aiName   string
+		expected string
+	}{
+		{
+			name:     "slash in name",
+			aiName:   "feature/fix-bug",
+			expected: "feature-fix-bug",
+		},
+		{
+			name:     "multiple slashes",
+			aiName:   "user/feature/new",
+			expected: "user-feature-new",
+		},
+		{
+			name:     "special characters",
+			aiName:   "Fix: Add Support!",
+			expected: "fix-add-support",
+		},
+		{
+			name:     "spaces",
+			aiName:   "my new branch",
+			expected: "my-new-branch",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &config.AppConfig{
+				WorktreeDir: t.TempDir(),
+			}
+			m := NewModel(cfg, "")
+
+			m.createFromCurrentRandomName = testFallback
+
+			// Simulate AI name generation message
+			msg := aiBranchNameGeneratedMsg{
+				name: tt.aiName,
+				err:  nil,
+			}
+
+			// Setup input screen
+			m.inputScreen = NewInputScreen("test", "placeholder", "initial", m.theme)
+			m.inputScreen.SetCheckbox("Include changes", true)
+
+			// Handle the AI name generation
+			updated, _ := m.Update(msg)
+			m = updated.(*Model)
+
+			// Check that the AI name was sanitized
+			if !strings.Contains(m.createFromCurrentAIName, tt.expected) {
+				t.Errorf("expected sanitized name to contain %q, got %q", tt.expected, m.createFromCurrentAIName)
+			}
+			if strings.Contains(m.createFromCurrentAIName, "/") {
+				t.Errorf("sanitized name should not contain slashes, got %q", m.createFromCurrentAIName)
+			}
+		})
+	}
+}
+
+func TestCacheCleanupOnSubmit(t *testing.T) {
+	cfg := &config.AppConfig{
+		WorktreeDir: t.TempDir(),
+	}
+	m := NewModel(cfg, "")
+	m.worktrees = []*models.WorktreeInfo{
+		{Path: "/tmp/main", Branch: mainWorktreeName, IsMain: true},
+	}
+
+	// Setup cached state
+	m.createFromCurrentDiff = testDiff
+	m.createFromCurrentRandomName = testRandomName
+	m.createFromCurrentBranch = mainWorktreeName
+	m.createFromCurrentAIName = "ai-cached"
+
+	msg := createFromCurrentReadyMsg{
+		currentWorktree:   &models.WorktreeInfo{Path: "/tmp/main", Branch: mainWorktreeName},
+		currentBranch:     mainWorktreeName,
+		diff:              testDiff,
+		hasChanges:        true,
+		defaultBranchName: testRandomName,
+	}
+
+	m.handleCreateFromCurrentReady(msg)
+
+	if m.inputSubmit == nil {
+		t.Fatal("inputSubmit callback should be set")
+	}
+
+	// Call inputSubmit (which should clear cache)
+	// Note: This will fail validation because branch doesn't exist in git, but cache should still be cleared
+	m.inputSubmit("new-branch-test", false)
+
+	// Verify cache is cleared
+	if m.createFromCurrentDiff != "" {
+		t.Errorf("expected diff cache to be cleared, got %q", m.createFromCurrentDiff)
+	}
+	if m.createFromCurrentRandomName != "" {
+		t.Errorf("expected random name cache to be cleared, got %q", m.createFromCurrentRandomName)
+	}
+	if m.createFromCurrentAIName != "" {
+		t.Errorf("expected AI name cache to be cleared, got %q", m.createFromCurrentAIName)
+	}
+	if m.createFromCurrentBranch != "" {
+		t.Errorf("expected branch cache to be cleared, got %q", m.createFromCurrentBranch)
 	}
 }
 
