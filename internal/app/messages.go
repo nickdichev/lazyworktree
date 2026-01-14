@@ -49,8 +49,24 @@ func (m *Model) handleWorktreesLoaded(msg worktreesLoadedMsg) (tea.Model, tea.Cm
 	}
 	m.detailsCache = make(map[string]*detailsCacheEntry)
 	m.ensureRepoConfig()
-	m.updateTable()
+
+	// If we have a pending selection (newly created worktree), record access first
 	if m.pendingSelectWorktreePath != "" {
+		m.recordAccess(m.pendingSelectWorktreePath)
+		// Update the LastSwitchedTS for this worktree before sorting
+		for _, wt := range m.worktrees {
+			if wt.Path == m.pendingSelectWorktreePath {
+				wt.LastSwitchedTS = m.accessHistory[wt.Path]
+				break
+			}
+		}
+	}
+
+	// Now update table with the new timestamp
+	m.updateTable()
+
+	if m.pendingSelectWorktreePath != "" {
+		// Find and select the worktree in the filtered list
 		for i, wt := range m.filteredWts {
 			if wt.Path == m.pendingSelectWorktreePath {
 				m.worktreeTable.SetCursor(i)

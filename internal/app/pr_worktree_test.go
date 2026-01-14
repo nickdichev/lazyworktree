@@ -137,11 +137,13 @@ func TestHandleWorktreesLoadedSelectsPendingPath(t *testing.T) {
 	_, _ = m.handleWorktreesLoaded(msg)
 
 	// Should have selected the pending worktree
-	if m.selectedIndex != 2 {
-		t.Errorf("Expected selectedIndex to be 2 (pr-789), got %d", m.selectedIndex)
+	// Since we record access for pending worktrees (newly created), it will be sorted to top (index 0)
+	// when using the default sortModeLastSwitched
+	if m.selectedIndex != 0 {
+		t.Errorf("Expected selectedIndex to be 0 (pr-789 sorted to top), got %d", m.selectedIndex)
 	}
-	if m.worktreeTable.Cursor() != 2 {
-		t.Errorf("Expected table cursor to be 2, got %d", m.worktreeTable.Cursor())
+	if m.worktreeTable.Cursor() != 0 {
+		t.Errorf("Expected table cursor to be 0, got %d", m.worktreeTable.Cursor())
 	}
 
 	// Should clear pending selection after applying it
