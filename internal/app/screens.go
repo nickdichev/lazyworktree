@@ -1157,6 +1157,7 @@ Supported: Letters (a-z, A-Z), numbers (0-9), and hyphens (-). See help for full
 **🔄 Repository Operations**
 - r: Refresh worktree list
 - R: Fetch all remotes
+- P: Push to upstream branch (requires a clean worktree, prompts to set upstream when missing)
 - p: Fetch PR/MR status from GitHub/GitLab
 - s: Cycle sort (Path / Last Active / Last Switched)
 

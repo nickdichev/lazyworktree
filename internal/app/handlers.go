@@ -442,6 +442,9 @@ func (m *Model) handleBuiltInKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.currentScreen = screenLoading
 		return m, m.fetchPRData()
 
+	case "P":
+		return m, m.pushToUpstream()
+
 	case "R":
 		m.loading = true
 		m.statusContent = "Fetching remotes..."

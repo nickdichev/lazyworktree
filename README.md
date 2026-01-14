@@ -399,6 +399,7 @@ custom_commands:
 | `g` | Open LazyGit |
 | `r` | Refresh list |
 | `R` | Fetch all remotes |
+| `P` | Push to upstream branch (requires a clean worktree, prompts to set upstream when missing) |
 | `f` | Filter focused pane (worktrees, files, commits) |
 | `/` | Search focused pane (incremental) |
 | `alt+n`, `alt+p` | Move selection and fill filter input |

@@ -137,6 +137,10 @@ type (
 		prs []*models.PRInfo
 		err error
 	}
+	pushResultMsg struct {
+		output string
+		err    error
+	}
 	createFromPRResultMsg struct {
 		prNumber   int
 		branch     string
@@ -855,6 +859,29 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, m.refreshWorktrees()
 
+	case pushResultMsg:
+		m.loading = false
+		if m.currentScreen == screenLoading {
+			m.currentScreen = screenNone
+			m.loadingScreen = nil
+		}
+		output := strings.TrimSpace(msg.output)
+		if msg.err != nil {
+			message := fmt.Sprintf("Push failed: %v", msg.err)
+			if output != "" {
+				message = fmt.Sprintf("Push failed.\n\n%s", truncateToHeight(output, 3))
+			}
+			m.showInfo(message, nil)
+			return m, nil
+		}
+		if output != "" {
+			message := fmt.Sprintf("Push completed.\n\n%s", truncateToHeight(output, 3))
+			m.showInfo(message, m.updateDetailsView())
+			return m, nil
+		}
+		m.statusContent = "Push completed"
+		return m, m.updateDetailsView()
+
 	case autoRefreshTickMsg:
 		if cmd := m.autoRefreshTick(); cmd != nil {
 			cmds = append(cmds, cmd)
@@ -1494,6 +1521,102 @@ func (m *Model) fetchRemotes() tea.Cmd {
 	return func() tea.Msg {
 		m.git.RunGit(m.ctx, []string{"git", "fetch", "--all", "--quiet"}, "", []int{0}, false, false)
 		return fetchRemotesCompleteMsg{}
+	}
+}
+
+func (m *Model) pushToUpstream() tea.Cmd {
+	wt := m.selectedWorktree()
+	if wt == nil {
+		m.showInfo(errNoWorktreeSelected, nil)
+		return nil
+	}
+	if hasLocalChanges(wt) {
+		m.showInfo("Cannot push while the worktree has local changes.\n\nPlease commit, stash, or discard them first.", nil)
+		return nil
+	}
+	if strings.TrimSpace(wt.Branch) == "" {
+		m.showInfo("Cannot push a detached worktree.", nil)
+		return nil
+	}
+	if wt.HasUpstream {
+		return m.beginPush(wt, nil)
+	}
+	return m.showPushUpstreamInput(wt)
+}
+
+func (m *Model) beginPush(wt *models.WorktreeInfo, args []string) tea.Cmd {
+	m.loading = true
+	m.statusContent = "Pushing to upstream..."
+	m.loadingScreen = NewLoadingScreen("Pushing to upstream...", m.theme)
+	m.currentScreen = screenLoading
+	return m.runPush(wt, args)
+}
+
+func (m *Model) showPushUpstreamInput(wt *models.WorktreeInfo) tea.Cmd {
+	defaultUpstream := fmt.Sprintf("origin/%s", wt.Branch)
+	prompt := fmt.Sprintf("Set upstream for '%s' (remote/branch)", wt.Branch)
+	m.inputScreen = NewInputScreen(prompt, defaultUpstream, defaultUpstream, m.theme)
+	m.inputSubmit = func(value string, checked bool) (tea.Cmd, bool) {
+		remote, branch, ok := parseUpstreamRef(value)
+		if !ok {
+			m.inputScreen.errorMsg = "Please provide upstream as remote/branch."
+			return nil, false
+		}
+		m.inputScreen.errorMsg = ""
+		return m.beginPush(wt, []string{"-u", remote, branch}), true
+	}
+	m.currentScreen = screenInput
+	return textinput.Blink
+}
+
+func parseUpstreamRef(input string) (string, string, bool) {
+	value := strings.TrimSpace(input)
+	if value == "" {
+		return "", "", false
+	}
+	remote, branch, ok := strings.Cut(value, "/")
+	if !ok {
+		return "", "", false
+	}
+	remote = strings.TrimSpace(remote)
+	branch = strings.TrimSpace(branch)
+	if remote == "" || branch == "" {
+		return "", "", false
+	}
+	return remote, branch, true
+}
+
+func hasLocalChanges(wt *models.WorktreeInfo) bool {
+	if wt == nil {
+		return false
+	}
+	if wt.Dirty {
+		return true
+	}
+	return wt.Untracked > 0 || wt.Modified > 0 || wt.Staged > 0
+}
+
+func (m *Model) runPush(wt *models.WorktreeInfo, args []string) tea.Cmd {
+	env := m.buildCommandEnv(wt.Branch, wt.Path)
+	envVars := os.Environ()
+	for k, v := range env {
+		envVars = append(envVars, fmt.Sprintf("%s=%s", k, v))
+	}
+
+	// Clear cache so status pane refreshes with latest git status
+	delete(m.detailsCache, wt.Path)
+
+	cmdArgs := append([]string{"push"}, args...)
+	c := m.commandRunner("git", cmdArgs...)
+	c.Dir = wt.Path
+	c.Env = envVars
+
+	return func() tea.Msg {
+		output, err := c.CombinedOutput()
+		return pushResultMsg{
+			output: strings.TrimSpace(string(output)),
+			err:    err,
+		}
 	}
 }
 
@@ -6017,6 +6140,7 @@ func (m *Model) renderFooter(layout layoutDims) string {
 			m.renderKeyHint("d", "Diff"),
 			m.renderKeyHint("D", "Delete"),
 			m.renderKeyHint("p", "PR Info"),
+			m.renderKeyHint("P", "Push"),
 		}
 		// Show "o" key hint only when current worktree has PR info
 		if m.selectedIndex >= 0 && m.selectedIndex < len(m.filteredWts) {

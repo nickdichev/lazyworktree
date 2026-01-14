@@ -16,6 +16,7 @@ import (
 
 const (
 	testFeat        = "feat"
+	testGitCmd      = "git"
 	testWt1         = "wt1"
 	testWt2         = "wt2"
 	testReadme      = "README.md"
@@ -1132,6 +1133,167 @@ func TestCommitStagedChangesNotInStatusPane(t *testing.T) {
 	// When not in status pane, 'c' should trigger create worktree which returns a command
 	if cmd == nil {
 		t.Fatal("expected command for create worktree when not in status pane")
+	}
+}
+
+func TestPushToUpstreamRunsGitPush(t *testing.T) {
+	cfg := &config.AppConfig{
+		WorktreeDir: t.TempDir(),
+	}
+	m := NewModel(cfg, "")
+
+	wtPath := filepath.Join(cfg.WorktreeDir, "wt1")
+	if err := os.MkdirAll(wtPath, 0o700); err != nil {
+		t.Fatalf("failed to create worktree dir: %v", err)
+	}
+
+	m.filteredWts = []*models.WorktreeInfo{
+		{Path: wtPath, Branch: "feature", HasUpstream: true},
+	}
+	m.selectedIndex = 0
+
+	var gotName string
+	var gotArgs []string
+	m.commandRunner = func(name string, args ...string) *exec.Cmd {
+		gotName = name
+		gotArgs = append([]string{}, args...)
+		return exec.Command("printf", "")
+	}
+
+	_, cmd := m.handleBuiltInKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'P'}})
+	if cmd == nil {
+		t.Fatal("expected command to be returned")
+	}
+	if m.currentScreen != screenLoading {
+		t.Fatalf("expected screenLoading, got %v", m.currentScreen)
+	}
+	if !m.loading || m.loadingScreen == nil {
+		t.Fatal("expected loading screen to be set")
+	}
+	msg := cmd()
+	pushMsg, ok := msg.(pushResultMsg)
+	if !ok {
+		t.Fatalf("expected pushResultMsg, got %T", msg)
+	}
+	if pushMsg.err != nil {
+		t.Fatalf("unexpected push error: %v", pushMsg.err)
+	}
+
+	if gotName != testGitCmd {
+		t.Fatalf("expected git command, got %q", gotName)
+	}
+	if len(gotArgs) < 1 || gotArgs[0] != "push" {
+		t.Fatalf("expected git push args, got %v", gotArgs)
+	}
+	for _, arg := range gotArgs {
+		if arg == "-u" {
+			t.Fatalf("did not expect set-upstream flag, got %v", gotArgs)
+		}
+	}
+}
+
+func TestPushToUpstreamPromptsForUpstream(t *testing.T) {
+	cfg := &config.AppConfig{
+		WorktreeDir: t.TempDir(),
+	}
+	m := NewModel(cfg, "")
+
+	wtPath := filepath.Join(cfg.WorktreeDir, "wt1")
+	if err := os.MkdirAll(wtPath, 0o700); err != nil {
+		t.Fatalf("failed to create worktree dir: %v", err)
+	}
+
+	m.filteredWts = []*models.WorktreeInfo{
+		{Path: wtPath, Branch: "feature"},
+	}
+	m.selectedIndex = 0
+
+	_, cmd := m.handleBuiltInKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'P'}})
+	if cmd == nil {
+		t.Fatal("expected input command to be returned")
+	}
+	if m.currentScreen != screenInput {
+		t.Fatalf("expected screenInput, got %v", m.currentScreen)
+	}
+	if m.inputScreen == nil {
+		t.Fatal("expected inputScreen to be set")
+	}
+	if got := m.inputScreen.input.Value(); got != "origin/feature" {
+		t.Fatalf("expected default upstream %q, got %q", "origin/feature", got)
+	}
+
+	var gotName string
+	var gotArgs []string
+	m.commandRunner = func(name string, args ...string) *exec.Cmd {
+		gotName = name
+		gotArgs = append([]string{}, args...)
+		return exec.Command("printf", "")
+	}
+
+	pushCmd, closeInput := m.inputSubmit("origin/feature", false)
+	if !closeInput {
+		t.Fatal("expected input to close after submit")
+	}
+	if pushCmd == nil {
+		t.Fatal("expected push command to be returned")
+	}
+	if m.currentScreen != screenLoading {
+		t.Fatalf("expected screenLoading, got %v", m.currentScreen)
+	}
+	if !m.loading || m.loadingScreen == nil {
+		t.Fatal("expected loading screen to be set")
+	}
+	msg := pushCmd()
+	pushMsg, ok := msg.(pushResultMsg)
+	if !ok {
+		t.Fatalf("expected pushResultMsg, got %T", msg)
+	}
+	if pushMsg.err != nil {
+		t.Fatalf("unexpected push error: %v", pushMsg.err)
+	}
+
+	if gotName != testGitCmd {
+		t.Fatalf("expected git command, got %q", gotName)
+	}
+	if len(gotArgs) < 4 {
+		t.Fatalf("expected git push -u args, got %v", gotArgs)
+	}
+	if gotArgs[0] != "push" {
+		t.Fatalf("expected git push args, got %v", gotArgs)
+	}
+	if gotArgs[1] != "-u" || gotArgs[2] != "origin" || gotArgs[3] != "feature" {
+		t.Fatalf("expected git push -u origin feature, got %v", gotArgs)
+	}
+}
+
+func TestPushToUpstreamBlocksWithLocalChanges(t *testing.T) {
+	cfg := &config.AppConfig{
+		WorktreeDir: t.TempDir(),
+	}
+	m := NewModel(cfg, "")
+
+	wtPath := filepath.Join(cfg.WorktreeDir, "wt1")
+	if err := os.MkdirAll(wtPath, 0o700); err != nil {
+		t.Fatalf("failed to create worktree dir: %v", err)
+	}
+
+	m.filteredWts = []*models.WorktreeInfo{
+		{Path: wtPath, Branch: "feature", Dirty: true, Modified: 1},
+	}
+	m.selectedIndex = 0
+
+	_, cmd := m.handleBuiltInKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'P'}})
+	if cmd != nil {
+		t.Fatal("expected no command when local changes exist")
+	}
+	if m.currentScreen != screenInfo {
+		t.Fatalf("expected screenInfo, got %v", m.currentScreen)
+	}
+	if m.infoScreen == nil {
+		t.Fatal("expected infoScreen to be set")
+	}
+	if !strings.Contains(m.infoScreen.message, "Cannot push") {
+		t.Fatalf("unexpected info message: %q", m.infoScreen.message)
 	}
 }
 
