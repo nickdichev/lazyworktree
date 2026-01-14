@@ -436,6 +436,18 @@ Enable fuzzy finder suggestions in input dialogues. When enabled, typing in text
 Default: false
 .
 .TP
+.B palette_mru
+Enable MRU (Most Recently Used) sorting for the command palette. When enabled, a "Recently Used" section appears at the top of the palette showing your most frequently used commands. Usage history is stored per-repository in .command-palette-history.json.
+.br
+Default: true
+.
+.TP
+.B palette_mru_limit
+Number of recent commands to show in the command palette MRU section. Only applies when palette_mru is enabled.
+.br
+Default: 8
+.
+.TP
 .B max_untracked_diffs
 Maximum number of untracked file diffs to show. Set to 0 to hide untracked diffs.
 .br
@@ -648,6 +660,8 @@ sort_mode: switched
 fuzzy_finder_input: true
 auto_refresh: true
 refresh_interval: 10
+palette_mru: true
+palette_mru_limit: 5
 
 # Forge integration
 auto_fetch_prs: true

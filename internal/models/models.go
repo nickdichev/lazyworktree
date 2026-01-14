@@ -69,4 +69,6 @@ const (
 	CommandHistoryFilename = ".command-history.json"
 	// AccessHistoryFilename stores worktree access timestamps for sorting.
 	AccessHistoryFilename = ".worktree-access.json"
+	// CommandPaletteHistoryFilename stores command palette usage history for MRU sorting.
+	CommandPaletteHistoryFilename = ".command-palette-history.json"
 )

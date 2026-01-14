@@ -21,11 +21,14 @@ import (
 )
 
 const (
-	randomSHA      = "abc123"
-	testRandomName = "main-random123"
-	testDiff       = "diff"
-	testFallback   = "fallback"
-	testShell      = "shell"
+	randomSHA          = "abc123"
+	testRandomName     = "main-random123"
+	testDiff           = "diff"
+	testFallback       = "fallback"
+	testShell          = "shell"
+	mruSectionLabel    = "Recently Used"
+	testCommandCreate  = "create"
+	testCommandRefresh = "refresh"
 )
 
 func TestFilterPaletteItemsEmptyQueryReturnsAll(t *testing.T) {
@@ -3084,5 +3087,178 @@ func TestCustomPaletteItemsWithNoActiveSessions(t *testing.T) {
 	}
 	if !foundCustomShell {
 		t.Fatal("expected to find custom tmux command 'shell'")
+	}
+}
+
+func TestCommandPaletteMRUDeduplication(t *testing.T) {
+	m := &Model{
+		config: &config.AppConfig{
+			PaletteMRU:      true,
+			PaletteMRULimit: 5,
+		},
+		paletteHistory: []commandPaletteUsage{
+			{ID: "refresh", Timestamp: time.Now().Unix(), Count: 5},
+			{ID: "create", Timestamp: time.Now().Unix() - 100, Count: 3},
+			{ID: "diff", Timestamp: time.Now().Unix() - 200, Count: 2},
+		},
+		windowWidth:  100,
+		windowHeight: 50,
+	}
+
+	cmd := m.showCommandPalette()
+	if cmd == nil {
+		t.Errorf("showCommandPalette should not return nil, got %v", cmd)
+	}
+
+	if m.paletteScreen == nil {
+		t.Fatal("paletteScreen should be set")
+	}
+
+	items := m.paletteScreen.items
+
+	// Check that MRU section exists and is first
+	if len(items) == 0 {
+		t.Fatal("palette should have items")
+	}
+
+	if !items[0].isSection || items[0].label != mruSectionLabel {
+		t.Errorf("first item should be 'Recently Used' section, got %+v", items[0])
+	}
+
+	// Count occurrences of MRU items
+	refreshCount := 0
+	createCount := 0
+	diffCount := 0
+	inMRUSection := false
+
+	for i, item := range items {
+		if item.isSection {
+			if item.label == mruSectionLabel {
+				inMRUSection = true
+			} else {
+				inMRUSection = false
+			}
+			continue
+		}
+
+		if item.id == testCommandRefresh {
+			refreshCount++
+			if !inMRUSection {
+				t.Errorf("'refresh' found outside MRU section at index %d", i)
+			}
+		}
+		if item.id == testCommandCreate {
+			createCount++
+			if !inMRUSection {
+				t.Errorf("'create' found outside MRU section at index %d", i)
+			}
+		}
+		if item.id == "diff" {
+			diffCount++
+			if !inMRUSection {
+				t.Errorf("'diff' found outside MRU section at index %d", i)
+			}
+		}
+	}
+
+	// Each MRU item should appear exactly once (only in MRU section)
+	if refreshCount != 1 {
+		t.Errorf("'refresh' should appear exactly once, found %d times", refreshCount)
+	}
+	if createCount != 1 {
+		t.Errorf("'create' should appear exactly once, found %d times", createCount)
+	}
+	if diffCount != 1 {
+		t.Errorf("'diff' should appear exactly once, found %d times", diffCount)
+	}
+}
+
+func TestCommandPaletteMRUDisabled(t *testing.T) {
+	m := &Model{
+		config: &config.AppConfig{
+			PaletteMRU:      false,
+			PaletteMRULimit: 5,
+		},
+		paletteHistory: []commandPaletteUsage{
+			{ID: "refresh", Timestamp: time.Now().Unix(), Count: 5},
+		},
+		windowWidth:  100,
+		windowHeight: 50,
+	}
+
+	cmd := m.showCommandPalette()
+	if cmd == nil {
+		t.Errorf("showCommandPalette should not return nil, got %v", cmd)
+	}
+
+	items := m.paletteScreen.items
+
+	// Should NOT have MRU section when disabled
+	for _, item := range items {
+		if item.isSection && item.label == mruSectionLabel {
+			t.Error("MRU section should not appear when palette_mru is false")
+		}
+	}
+
+	// Items should appear in their original sections
+	refreshCount := 0
+	for _, item := range items {
+		if item.id == testCommandRefresh {
+			refreshCount++
+		}
+	}
+
+	if refreshCount != 1 {
+		t.Errorf("'refresh' should appear exactly once in original section, found %d times", refreshCount)
+	}
+}
+
+func TestCommandPaletteMRUEmptyHistory(t *testing.T) {
+	m := &Model{
+		config: &config.AppConfig{
+			PaletteMRU:      true,
+			PaletteMRULimit: 5,
+		},
+		paletteHistory: []commandPaletteUsage{},
+		windowWidth:    100,
+		windowHeight:   50,
+	}
+
+	cmd := m.showCommandPalette()
+	if cmd == nil {
+		t.Errorf("showCommandPalette should not return nil, got %v", cmd)
+	}
+
+	items := m.paletteScreen.items
+
+	// Should NOT have MRU section when history is empty
+	for _, item := range items {
+		if item.isSection && item.label == mruSectionLabel {
+			t.Error("MRU section should not appear when history is empty")
+		}
+	}
+}
+
+func TestFilterPaletteItemsSkipsMRU(t *testing.T) {
+	items := []paletteItem{
+		{label: mruSectionLabel, isSection: true},
+		{id: "refresh", label: "Refresh (r)", description: "Reload worktrees", isMRU: true},
+		{label: "Git Operations", isSection: true},
+		{id: "refresh", label: "Refresh (r)", description: "Reload worktrees"},
+		{id: "diff", label: "Show diff (d)", description: "Show diff"},
+	}
+
+	filtered := filterPaletteItems(items, "ref")
+
+	// Should skip MRU items and sections during filtering
+	if len(filtered) != 1 {
+		t.Errorf("expected 1 filtered item (refresh from Git Operations), got %d", len(filtered))
+		for i, item := range filtered {
+			t.Logf("  [%d] id=%s label=%s isMRU=%v isSection=%v", i, item.id, item.label, item.isMRU, item.isSection)
+		}
+	}
+
+	if len(filtered) > 0 && filtered[0].isMRU {
+		t.Error("filtered item should not be marked as MRU")
 	}
 }

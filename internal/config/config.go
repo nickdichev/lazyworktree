@@ -80,6 +80,8 @@ type AppConfig struct {
 	IssueBranchNameTemplate string // Template for issue branch names with placeholders: {number}, {title} (default: "issue-{number}-{title}")
 	PRBranchNameTemplate    string // Template for PR branch names with placeholders: {number}, {title} (default: "pr-{number}-{title}")
 	SessionPrefix           string // Prefix for tmux/zellij session names (default: "wt-")
+	PaletteMRU              bool   // Enable MRU sorting for command palette (default: false)
+	PaletteMRULimit         int    // Number of MRU items to show (default: 5)
 	CustomCreateMenus       []*CustomCreateMenu
 	ConfigPath              string `yaml:"-"` // Path to the configuration file
 }
@@ -110,6 +112,8 @@ func DefaultConfig() *AppConfig {
 		IssueBranchNameTemplate: "issue-{number}-{title}",
 		PRBranchNameTemplate:    "pr-{number}-{title}",
 		SessionPrefix:           "wt-",
+		PaletteMRU:              true,
+		PaletteMRULimit:         5,
 		ShowIcons:               true,
 		CustomCommands: map[string]*CustomCommand{
 			"t": {
@@ -269,6 +273,12 @@ func parseConfig(data map[string]any) *AppConfig {
 		if sessionPrefix != "" {
 			cfg.SessionPrefix = sessionPrefix
 		}
+	}
+
+	cfg.PaletteMRU = coerceBool(data["palette_mru"], true)
+	cfg.PaletteMRULimit = coerceInt(data["palette_mru_limit"], 5)
+	if cfg.PaletteMRULimit <= 0 {
+		cfg.PaletteMRULimit = 5
 	}
 
 	if cfg.MaxUntrackedDiffs < 0 {

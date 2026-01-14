@@ -636,14 +636,14 @@ func TestFilterPaletteItems(t *testing.T) {
 func TestFilterPaletteItemsSkipsSections(t *testing.T) {
 	items := []paletteItem{
 		{label: "Section", isSection: true},
-		{id: "create", label: "Create", description: "Create item"},
+		{id: testCommandCreate, label: "Create", description: "Create item"},
 		{id: "delete", label: "Delete", description: "Delete item"},
 	}
 	result := filterPaletteItems(items, "cre")
 	if len(result) != 1 {
 		t.Errorf("expected 1 result, got %d", len(result))
 	}
-	if result[0].id != "create" {
+	if result[0].id != testCommandCreate {
 		t.Errorf("expected 'create', got %q", result[0].id)
 	}
 }
@@ -651,7 +651,7 @@ func TestFilterPaletteItemsSkipsSections(t *testing.T) {
 func TestFilterPaletteItemsIncludesSectionsWhenEmpty(t *testing.T) {
 	items := []paletteItem{
 		{label: "Section", isSection: true},
-		{id: "create", label: "Create", description: "Create item"},
+		{id: testCommandCreate, label: "Create", description: "Create item"},
 	}
 	result := filterPaletteItems(items, "")
 	if len(result) != 2 {

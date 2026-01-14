@@ -403,6 +403,9 @@ type Model struct {
 	// Command history for ! command
 	commandHistory []string
 
+	// Command palette usage history for MRU sorting
+	paletteHistory []commandPaletteUsage
+
 	// Original theme before theme selection (for preview rollback)
 	originalTheme string
 
@@ -595,6 +598,7 @@ func NewModel(cfg *config.AppConfig, initialFilter string) *Model {
 func (m *Model) Init() tea.Cmd {
 	m.loadCommandHistory()
 	m.loadAccessHistory()
+	m.loadPaletteHistory()
 	cmds := []tea.Cmd{
 		m.loadCache(),
 		m.refreshWorktrees(),
@@ -2839,71 +2843,195 @@ func (m *Model) showAbsorbWorktree() tea.Cmd {
 	return nil
 }
 
+func (m *Model) buildMRUPaletteItems() []paletteItem {
+	if !m.config.PaletteMRU || len(m.paletteHistory) == 0 {
+		return nil
+	}
+
+	// Build a lookup map of all available palette items
+	itemMap := make(map[string]paletteItem)
+	customItems := m.customPaletteItems()
+
+	// Add all standard palette items
+	standardItems := []paletteItem{
+		// Worktree Actions
+		{id: "create", label: "Create worktree (c)", description: "Add a new worktree from base branch or PR/MR"},
+		{id: "delete", label: "Delete worktree (D)", description: "Remove worktree and branch"},
+		{id: "rename", label: "Rename worktree (m)", description: "Rename worktree and branch"},
+		{id: "absorb", label: "Absorb worktree (A)", description: "Merge branch into main and remove worktree"},
+		{id: "prune", label: "Prune merged (X)", description: "Remove merged PR worktrees"},
+
+		// Create Shortcuts
+		{id: "create-from-current", label: "Create worktree from current branch", description: "Create from current branch with or without changes"},
+		{id: "create-from-branch", label: "Create worktree from branch/tag", description: "Select a branch, tag, or remote as base"},
+		{id: "create-from-commit", label: "Create worktree from commit", description: "Choose a branch, then select a specific commit"},
+		{id: "create-from-pr", label: "Create worktree from PR/MR", description: "Create from a pull/merge request"},
+		{id: "create-from-issue", label: "Create worktree from issue", description: "Create from a GitHub/GitLab issue"},
+		{id: "create-freeform", label: "Create worktree from ref", description: "Enter a branch, tag, or commit manually"},
+
+		// Git Operations
+		{id: "diff", label: "Show diff (d)", description: "Show diff for current worktree or commit"},
+		{id: "refresh", label: "Refresh (r)", description: "Reload worktrees"},
+		{id: "fetch", label: "Fetch remotes (R)", description: "git fetch --all"},
+		{id: "fetch-pr-data", label: "Fetch PR data (p)", description: "Fetch PR/MR status from GitHub/GitLab"},
+		{id: "pr", label: "Open PR (o)", description: "Open PR in browser"},
+		{id: "lazygit", label: "Open LazyGit (g)", description: "Open LazyGit in selected worktree"},
+		{id: "run-command", label: "Run command (!)", description: "Run arbitrary command in worktree"},
+
+		// Status Pane
+		{id: "stage-file", label: "Stage/unstage file (s)", description: "Stage or unstage selected file"},
+		{id: "commit-staged", label: "Commit staged (c)", description: "Commit staged changes"},
+		{id: "commit-all", label: "Stage all and commit (C)", description: "Stage all changes and commit"},
+		{id: "edit-file", label: "Edit file (e)", description: "Open selected file in editor"},
+		{id: "delete-file", label: "Delete file (D)", description: "Delete selected file or directory"},
+
+		// Log Pane
+		{id: "cherry-pick", label: "Cherry-pick commit (C)", description: "Cherry-pick commit to another worktree"},
+		{id: "commit-view", label: "Browse commit files", description: "Browse files changed in selected commit"},
+
+		// Navigation
+		{id: "zoom-toggle", label: "Toggle zoom (=)", description: "Toggle zoom on focused pane"},
+		{id: "filter", label: "Filter (f)", description: "Filter items in focused pane"},
+		{id: "search", label: "Search (/)", description: "Search items in focused pane"},
+		{id: "focus-worktrees", label: "Focus worktrees (1)", description: "Focus worktree pane"},
+		{id: "focus-status", label: "Focus status (2)", description: "Focus status pane"},
+		{id: "focus-log", label: "Focus log (3)", description: "Focus log pane"},
+		{id: "sort-cycle", label: "Cycle sort (s)", description: "Cycle sort mode (path/active/switched)"},
+
+		// Settings
+		{id: "theme", label: "Select theme", description: "Change the application theme with live preview"},
+		{id: "help", label: "Help (?)", description: "Show help"},
+	}
+
+	for _, item := range standardItems {
+		if item.id != "" {
+			itemMap[item.id] = item
+		}
+	}
+
+	// Add custom items to the map
+	for _, item := range customItems {
+		if item.id != "" && !item.isSection {
+			itemMap[item.id] = item
+		}
+	}
+
+	// Build MRU list from history
+	mruItems := make([]paletteItem, 0, m.config.PaletteMRULimit)
+	for _, usage := range m.paletteHistory {
+		if len(mruItems) >= m.config.PaletteMRULimit {
+			break
+		}
+
+		// Look up the item details
+		if item, exists := itemMap[usage.ID]; exists {
+			// Mark as MRU and add to list
+			item.isMRU = true
+			mruItems = append(mruItems, item)
+		}
+	}
+
+	return mruItems
+}
+
 func (m *Model) showCommandPalette() tea.Cmd {
 	m.debugf("open palette")
 	customItems := m.customPaletteItems()
 	items := make([]paletteItem, 0, 40+len(customItems))
-	items = append(items,
-		// Section: Worktree Actions
-		paletteItem{label: "Worktree Actions", isSection: true},
-		paletteItem{id: "create", label: "Create worktree (c)", description: "Add a new worktree from base branch or PR/MR"},
-		paletteItem{id: "delete", label: "Delete worktree (D)", description: "Remove worktree and branch"},
-		paletteItem{id: "rename", label: "Rename worktree (m)", description: "Rename worktree and branch"},
-		paletteItem{id: "absorb", label: "Absorb worktree (A)", description: "Merge branch into main and remove worktree"},
-		paletteItem{id: "prune", label: "Prune merged (X)", description: "Remove merged PR worktrees"},
 
-		// Section: Create Shortcuts
-		paletteItem{label: "Create Shortcuts", isSection: true},
-		paletteItem{id: "create-from-current", label: "Create worktree from current branch", description: "Create from current branch with or without changes"},
-		paletteItem{id: "create-from-branch", label: "Create worktree from branch/tag", description: "Select a branch, tag, or remote as base"},
-		paletteItem{id: "create-from-commit", label: "Create worktree from commit", description: "Choose a branch, then select a specific commit"},
-		paletteItem{id: "create-from-pr", label: "Create worktree from PR/MR", description: "Create from a pull/merge request"},
-		paletteItem{id: "create-from-issue", label: "Create worktree from issue", description: "Create from a GitHub/GitLab issue"},
-		paletteItem{id: "create-freeform", label: "Create worktree from ref", description: "Enter a branch, tag, or commit manually"},
+	// Build MRU section and track which items are in it
+	mruIDs := make(map[string]bool)
+	m.debugf("palette MRU: enabled=%v, history_len=%d", m.config.PaletteMRU, len(m.paletteHistory))
+	if m.config.PaletteMRU && len(m.paletteHistory) > 0 {
+		mruItems := m.buildMRUPaletteItems()
+		m.debugf("palette MRU: built %d items", len(mruItems))
+		if len(mruItems) > 0 {
+			items = append(items, paletteItem{label: "Recently Used", isSection: true})
+			items = append(items, mruItems...)
+			// Track MRU IDs to exclude from other sections
+			for _, item := range mruItems {
+				if item.id != "" {
+					mruIDs[item.id] = true
+				}
+			}
+		}
+	}
 
-		// Section: Git Operations
-		paletteItem{label: "Git Operations", isSection: true},
-		paletteItem{id: "diff", label: "Show diff (d)", description: "Show diff for current worktree or commit"},
-		paletteItem{id: "refresh", label: "Refresh (r)", description: "Reload worktrees"},
-		paletteItem{id: "fetch", label: "Fetch remotes (R)", description: "git fetch --all"},
-		paletteItem{id: "fetch-pr-data", label: "Fetch PR data (p)", description: "Fetch PR/MR status from GitHub/GitLab"},
-		paletteItem{id: "pr", label: "Open PR (o)", description: "Open PR in browser"},
-		paletteItem{id: "lazygit", label: "Open LazyGit (g)", description: "Open LazyGit in selected worktree"},
-		paletteItem{id: "run-command", label: "Run command (!)", description: "Run arbitrary command in worktree"},
+	// Helper to add item only if not in MRU
+	addItem := func(item paletteItem) {
+		if item.id == "" || !mruIDs[item.id] {
+			items = append(items, item)
+		}
+	}
 
-		// Section: Status Pane
-		paletteItem{label: "Status Pane", isSection: true},
-		paletteItem{id: "stage-file", label: "Stage/unstage file (s)", description: "Stage or unstage selected file"},
-		paletteItem{id: "commit-staged", label: "Commit staged (c)", description: "Commit staged changes"},
-		paletteItem{id: "commit-all", label: "Stage all and commit (C)", description: "Stage all changes and commit"},
-		paletteItem{id: "edit-file", label: "Edit file (e)", description: "Open selected file in editor"},
-		paletteItem{id: "delete-file", label: "Delete file (D)", description: "Delete selected file or directory"},
+	// Section: Worktree Actions
+	items = append(items, paletteItem{label: "Worktree Actions", isSection: true})
+	addItem(paletteItem{id: "create", label: "Create worktree (c)", description: "Add a new worktree from base branch or PR/MR"})
+	addItem(paletteItem{id: "delete", label: "Delete worktree (D)", description: "Remove worktree and branch"})
+	addItem(paletteItem{id: "rename", label: "Rename worktree (m)", description: "Rename worktree and branch"})
+	addItem(paletteItem{id: "absorb", label: "Absorb worktree (A)", description: "Merge branch into main and remove worktree"})
+	addItem(paletteItem{id: "prune", label: "Prune merged (X)", description: "Remove merged PR worktrees"})
 
-		// Section: Log Pane
-		paletteItem{label: "Log Pane", isSection: true},
-		paletteItem{id: "cherry-pick", label: "Cherry-pick commit (C)", description: "Cherry-pick commit to another worktree"},
-		paletteItem{id: "commit-view", label: "Browse commit files", description: "Browse files changed in selected commit"},
+	// Section: Create Shortcuts
+	items = append(items, paletteItem{label: "Create Shortcuts", isSection: true})
+	addItem(paletteItem{id: "create-from-current", label: "Create worktree from current branch", description: "Create from current branch with or without changes"})
+	addItem(paletteItem{id: "create-from-branch", label: "Create worktree from branch/tag", description: "Select a branch, tag, or remote as base"})
+	addItem(paletteItem{id: "create-from-commit", label: "Create worktree from commit", description: "Choose a branch, then select a specific commit"})
+	addItem(paletteItem{id: "create-from-pr", label: "Create worktree from PR/MR", description: "Create from a pull/merge request"})
+	addItem(paletteItem{id: "create-from-issue", label: "Create worktree from issue", description: "Create from a GitHub/GitLab issue"})
+	addItem(paletteItem{id: "create-freeform", label: "Create worktree from ref", description: "Enter a branch, tag, or commit manually"})
 
-		// Section: Navigation
-		paletteItem{label: "Navigation", isSection: true},
-		paletteItem{id: "zoom-toggle", label: "Toggle zoom (=)", description: "Toggle zoom on focused pane"},
-		paletteItem{id: "filter", label: "Filter (f)", description: "Filter items in focused pane"},
-		paletteItem{id: "search", label: "Search (/)", description: "Search items in focused pane"},
-		paletteItem{id: "focus-worktrees", label: "Focus worktrees (1)", description: "Focus worktree pane"},
-		paletteItem{id: "focus-status", label: "Focus status (2)", description: "Focus status pane"},
-		paletteItem{id: "focus-log", label: "Focus log (3)", description: "Focus log pane"},
-		paletteItem{id: "sort-cycle", label: "Cycle sort (s)", description: "Cycle sort mode (path/active/switched)"},
+	// Section: Git Operations
+	items = append(items, paletteItem{label: "Git Operations", isSection: true})
+	addItem(paletteItem{id: "diff", label: "Show diff (d)", description: "Show diff for current worktree or commit"})
+	addItem(paletteItem{id: "refresh", label: "Refresh (r)", description: "Reload worktrees"})
+	addItem(paletteItem{id: "fetch", label: "Fetch remotes (R)", description: "git fetch --all"})
+	addItem(paletteItem{id: "fetch-pr-data", label: "Fetch PR data (p)", description: "Fetch PR/MR status from GitHub/GitLab"})
+	addItem(paletteItem{id: "pr", label: "Open PR (o)", description: "Open PR in browser"})
+	addItem(paletteItem{id: "lazygit", label: "Open LazyGit (g)", description: "Open LazyGit in selected worktree"})
+	addItem(paletteItem{id: "run-command", label: "Run command (!)", description: "Run arbitrary command in worktree"})
 
-		// Section: Settings
-		paletteItem{label: "Settings", isSection: true},
-		paletteItem{id: "theme", label: "Select theme", description: "Change the application theme with live preview"},
-		paletteItem{id: "help", label: "Help (?)", description: "Show help"},
-	)
-	items = append(items, customItems...)
+	// Section: Status Pane
+	items = append(items, paletteItem{label: "Status Pane", isSection: true})
+	addItem(paletteItem{id: "stage-file", label: "Stage/unstage file (s)", description: "Stage or unstage selected file"})
+	addItem(paletteItem{id: "commit-staged", label: "Commit staged (c)", description: "Commit staged changes"})
+	addItem(paletteItem{id: "commit-all", label: "Stage all and commit (C)", description: "Stage all changes and commit"})
+	addItem(paletteItem{id: "edit-file", label: "Edit file (e)", description: "Open selected file in editor"})
+	addItem(paletteItem{id: "delete-file", label: "Delete file (D)", description: "Delete selected file or directory"})
+
+	// Section: Log Pane
+	items = append(items, paletteItem{label: "Log Pane", isSection: true})
+	addItem(paletteItem{id: "cherry-pick", label: "Cherry-pick commit (C)", description: "Cherry-pick commit to another worktree"})
+	addItem(paletteItem{id: "commit-view", label: "Browse commit files", description: "Browse files changed in selected commit"})
+
+	// Section: Navigation
+	items = append(items, paletteItem{label: "Navigation", isSection: true})
+	addItem(paletteItem{id: "zoom-toggle", label: "Toggle zoom (=)", description: "Toggle zoom on focused pane"})
+	addItem(paletteItem{id: "filter", label: "Filter (f)", description: "Filter items in focused pane"})
+	addItem(paletteItem{id: "search", label: "Search (/)", description: "Search items in focused pane"})
+	addItem(paletteItem{id: "focus-worktrees", label: "Focus worktrees (1)", description: "Focus worktree pane"})
+	addItem(paletteItem{id: "focus-status", label: "Focus status (2)", description: "Focus status pane"})
+	addItem(paletteItem{id: "focus-log", label: "Focus log (3)", description: "Focus log pane"})
+	addItem(paletteItem{id: "sort-cycle", label: "Cycle sort (s)", description: "Cycle sort mode (path/active/switched)"})
+
+	// Section: Settings
+	items = append(items, paletteItem{label: "Settings", isSection: true})
+	addItem(paletteItem{id: "theme", label: "Select theme", description: "Change the application theme with live preview"})
+	addItem(paletteItem{id: "help", label: "Help (?)", description: "Show help"})
+
+	// Add custom items (filter out MRU duplicates)
+	for _, item := range customItems {
+		if item.id == "" || !mruIDs[item.id] {
+			items = append(items, item)
+		}
+	}
 
 	m.paletteScreen = NewCommandPaletteScreen(items, m.windowWidth, m.windowHeight, m.theme)
 	m.paletteSubmit = func(action string) tea.Cmd {
 		m.debugf("palette action: %s", action)
+
+		// Track usage for MRU
+		m.addToPaletteHistory(action)
 
 		// Handle tmux active session attachment
 		if strings.HasPrefix(action, "tmux-attach:") {
@@ -4562,6 +4690,13 @@ func (m *Model) saveCache() {
 	}
 }
 
+// commandPaletteUsage tracks usage frequency and recency for command palette items.
+type commandPaletteUsage struct {
+	ID        string `json:"id"`
+	Timestamp int64  `json:"timestamp"`
+	Count     int    `json:"count"`
+}
+
 func (m *Model) loadCommandHistory() {
 	repoKey := m.getRepoKey()
 	historyPath := filepath.Join(m.getWorktreeDir(), repoKey, models.CommandHistoryFilename)
@@ -4660,6 +4795,91 @@ func (m *Model) saveAccessHistory() {
 	if err := os.WriteFile(historyPath, data, defaultFilePerms); err != nil {
 		m.debugf("failed to write access history: %v", err)
 	}
+}
+
+func (m *Model) loadPaletteHistory() {
+	repoKey := m.getRepoKey()
+	historyPath := filepath.Join(m.getWorktreeDir(), repoKey, models.CommandPaletteHistoryFilename)
+	// #nosec G304 -- historyPath is constructed from vetted worktree directory and constant filename
+	data, err := os.ReadFile(historyPath)
+	if err != nil {
+		m.paletteHistory = []commandPaletteUsage{}
+		return
+	}
+
+	var payload struct {
+		Commands []commandPaletteUsage `json:"commands"`
+	}
+	if err := json.Unmarshal(data, &payload); err != nil {
+		m.debugf("failed to parse palette history: %v", err)
+		m.paletteHistory = []commandPaletteUsage{}
+		return
+	}
+
+	m.paletteHistory = payload.Commands
+	if m.paletteHistory == nil {
+		m.paletteHistory = []commandPaletteUsage{}
+	}
+}
+
+func (m *Model) savePaletteHistory() {
+	repoKey := m.getRepoKey()
+	historyPath := filepath.Join(m.getWorktreeDir(), repoKey, models.CommandPaletteHistoryFilename)
+	if err := os.MkdirAll(filepath.Dir(historyPath), defaultDirPerms); err != nil {
+		m.debugf("failed to create palette history dir: %v", err)
+		return
+	}
+
+	historyData := struct {
+		Commands []commandPaletteUsage `json:"commands"`
+	}{
+		Commands: m.paletteHistory,
+	}
+	data, _ := json.Marshal(historyData)
+	if err := os.WriteFile(historyPath, data, defaultFilePerms); err != nil {
+		m.debugf("failed to write palette history: %v", err)
+	}
+}
+
+func (m *Model) addToPaletteHistory(id string) {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return
+	}
+
+	m.debugf("adding to palette history: %s", id)
+	now := time.Now().Unix()
+
+	// Find existing entry and update it
+	found := false
+	for i, entry := range m.paletteHistory {
+		if entry.ID == id {
+			m.paletteHistory[i].Timestamp = now
+			m.paletteHistory[i].Count++
+			// Move to front
+			updated := m.paletteHistory[i]
+			m.paletteHistory = append([]commandPaletteUsage{updated}, append(m.paletteHistory[:i], m.paletteHistory[i+1:]...)...)
+			found = true
+			break
+		}
+	}
+
+	// Add new entry if not found
+	if !found {
+		m.paletteHistory = append([]commandPaletteUsage{{
+			ID:        id,
+			Timestamp: now,
+			Count:     1,
+		}}, m.paletteHistory...)
+	}
+
+	// Limit history to 100 entries
+	maxHistory := 100
+	if len(m.paletteHistory) > maxHistory {
+		m.paletteHistory = m.paletteHistory[:maxHistory]
+	}
+
+	m.savePaletteHistory()
 }
 
 func (m *Model) recordAccess(path string) {

@@ -514,6 +514,8 @@ refresh_interval: 10  # Seconds
 show_icons: true
 search_auto_select: false
 fuzzy_finder_input: false
+palette_mru: true         # Enable MRU (Most Recently Used) sorting for command palette
+palette_mru_limit: 5      # Number of recent commands to show (default: 5)
 max_untracked_diffs: 10
 max_diff_chars: 200000
 theme: ""       # Leave empty to auto-detect based on terminal background color
@@ -571,6 +573,7 @@ Notes:
 - Set `show_icons: false` to disable icons.
 - Set `search_auto_select` to `true` to commence with the filter focused (alternatively, pass `--search-auto-select`).
 - Set `fuzzy_finder_input` to `true` to enable fuzzy finder suggestions in input dialogs. When enabled, typing in text input fields displays fuzzy-filtered suggestions from available options. Use arrow keys to navigate suggestions and Enter to select.
+- The command palette includes MRU (Most Recently Used) sorting by default (`palette_mru: true`). A "Recently Used" section appears at the top of the palette showing your most frequently used commands. The number of commands shown is controlled by `palette_mru_limit` (default: 5). Usage history is stored per-repository in `.command-palette-history.json`. Set `palette_mru: false` to disable this feature.
 - Use `max_untracked_diffs: 0` to conceal untracked diffs; `max_diff_chars: 0` disables truncation.
 - Execute `lazyworktree --show-syntax-themes` to display the default delta `--syntax-theme` values for each UI theme.
 - Use `lazyworktree --theme <name>` to select a UI theme directly; the supported names correspond to those listed above.

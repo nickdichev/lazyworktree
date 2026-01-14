@@ -75,8 +75,8 @@ func filterPaletteItems(items []paletteItem, query string) []paletteItem {
 
 	scored := make([]scoredPaletteItem, 0, len(items))
 	for _, it := range items {
-		// Skip sections when filtering
-		if it.isSection {
+		// Skip sections and MRU items when filtering
+		if it.isSection || it.isMRU {
 			continue
 		}
 		score, ok := paletteMatchScore(q, it)

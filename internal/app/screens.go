@@ -145,6 +145,7 @@ type paletteItem struct {
 	label       string
 	description string
 	isSection   bool
+	isMRU       bool
 }
 
 type selectionItem struct {
