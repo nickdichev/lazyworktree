@@ -2484,7 +2484,7 @@ func (s *WelcomeScreen) View() string {
 		"",
 		textStyle.Render("Please ensure you are in a git repository."),
 		"",
-		buttonStyle.Render("[Q] Quit"),
+		buttonStyle.Render("[Q/Enter] Quit"),
 	)
 
 	return boxStyle.Render(content)

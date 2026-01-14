@@ -4017,7 +4017,7 @@ func (m *Model) handleScreenKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.currentScreen = screenNone
 			m.welcomeScreen = nil
 			return m, m.refreshWorktrees()
-		case keyStr == keyQ || keyStr == "Q" || isEscKey(keyStr):
+		case keyStr == keyQ || keyStr == "Q" || keyStr == "enter" || isEscKey(keyStr):
 			m.quitting = true
 			return m, tea.Quit
 		}
