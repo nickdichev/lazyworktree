@@ -87,13 +87,22 @@ func (m *Model) handleWorktreesLoaded(msg worktreesLoadedMsg) (tea.Model, tea.Cm
 		m.currentScreen = screenNone
 		m.welcomeScreen = nil
 	}
+	cmds := []tea.Cmd{}
 	if m.config.AutoFetchPRs && !m.prDataLoaded {
 		m.loading = true
 		m.loadingScreen = NewLoadingScreen("Fetching PR data...", m.theme)
 		m.currentScreen = screenLoading
-		return m, m.fetchPRData()
+		cmds = append(cmds, m.fetchPRData())
+	} else if cmd := m.updateDetailsView(); cmd != nil {
+		cmds = append(cmds, cmd)
 	}
-	return m, m.updateDetailsView()
+	if cmd := m.startAutoRefresh(); cmd != nil {
+		cmds = append(cmds, cmd)
+	}
+	if cmd := m.startGitWatcher(); cmd != nil {
+		cmds = append(cmds, cmd)
+	}
+	return m, tea.Batch(cmds...)
 }
 
 // handleCachedWorktrees processes cached worktrees message.

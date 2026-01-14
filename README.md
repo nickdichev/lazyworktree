@@ -509,6 +509,8 @@ lazyworktree reads `~/.config/lazyworktree/config.yaml` (or `.yml`) for default 
 worktree_dir: ~/.local/share/worktrees
 sort_mode: switched  # Options: "path", "active" (commit date), "switched" (last accessed)
 auto_fetch_prs: false
+auto_refresh: true
+refresh_interval: 10  # Seconds
 show_icons: true
 search_auto_select: false
 fuzzy_finder_input: false
@@ -564,6 +566,8 @@ Notes:
 - `init_commands` and `terminate_commands` execute prior to any repository-specific `.wt` commands (if present).
 - `sort_mode` controls the default sort order: `"switched"` (last accessed, default), `"active"` (last commit date), or `"path"` (alphabetical). The old `sort_by_active` option is still supported for backwards compatibility.
 - Set `auto_fetch_prs` to `true` to fetch PR data upon startup.
+- Set `auto_refresh` to `false` to disable background refresh of git metadata and working tree status.
+- Set `refresh_interval` to control background refresh frequency in seconds (e.g., `10`).
 - Set `show_icons: false` to disable icons.
 - Set `search_auto_select` to `true` to commence with the filter focused (alternatively, pass `--search-auto-select`).
 - Set `fuzzy_finder_input` to `true` to enable fuzzy finder suggestions in input dialogs. When enabled, typing in text input fields displays fuzzy-filtered suggestions from available options. Use arrow keys to navigate suggestions and Enter to select.

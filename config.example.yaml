@@ -9,6 +9,13 @@ worktree_dir: ~/.local/share/worktrees
 # Options: "path" (alphabetical), "active" (last commit date), "switched" (last accessed by you)
 sort_mode: switched
 
+# Refresh git metadata and working tree status in the background
+# Set to false to rely on manual refresh (r)
+auto_refresh: true
+
+# Background refresh interval in seconds (lower this for more frequent updates)
+refresh_interval: 10
+
 # Start with fuzzy finder input focused in selection screens
 fuzzy_finder_input: false
 

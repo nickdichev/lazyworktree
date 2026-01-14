@@ -69,6 +69,8 @@ type AppConfig struct {
 	DebugLog                string
 	Pager                   string
 	Editor                  string
+	AutoRefresh             bool
+	RefreshIntervalSeconds  int
 	CustomCommands          map[string]*CustomCommand
 	BranchNameScript        string // Script to generate branch name suggestions from diff
 	Theme                   string // Theme name: see AvailableThemes in internal/theme
@@ -94,6 +96,8 @@ func DefaultConfig() *AppConfig {
 	return &AppConfig{
 		SortMode:                "switched",
 		AutoFetchPRs:            false,
+		AutoRefresh:             true,
+		RefreshIntervalSeconds:  10,
 		SearchAutoSelect:        false,
 		MaxUntrackedDiffs:       10,
 		MaxDiffChars:            200000,
@@ -185,6 +189,8 @@ func parseConfig(data map[string]any) *AppConfig {
 	}
 
 	cfg.AutoFetchPRs = coerceBool(data["auto_fetch_prs"], false)
+	cfg.AutoRefresh = coerceBool(data["auto_refresh"], cfg.AutoRefresh)
+	cfg.RefreshIntervalSeconds = coerceInt(data["refresh_interval"], cfg.RefreshIntervalSeconds)
 	cfg.SearchAutoSelect = coerceBool(data["search_auto_select"], false)
 	cfg.FuzzyFinderInput = coerceBool(data["fuzzy_finder_input"], false)
 	cfg.ShowIcons = coerceBool(data["show_icons"], cfg.ShowIcons)

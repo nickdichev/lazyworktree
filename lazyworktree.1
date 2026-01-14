@@ -393,6 +393,22 @@ Default: false
 Can also be enabled with \fB--search-auto-select\fR.
 .
 .TP
+.B auto_refresh
+Refresh git metadata and working tree status in the background.
+.br
+Default: true
+.br
+Set to false to rely on manual refresh (r).
+.
+.TP
+.B refresh_interval
+Background refresh interval in seconds.
+.br
+Default: 10
+.br
+Set to 0 to disable timed refreshes.
+.
+.TP
 .B debug_log
 Path to debug log file for troubleshooting. When set, detailed debug information is written to this file.
 .br
@@ -630,6 +646,8 @@ theme: nord
 show_icons: true
 sort_mode: switched
 fuzzy_finder_input: true
+auto_refresh: true
+refresh_interval: 10
 
 # Forge integration
 auto_fetch_prs: true

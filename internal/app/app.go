@@ -27,6 +27,7 @@ import (
 	"github.com/chmouel/lazyworktree/internal/models"
 	"github.com/chmouel/lazyworktree/internal/security"
 	"github.com/chmouel/lazyworktree/internal/theme"
+	"github.com/fsnotify/fsnotify"
 	"github.com/muesli/reflow/wrap"
 )
 
@@ -86,6 +87,8 @@ type (
 	}
 	refreshCompleteMsg      struct{}
 	fetchRemotesCompleteMsg struct{}
+	autoRefreshTickMsg      struct{}
+	gitDirChangedMsg        struct{}
 	debouncedDetailsMsg     struct {
 		selectedIndex int
 	}
@@ -354,6 +357,19 @@ type Model struct {
 	// Debouncing
 	detailUpdateCancel  context.CancelFunc
 	pendingDetailsIndex int
+
+	// Auto refresh
+	autoRefreshStarted bool
+	gitWatchStarted    bool
+	gitWatchWaiting    bool
+	gitCommonDir       string
+	gitWatchRoots      []string
+	gitWatchEvents     chan struct{}
+	gitWatchDone       chan struct{}
+	gitWatchPaths      map[string]struct{}
+	gitWatchMu         sync.Mutex
+	gitWatcher         *fsnotify.Watcher
+	gitLastRefresh     time.Time
 
 	// Post-refresh selection (e.g. after creating worktree)
 	pendingSelectWorktreePath string
@@ -780,6 +796,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.infoContent = msg.info
 		}
 		m.setStatusFiles(msg.statusFiles)
+		m.updateWorktreeStatus(msg.path, msg.statusFiles)
 		if msg.log != nil {
 			reset := false
 			if msg.path != "" && msg.path != m.currentDetailsPath {
@@ -832,6 +849,23 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.loadingScreen.message = loadingRefreshWorktrees
 		}
 		return m, m.refreshWorktrees()
+
+	case autoRefreshTickMsg:
+		if cmd := m.autoRefreshTick(); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+		if cmd := m.refreshDetails(); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+		return m, tea.Batch(cmds...)
+
+	case gitDirChangedMsg:
+		m.gitWatchWaiting = false
+		cmds = append(cmds, m.waitForGitWatchEvent())
+		if m.shouldRefreshGitEvent(time.Now()) {
+			cmds = append(cmds, m.refreshWorktrees())
+		}
+		return m, tea.Batch(cmds...)
 
 	case cherryPickResultMsg:
 		return m, m.handleCherryPickResult(msg)
@@ -4281,6 +4315,7 @@ func (m *Model) handleScreenKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, m.refreshWorktrees()
 		case keyStr == keyQ || keyStr == "Q" || keyStr == "enter" || isEscKey(keyStr):
 			m.quitting = true
+			m.stopGitWatcher()
 			return m, tea.Quit
 		}
 	case screenTrust:
@@ -6092,6 +6127,54 @@ func parseStatusFiles(statusRaw string) []StatusFile {
 	}
 
 	return parsedFiles
+}
+
+func statusCounts(files []StatusFile) (staged, modified, untracked int) {
+	for _, file := range files {
+		if file.IsUntracked {
+			untracked++
+			continue
+		}
+		if file.Status != "" {
+			first := file.Status[0]
+			if first != '.' && first != ' ' {
+				staged++
+			}
+		}
+		if len(file.Status) > 1 {
+			second := file.Status[1]
+			if second != '.' && second != ' ' {
+				modified++
+			}
+		}
+	}
+	return staged, modified, untracked
+}
+
+func (m *Model) updateWorktreeStatus(path string, files []StatusFile) {
+	if path == "" {
+		return
+	}
+	var target *models.WorktreeInfo
+	for _, wt := range m.worktrees {
+		if wt.Path == path {
+			target = wt
+			break
+		}
+	}
+	if target == nil {
+		return
+	}
+	staged, modified, untracked := statusCounts(files)
+	dirty := staged+modified+untracked > 0
+	if target.Dirty == dirty && target.Staged == staged && target.Modified == modified && target.Untracked == untracked {
+		return
+	}
+	target.Dirty = dirty
+	target.Staged = staged
+	target.Modified = modified
+	target.Untracked = untracked
+	m.updateTable()
 }
 
 // buildStatusTree builds a tree structure from a flat list of files.

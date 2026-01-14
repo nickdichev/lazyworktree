@@ -225,9 +225,11 @@ func (m *Model) handleBuiltInKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case keyCtrlC, keyQ:
 		if m.selectedPath != "" {
+			m.stopGitWatcher()
 			return m, tea.Quit
 		}
 		m.quitting = true
+		m.stopGitWatcher()
 		return m, tea.Quit
 
 	case "1":
@@ -769,6 +771,7 @@ func (m *Model) handleEnterKey() (tea.Model, tea.Cmd) {
 			selectedPath := m.filteredWts[m.selectedIndex].Path
 			m.persistLastSelected(selectedPath)
 			m.selectedPath = selectedPath
+			m.stopGitWatcher()
 			return m, tea.Quit
 		}
 	case 1:
