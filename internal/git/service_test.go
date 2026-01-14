@@ -567,10 +567,59 @@ func TestDetectHost(t *testing.T) {
 			withCwd(t, repo)
 
 			service := NewService(func(string, string) {}, func(string, string, string) {})
-			if got := service.detectHost(ctx); got != tc.want {
+			if got := service.DetectHost(ctx); got != tc.want {
 				t.Fatalf("expected %q, got %q", tc.want, got)
 			}
 		})
+	}
+}
+
+func TestIsGitHubOrGitLab(t *testing.T) {
+	ctx := context.Background()
+	cases := []struct {
+		name   string
+		remote string
+		want   bool
+	}{
+		{name: "github", remote: "git@github.com:org/repo.git", want: true},
+		{name: "gitlab", remote: "https://gitlab.com/group/repo.git", want: true},
+		{name: "unknown", remote: "ssh://example.com/repo.git", want: false},
+		{name: "gitea", remote: "https://gitea.example.com/repo.git", want: false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := t.TempDir()
+			runGit(t, repo, "init")
+			runGit(t, repo, "remote", "add", "origin", tc.remote)
+			withCwd(t, repo)
+
+			service := NewService(func(string, string) {}, func(string, string, string) {})
+			if got := service.IsGitHubOrGitLab(ctx); got != tc.want {
+				t.Fatalf("expected %v, got %v", tc.want, got)
+			}
+		})
+	}
+}
+
+func TestFetchPRMapUnknownHost(t *testing.T) {
+	ctx := context.Background()
+	repo := t.TempDir()
+	runGit(t, repo, "init")
+	runGit(t, repo, "remote", "add", "origin", "https://gitea.example.com/repo.git")
+	withCwd(t, repo)
+
+	service := NewService(func(string, string) {}, func(string, string, string) {})
+	prMap, err := service.FetchPRMap(ctx)
+	// Should return empty map without error for unknown hosts (early exit)
+	if err != nil {
+		t.Fatalf("expected no error for unknown host, got: %v", err)
+	}
+	if prMap == nil {
+		t.Fatal("expected non-nil map for unknown host")
+	}
+	if len(prMap) != 0 {
+		t.Fatalf("expected empty map for unknown host, got %d entries", len(prMap))
 	}
 }
 

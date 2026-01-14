@@ -1090,7 +1090,7 @@ func NewHelpScreen(maxWidth, maxHeight int, customCommands map[string]*config.Cu
 - m: Rename selected worktree
 - D: Delete selected worktree
 - A: Absorb worktree into main (merge + delete)
-- X: Prune merged worktrees (PR merged or branch merged to main)
+- X: Prune merged worktrees (auto-refreshes PR data, then checks PR/branch merge status)
 - !: Run arbitrary command in selected worktree
 
 **📝 Branch Naming**

@@ -279,53 +279,54 @@ type Model struct {
 	filterInput    textinput.Model
 
 	// State
-	worktrees            []*models.WorktreeInfo
-	filteredWts          []*models.WorktreeInfo
-	selectedIndex        int
-	filterQuery          string
-	statusFilterQuery    string
-	logFilterQuery       string
-	worktreeSearchQuery  string
-	statusSearchQuery    string
-	logSearchQuery       string
-	sortMode             int // sortModePath, sortModeLastActive, or sortModeLastSwitched
-	prDataLoaded         bool
-	accessHistory        map[string]int64 // worktree path -> last access timestamp
-	repoKey              string
-	repoKeyOnce          sync.Once
-	currentScreen        screenType
-	currentDetailsPath   string
-	helpScreen           *HelpScreen
-	trustScreen          *TrustScreen
-	inputScreen          *InputScreen
-	inputSubmit          func(string, bool) (tea.Cmd, bool)
-	commitScreen         *CommitScreen
-	welcomeScreen        *WelcomeScreen
-	paletteScreen        *CommandPaletteScreen
-	paletteSubmit        func(string) tea.Cmd
-	prSelectionScreen    *PRSelectionScreen
-	issueSelectionScreen *IssueSelectionScreen
-	issueSelectionSubmit func(*models.IssueInfo) tea.Cmd
-	prSelectionSubmit    func(*models.PRInfo) tea.Cmd
-	listScreen           *ListSelectionScreen
-	listSubmit           func(selectionItem) tea.Cmd
-	checklistScreen      *ChecklistScreen
-	checklistSubmit      func([]ChecklistItem) tea.Cmd
-	spinner              spinner.Model
-	loading              bool
-	showingFilter        bool
-	filterTarget         filterTarget
-	showingSearch        bool
-	searchTarget         searchTarget
-	focusedPane          int // 0=table, 1=status, 2=log
-	zoomedPane           int // -1 = no zoom, 0/1/2 = which pane is zoomed
-	windowWidth          int
-	windowHeight         int
-	infoContent          string
-	statusContent        string
-	statusFiles          []StatusFile // parsed list of files from git status (kept for compatibility)
-	statusFilesAll       []StatusFile // full list of files from git status
-	statusFileIndex      int          // currently selected file index in status pane
+	worktrees                 []*models.WorktreeInfo
+	filteredWts               []*models.WorktreeInfo
+	selectedIndex             int
+	filterQuery               string
+	statusFilterQuery         string
+	logFilterQuery            string
+	worktreeSearchQuery       string
+	statusSearchQuery         string
+	logSearchQuery            string
+	sortMode                  int // sortModePath, sortModeLastActive, or sortModeLastSwitched
+	prDataLoaded              bool
+	checkMergedAfterPRRefresh bool             // Flag to trigger merged check after PR data refresh
+	accessHistory             map[string]int64 // worktree path -> last access timestamp
+	repoKey                   string
+	repoKeyOnce               sync.Once
+	currentScreen             screenType
+	currentDetailsPath        string
+	helpScreen                *HelpScreen
+	trustScreen               *TrustScreen
+	inputScreen               *InputScreen
+	inputSubmit               func(string, bool) (tea.Cmd, bool)
+	commitScreen              *CommitScreen
+	welcomeScreen             *WelcomeScreen
+	paletteScreen             *CommandPaletteScreen
+	paletteSubmit             func(string) tea.Cmd
+	prSelectionScreen         *PRSelectionScreen
+	issueSelectionScreen      *IssueSelectionScreen
+	issueSelectionSubmit      func(*models.IssueInfo) tea.Cmd
+	prSelectionSubmit         func(*models.PRInfo) tea.Cmd
+	listScreen                *ListSelectionScreen
+	listSubmit                func(selectionItem) tea.Cmd
+	checklistScreen           *ChecklistScreen
+	checklistSubmit           func([]ChecklistItem) tea.Cmd
+	spinner                   spinner.Model
+	loading                   bool
+	showingFilter             bool
+	filterTarget              filterTarget
+	showingSearch             bool
+	searchTarget              searchTarget
+	focusedPane               int // 0=table, 1=status, 2=log
+	zoomedPane                int // -1 = no zoom, 0/1/2 = which pane is zoomed
+	windowWidth               int
+	windowHeight              int
+	infoContent               string
+	statusContent             string
+	statusFiles               []StatusFile // parsed list of files from git status (kept for compatibility)
+	statusFilesAll            []StatusFile // full list of files from git status
+	statusFileIndex           int          // currently selected file index in status pane
 
 	// Status tree view
 	statusTree          *StatusTreeNode   // Root of the file tree
@@ -2618,6 +2619,24 @@ func (m *Model) showRunCommand() tea.Cmd {
 }
 
 func (m *Model) showPruneMerged() tea.Cmd {
+	// Check if repo is connected to GitHub/GitLab
+	if !m.git.IsGitHubOrGitLab(m.ctx) {
+		// Skip PR fetch for repos without GitHub/GitLab remotes,
+		// go straight to git-based merged detection
+		return m.performMergedWorktreeCheck()
+	}
+
+	// Refresh PR data first to ensure we have the latest merge status
+	m.checkMergedAfterPRRefresh = true
+	m.ciCache = make(map[string]*ciCacheEntry)
+	m.prDataLoaded = false
+	m.loading = true
+	m.loadingScreen = NewLoadingScreen("Fetching PR data...", m.theme)
+	m.currentScreen = screenLoading
+	return m.fetchPRData()
+}
+
+func (m *Model) performMergedWorktreeCheck() tea.Cmd {
 	// Get main branch for git-based merged detection
 	mainBranch := m.git.GetMainBranch(m.ctx)
 

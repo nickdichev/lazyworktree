@@ -2336,9 +2336,22 @@ func TestShowPruneMerged(t *testing.T) {
 		{Path: "/tmp/feat", Branch: featureBranch, PR: &models.PRInfo{State: "OPEN"}},
 	}
 
-	if cmd := m.showPruneMerged(); cmd != nil {
-		t.Fatal("expected nil command when nothing to prune")
+	// showPruneMerged now triggers PR data fetch first
+	if cmd := m.showPruneMerged(); cmd == nil {
+		t.Fatal("expected fetchPRData command")
 	}
+	if !m.checkMergedAfterPRRefresh {
+		t.Fatal("expected checkMergedAfterPRRefresh flag to be set")
+	}
+	if m.currentScreen != screenLoading {
+		t.Fatalf("expected loading screen, got %v", m.currentScreen)
+	}
+
+	// Simulate PR data loaded - this should trigger the actual merged check
+	msg := prDataLoadedMsg{prMap: nil, worktreePRs: nil, err: nil}
+	updated, _ := m.Update(msg)
+	m = updated.(*Model)
+
 	if m.currentScreen != screenInfo {
 		t.Fatalf("expected info screen, got %v", m.currentScreen)
 	}
@@ -2346,16 +2359,68 @@ func TestShowPruneMerged(t *testing.T) {
 		t.Fatalf("unexpected info modal: %#v", m.infoScreen)
 	}
 
+	// Reset and test with a merged PR
+	m = NewModel(cfg, "")
 	m.worktrees = []*models.WorktreeInfo{
 		{Path: "/tmp/main", Branch: mainWorktreeName, IsMain: true},
 		{Path: "/tmp/merged", Branch: "merged", PR: &models.PRInfo{State: "MERGED"}},
 	}
+
 	if m.showPruneMerged() == nil {
-		t.Fatal("expected blink command for checklist screen")
+		t.Fatal("expected fetchPRData command")
 	}
+
+	// Simulate PR data loaded - this should show the checklist
+	msg = prDataLoadedMsg{prMap: nil, worktreePRs: nil, err: nil}
+	updated, _ = m.Update(msg)
+	m = updated.(*Model)
+
 	if m.checklistScreen == nil || m.checklistSubmit == nil || m.currentScreen != screenChecklist {
 		t.Fatal("expected checklist screen for prune")
 	}
+}
+
+func TestShowPruneMergedUnknownHost(t *testing.T) {
+	// Test that showPruneMerged skips PR fetch for unknown hosts
+	cfg := &config.AppConfig{
+		WorktreeDir: t.TempDir(),
+	}
+
+	// Create a test repo with unknown remote
+	repo := t.TempDir()
+	runGit(t, repo, "init")
+	runGit(t, repo, "remote", "add", "origin", "https://gitea.example.com/repo.git")
+	runGit(t, repo, "config", "user.email", "test@example.com")
+	runGit(t, repo, "config", "user.name", "Test User")
+	runGit(t, repo, "config", "commit.gpgsign", "false")
+	runGit(t, repo, "commit", "--allow-empty", "-m", "Initial commit")
+
+	withCwd(t, repo)
+
+	m := NewModel(cfg, "")
+	m.worktrees = []*models.WorktreeInfo{
+		{Path: repo, Branch: mainWorktreeName, IsMain: true},
+	}
+
+	// showPruneMerged should skip PR fetch and go straight to merged check
+	cmd := m.showPruneMerged()
+
+	// Should return performMergedWorktreeCheck (which returns nil for no merged worktrees)
+	// or textinput.Blink if there are merged worktrees
+	// Key assertion: should NOT trigger loading screen or set checkMergedAfterPRRefresh
+	if m.checkMergedAfterPRRefresh {
+		t.Fatal("expected checkMergedAfterPRRefresh to be false for unknown host")
+	}
+	if m.currentScreen == screenLoading {
+		t.Fatal("expected no loading screen for unknown host")
+	}
+
+	// Should show info screen with "No merged worktrees to prune"
+	if m.currentScreen != screenInfo {
+		t.Fatalf("expected info screen, got %v", m.currentScreen)
+	}
+
+	_ = cmd // May be nil or blink depending on merged worktrees
 }
 
 func TestHandlePruneResult(t *testing.T) {

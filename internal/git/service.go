@@ -558,8 +558,8 @@ func (s *Service) GetWorktrees(ctx context.Context) ([]*models.WorktreeInfo, err
 	return worktrees, nil
 }
 
-// detectHost detects the git host (github, gitlab, or unknown)
-func (s *Service) detectHost(ctx context.Context) string {
+// DetectHost detects the git host (github, gitlab, or unknown)
+func (s *Service) DetectHost(ctx context.Context) string {
 	if s.gitHost != "" {
 		return s.gitHost
 	}
@@ -583,6 +583,12 @@ func (s *Service) detectHost(ctx context.Context) string {
 
 	s.gitHost = gitHostUnknown
 	return gitHostUnknown
+}
+
+// IsGitHubOrGitLab returns true if the repository is connected to GitHub or GitLab.
+func (s *Service) IsGitHubOrGitLab(ctx context.Context) bool {
+	host := s.DetectHost(ctx)
+	return host == gitHostGithub || host == gitHostGitLab
 }
 
 func (s *Service) fetchGitLabPRs(ctx context.Context) (map[string]*models.PRInfo, error) {
@@ -649,7 +655,13 @@ func (s *Service) fetchGitLabPRs(ctx context.Context) (map[string]*models.PRInfo
 // Returns a map keyed by branch name to PRInfo. Detects the host automatically
 // based on the repository's remote URL.
 func (s *Service) FetchPRMap(ctx context.Context) (map[string]*models.PRInfo, error) {
-	host := s.detectHost(ctx)
+	host := s.DetectHost(ctx)
+
+	// Skip PR fetching for repos without GitHub/GitLab remotes
+	if host == gitHostUnknown {
+		return make(map[string]*models.PRInfo), nil
+	}
+
 	if host == gitHostGitLab {
 		return s.fetchGitLabPRs(ctx)
 	}
@@ -718,7 +730,7 @@ func (s *Service) FetchPRMap(ctx context.Context) (map[string]*models.PRInfo, er
 // FetchPRForWorktree fetches PR info for a specific worktree by running gh/glab in that directory.
 // This correctly detects PRs even when the local branch name differs from the remote branch.
 func (s *Service) FetchPRForWorktree(ctx context.Context, worktreePath string) *models.PRInfo {
-	host := s.detectHost(ctx)
+	host := s.DetectHost(ctx)
 
 	switch host {
 	case gitHostGithub:
@@ -832,7 +844,7 @@ func (s *Service) FetchPRForWorktree(ctx context.Context, worktreePath string) *
 
 // FetchAllOpenPRs fetches all open PRs/MRs and returns them as a slice.
 func (s *Service) FetchAllOpenPRs(ctx context.Context) ([]*models.PRInfo, error) {
-	host := s.detectHost(ctx)
+	host := s.DetectHost(ctx)
 	if host == gitHostGitLab {
 		return s.fetchGitLabOpenPRs(ctx)
 	}
@@ -962,7 +974,7 @@ func (s *Service) fetchGitLabOpenPRs(ctx context.Context) ([]*models.PRInfo, err
 
 // FetchAllOpenIssues fetches all open issues and returns them as a slice.
 func (s *Service) FetchAllOpenIssues(ctx context.Context) ([]*models.IssueInfo, error) {
-	host := s.detectHost(ctx)
+	host := s.DetectHost(ctx)
 	if host == gitHostGitLab {
 		return s.fetchGitLabOpenIssues(ctx)
 	}
@@ -1085,7 +1097,7 @@ func (s *Service) fetchGitLabOpenIssues(ctx context.Context) ([]*models.IssueInf
 
 // FetchCIStatus fetches CI check statuses for a PR from GitHub or GitLab.
 func (s *Service) FetchCIStatus(ctx context.Context, prNumber int, branch string) ([]*models.CICheck, error) {
-	host := s.detectHost(ctx)
+	host := s.DetectHost(ctx)
 	switch host {
 	case gitHostGithub:
 		return s.fetchGitHubCI(ctx, prNumber)
@@ -1243,7 +1255,7 @@ func (s *Service) RenameWorktree(ctx context.Context, oldPath, newPath, oldBranc
 // It creates a detached worktree first, then uses gh/glab CLI to checkout the PR
 // inside that worktree, which properly sets up fork remotes and tracking.
 func (s *Service) CreateWorktreeFromPR(ctx context.Context, prNumber int, remoteBranch, localBranch, targetPath string) bool {
-	host := s.detectHost(ctx)
+	host := s.DetectHost(ctx)
 
 	// For unknown host, fall back to manual fetch
 	if host != gitHostGithub && host != gitHostGitLab {

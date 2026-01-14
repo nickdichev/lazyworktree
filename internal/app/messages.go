@@ -195,7 +195,19 @@ func (m *Model) handlePRDataLoaded(msg prDataLoadedMsg) (tea.Model, tea.Cmd) {
 		// Update columns before rows to include the PR column
 		m.updateTableColumns(m.worktreeTable.Width())
 		m.updateTable()
+
+		// If we were triggered from showPruneMerged, run the merged check now
+		if m.checkMergedAfterPRRefresh {
+			m.checkMergedAfterPRRefresh = false
+			return m, m.performMergedWorktreeCheck()
+		}
+
 		return m, m.updateDetailsView()
+	}
+	// Even if PR fetch failed, run merged check if requested (will fall back to git-based detection)
+	if m.checkMergedAfterPRRefresh {
+		m.checkMergedAfterPRRefresh = false
+		return m, m.performMergedWorktreeCheck()
 	}
 	return m, nil
 }
