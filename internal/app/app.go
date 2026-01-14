@@ -3384,8 +3384,9 @@ func (m *Model) openTmuxSession(tmuxCfg *config.TmuxCommand, wt *models.Worktree
 	insideTmux := os.Getenv("TMUX") != ""
 	sessionName := expandWithEnv(tmuxCfg.SessionName, env)
 	if strings.TrimSpace(sessionName) == "" {
-		sessionName = fmt.Sprintf("wt:%s", filepath.Base(wt.Path))
+		sessionName = fmt.Sprintf("wt-%s", filepath.Base(wt.Path))
 	}
+	sessionName = sanitizeTmuxSessionName(sessionName)
 
 	resolved, ok := resolveTmuxWindows(tmuxCfg.Windows, env, wt.Path)
 	if !ok {
@@ -3441,7 +3442,7 @@ func (m *Model) openZellijSession(zellijCfg *config.TmuxCommand, wt *models.Work
 	insideZellij := os.Getenv("ZELLIJ") != "" || os.Getenv("ZELLIJ_SESSION_NAME") != ""
 	sessionName := strings.TrimSpace(expandWithEnv(zellijCfg.SessionName, env))
 	if sessionName == "" {
-		sessionName = fmt.Sprintf("wt:%s", filepath.Base(wt.Path))
+		sessionName = fmt.Sprintf("wt-%s", filepath.Base(wt.Path))
 	}
 	sessionName = sanitizeZellijSessionName(sessionName)
 
@@ -5089,11 +5090,19 @@ func kdlQuote(input string) string {
 	return "\"" + escaped + "\""
 }
 
+func sanitizeTmuxSessionName(name string) string {
+	if name == "" {
+		return ""
+	}
+	replacer := strings.NewReplacer(":", "-", "/", "-", "\\", "-")
+	return replacer.Replace(name)
+}
+
 func sanitizeZellijSessionName(name string) string {
 	if name == "" {
 		return ""
 	}
-	replacer := strings.NewReplacer("/", "-", "\\", "-")
+	replacer := strings.NewReplacer("/", "-", "\\", "-", ":", "-")
 	return replacer.Replace(name)
 }
 

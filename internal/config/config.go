@@ -110,7 +110,7 @@ func DefaultConfig() *AppConfig {
 				Description: "Tmux",
 				ShowHelp:    true,
 				Tmux: &TmuxCommand{
-					SessionName: "${REPO_NAME}_wt_$WORKTREE_NAME",
+					SessionName: "wt:$WORKTREE_NAME",
 					Attach:      true,
 					OnExists:    "switch",
 					Windows: []TmuxWindow{
@@ -121,7 +121,7 @@ func DefaultConfig() *AppConfig {
 			"Z": {
 				Description: "Zellij",
 				Zellij: &TmuxCommand{
-					SessionName: "${REPO_NAME}_wt_$WORKTREE_NAME",
+					SessionName: "wt:$WORKTREE_NAME",
 					Attach:      true,
 					OnExists:    "switch",
 					Windows: []TmuxWindow{

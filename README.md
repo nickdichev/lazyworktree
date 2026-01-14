@@ -241,7 +241,7 @@ custom_commands:
     description: Tmux
     show_help: true
     tmux:
-      session_name: "${REPO_NAME}_wt_$WORKTREE_NAME"
+      session_name: "wt:$WORKTREE_NAME"
       attach: true
       on_exists: switch
       windows:
@@ -255,7 +255,7 @@ custom_commands:
     description: Zellij
     show_help: true
     zellij:
-      session_name: "${REPO_NAME}_wt_$WORKTREE_NAME"
+      session_name: "wt:$WORKTREE_NAME"
       attach: true
       on_exists: switch
       windows:
@@ -283,7 +283,7 @@ custom_commands:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `session_name` | string | `${REPO_NAME}_wt_$WORKTREE_NAME` | tmux session name (supports env vars) |
+| `session_name` | string | `wt:$WORKTREE_NAME` | tmux session name (supports env vars). Colons, slashes, and backslashes are replaced with `-`. |
 | `attach` | bool | `true` | If true, attach/switch immediately; if false, show info modal with attach instructions |
 | `on_exists` | string | `switch` | Behavior if session exists: `switch`, `attach`, `kill`, `new` |
 | `windows` | list | `[ { name: "shell" } ]` | Window definitions for the session |
@@ -302,13 +302,13 @@ If `windows` is omitted or empty, lazyworktree creates a single `shell` window.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `session_name` | string | `${REPO_NAME}_wt_$WORKTREE_NAME` | zellij session name (supports env vars) |
+| `session_name` | string | `wt:$WORKTREE_NAME` | zellij session name (supports env vars) |
 | `attach` | bool | `true` | If true, attach immediately; if false, show info modal with attach instructions |
 | `on_exists` | string | `switch` | Behavior if session exists: `switch`, `attach`, `kill`, `new` |
 | `windows` | list | `[ { name: "shell" } ]` | Tab definitions for the session |
 
 If `windows` is omitted or empty, lazyworktree creates a single `shell` tab.
-Zellij session names cannot include `/` or `\`, so lazyworktree replaces them with `-`.
+Zellij session names cannot include `/`, `\`, or `:`, so lazyworktree replaces them with `-`.
 
 #### zellij window fields
 

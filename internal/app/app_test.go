@@ -2624,9 +2624,16 @@ func TestBuildZellijInfoMessage(t *testing.T) {
 	}
 }
 
+func TestSanitizeTmuxSessionName(t *testing.T) {
+	got := sanitizeTmuxSessionName("wt:feature/branch")
+	if got != "wt-feature-branch" {
+		t.Fatalf("expected sanitized name, got %q", got)
+	}
+}
+
 func TestSanitizeZellijSessionName(t *testing.T) {
-	got := sanitizeZellijSessionName("owner/repo\\worktree")
-	if got != "owner-repo-worktree" {
+	got := sanitizeZellijSessionName("owner/repo\\wt:worktree")
+	if got != "owner-repo-wt-worktree" {
 		t.Fatalf("expected sanitized name, got %q", got)
 	}
 }

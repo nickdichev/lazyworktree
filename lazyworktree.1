@@ -524,7 +524,7 @@ Environment variables available in custom commands: WORKTREE_BRANCH, MAIN_WORKTR
 For tmux sessions, the following fields are available:
 .RS
 .IP \(bu 2
-\fBsession_name\fR: tmux session name, supports env vars (default: ${REPO_NAME}_wt_$WORKTREE_NAME)
+\fBsession_name\fR: tmux session name, supports env vars (default: wt:$WORKTREE_NAME). Colons, slashes, and backslashes are replaced with -.
 .IP \(bu 2
 \fBattach\fR: If true, attach/switch immediately; if false, show info modal (default: true)
 .IP \(bu 2
@@ -536,7 +536,7 @@ For tmux sessions, the following fields are available:
 For zellij sessions, the following fields are available:
 .RS
 .IP \(bu 2
-\fBsession_name\fR: zellij session name, supports env vars (default: ${REPO_NAME}_wt_$WORKTREE_NAME). Note: zellij session names cannot include / or \\, so lazyworktree replaces them with -.
+\fBsession_name\fR: zellij session name, supports env vars (default: wt:$WORKTREE_NAME). Colons, slashes, and backslashes are replaced with -.
 .IP \(bu 2
 \fBattach\fR: If true, attach immediately; if false, show info modal (default: true)
 .IP \(bu 2

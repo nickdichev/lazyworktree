@@ -257,7 +257,7 @@ custom_commands:
     description: Tmux session
     show_help: true
     tmux:
-      session_name: "${REPO_NAME}_wt_$WORKTREE_NAME"
+      session_name: "wt:$WORKTREE_NAME"
       attach: true
       on_exists: "switch"
       windows:
@@ -271,7 +271,7 @@ custom_commands:
     description: Zellij session
     show_help: true
     zellij:
-      session_name: "${REPO_NAME}_wt_$WORKTREE_NAME"
+      session_name: "wt:$WORKTREE_NAME"
       attach: true
       on_exists: "switch"
       windows:
