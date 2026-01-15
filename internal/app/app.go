@@ -493,8 +493,8 @@ func NewModel(cfg *config.AppConfig, initialFilter string) *Model {
 
 	columns := []table.Column{
 		{Title: "Name", Width: 20},
-		{Title: "Status", Width: 8},
-		{Title: "±", Width: 10},
+		{Title: "Changes", Width: 8},
+		{Title: "Status", Width: 7},
 		{Title: "Last Active", Width: 20},
 	}
 
@@ -7538,7 +7538,7 @@ func (m *Model) rebuildStatusContentWithHighlight() {
 }
 
 func (m *Model) updateTableColumns(totalWidth int) {
-	status := 6
+	status := 8
 	ab := 7
 	last := 15
 
@@ -7596,8 +7596,8 @@ func (m *Model) updateTableColumns(totalWidth int) {
 
 	columns := []table.Column{
 		{Title: "Name", Width: worktree},
-		{Title: "Status", Width: status},
-		{Title: "±", Width: ab},
+		{Title: "Changes", Width: status},
+		{Title: "Status", Width: ab},
 		{Title: "Last Active", Width: last},
 	}
 
