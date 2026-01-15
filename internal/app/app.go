@@ -76,9 +76,10 @@ type (
 		err       error
 	}
 	prDataLoadedMsg struct {
-		prMap       map[string]*models.PRInfo
-		worktreePRs map[string]*models.PRInfo // keyed by worktree path
-		err         error
+		prMap          map[string]*models.PRInfo
+		worktreePRs    map[string]*models.PRInfo // keyed by worktree path
+		worktreeErrors map[string]string         // keyed by worktree path, stores error messages
+		err            error
 	}
 	statusUpdatedMsg struct {
 		info        string
@@ -1505,24 +1506,57 @@ func (m *Model) fetchPRData() tea.Cmd {
 			return prDataLoadedMsg{prMap: nil, err: err}
 		}
 
+		// DEBUG: Log what we got from FetchPRMap
+		if m.debugLogger != nil {
+			m.debugLogger.Printf("FetchPRMap returned %d PRs", len(prMap))
+			for branch, pr := range prMap {
+				m.debugLogger.Printf("  prMap[%q] = PR#%d", branch, pr.Number)
+			}
+		}
+
 		// Also fetch PRs per worktree for cases where local branch differs from remote
 		// This handles fork PRs where local branch name doesn't match headRefName
 		worktreePRs := make(map[string]*models.PRInfo)
+		worktreeErrors := make(map[string]string)
 		for _, wt := range m.worktrees {
+			// DEBUG: Log branch name and match attempt
+			if m.debugLogger != nil {
+				m.debugLogger.Printf("Checking worktree: Branch=%q Path=%q", wt.Branch, wt.Path)
+				if pr, ok := prMap[wt.Branch]; ok {
+					m.debugLogger.Printf("  Found in prMap: PR#%d", pr.Number)
+				} else {
+					m.debugLogger.Printf("  Not in prMap, will fetch per-worktree")
+				}
+			}
+
 			// Skip if already matched by headRefName
 			if _, ok := prMap[wt.Branch]; ok {
 				continue
 			}
 			// Try to fetch PR for this worktree directly
-			if pr := m.git.FetchPRForWorktree(m.ctx, wt.Path); pr != nil {
+			pr, fetchErr := m.git.FetchPRForWorktreeWithError(m.ctx, wt.Path)
+			if pr != nil {
 				worktreePRs[wt.Path] = pr
+				if m.debugLogger != nil {
+					m.debugLogger.Printf("  FetchPRForWorktree returned PR#%d", pr.Number)
+				}
+			}
+			if fetchErr != nil {
+				worktreeErrors[wt.Path] = fetchErr.Error()
+				if m.debugLogger != nil {
+					m.debugLogger.Printf("  FetchPRForWorktree error: %v", fetchErr)
+				}
+			}
+			if pr == nil && fetchErr == nil && m.debugLogger != nil {
+				m.debugLogger.Printf("  FetchPRForWorktree returned nil (no PR)")
 			}
 		}
 
 		return prDataLoadedMsg{
-			prMap:       prMap,
-			worktreePRs: worktreePRs,
-			err:         nil,
+			prMap:          prMap,
+			worktreePRs:    worktreePRs,
+			worktreeErrors: worktreeErrors,
+			err:            nil,
 		}
 	}
 }
@@ -6718,6 +6752,57 @@ func (m *Model) buildInfoContent(wt *models.WorktreeInfo) string {
 					}
 				}
 				infoLines = append(infoLines, fmt.Sprintf("  %s %s", style.Render(symbol), check.Name))
+			}
+		}
+	} else {
+		// Show PR status/error when PR is nil
+		grayStyle := lipgloss.NewStyle().Foreground(m.theme.MutedFg)
+		errorStyle := lipgloss.NewStyle().Foreground(m.theme.ErrorFg)
+
+		infoLines = append(infoLines, "") // blank line
+
+		switch wt.PRFetchStatus {
+		case models.PRFetchStatusLoaded:
+			// This shouldn't happen (PR is nil but status is loaded) - show debug info
+			infoLines = append(infoLines, errorStyle.Render("PR Status: Loaded but nil (bug)"))
+
+		case models.PRFetchStatusError:
+			labelStyle := lipgloss.NewStyle().Foreground(m.theme.TextFg).Bold(true)
+			infoLines = append(infoLines, labelStyle.Render("PR Status:"))
+			infoLines = append(infoLines, errorStyle.Render("  ✗ Fetch failed"))
+
+			// Provide helpful error messages based on error content
+			switch {
+			case strings.Contains(wt.PRFetchError, "not found") || strings.Contains(wt.PRFetchError, "PATH"):
+				infoLines = append(infoLines, grayStyle.Render("  gh/glab CLI not found"))
+				infoLines = append(infoLines, grayStyle.Render("  Install from https://cli.github.com"))
+			case strings.Contains(wt.PRFetchError, "auth") || strings.Contains(wt.PRFetchError, "401"):
+				infoLines = append(infoLines, grayStyle.Render("  Authentication failed"))
+				infoLines = append(infoLines, grayStyle.Render("  Run 'gh auth login' or 'glab auth login'"))
+			case wt.PRFetchError != "":
+				infoLines = append(infoLines, grayStyle.Render(fmt.Sprintf("  %s", wt.PRFetchError)))
+			}
+
+		case models.PRFetchStatusNoPR:
+			switch {
+			case m.prDataLoaded && wt.HasUpstream:
+				// Fetch was attempted, no error, no PR found - this is expected
+				infoLines = append(infoLines, grayStyle.Render("No PR for this branch"))
+			case !m.prDataLoaded:
+				// PR data hasn't been fetched yet
+				infoLines = append(infoLines, grayStyle.Render("PR data not loaded (press 'p' to fetch)"))
+			case !wt.HasUpstream:
+				// No upstream, so no PR possible
+				infoLines = append(infoLines, grayStyle.Render("Branch has no upstream"))
+			}
+
+		case models.PRFetchStatusFetching:
+			infoLines = append(infoLines, grayStyle.Render("Fetching PR data..."))
+
+		default:
+			// Not fetched yet
+			if !m.prDataLoaded {
+				infoLines = append(infoLines, grayStyle.Render("Press 'p' to fetch PR data"))
 			}
 		}
 	}

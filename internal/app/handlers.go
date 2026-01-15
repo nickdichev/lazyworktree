@@ -432,10 +432,10 @@ func (m *Model) handleBuiltInKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "p":
 		m.ciCache = make(map[string]*ciCacheEntry)
 		m.prDataLoaded = false
-		// Must update rows before columns to avoid index out of range panic
-		// because SetColumns triggers a viewport render with existing rows
+		// Must update table rows immediately to match the column count change
+		// Otherwise View() -> applyLayout() -> updateTableColumns() will create
+		// a mismatch between column count (4) and row element count (5)
 		m.updateTable()
-		m.updateTableColumns(m.worktreeTable.Width())
 		m.loading = true
 		m.statusContent = "Fetching PR data..."
 		m.loadingScreen = NewLoadingScreen("Fetching PR data...", m.theme)

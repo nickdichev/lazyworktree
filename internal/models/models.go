@@ -55,6 +55,8 @@ type WorktreeInfo struct {
 	LastActiveTS   int64
 	LastSwitchedTS int64 // Unix timestamp of last UI access/switch
 	PR             *PRInfo
+	PRFetchError   string // Stores error message if PR fetch failed
+	PRFetchStatus  string // "not_fetched", "fetching", "loaded", "error", "no_pr"
 	Untracked      int
 	Modified       int
 	Staged         int
@@ -72,4 +74,13 @@ const (
 	AccessHistoryFilename = ".worktree-access.json"
 	// CommandPaletteHistoryFilename stores command palette usage history for MRU sorting.
 	CommandPaletteHistoryFilename = ".command-palette-history.json"
+)
+
+// PR fetch status values for WorktreeInfo.PRFetchStatus field.
+const (
+	PRFetchStatusNotFetched = "not_fetched" // PR data has not been fetched yet
+	PRFetchStatusFetching   = "fetching"    // PR data is currently being fetched
+	PRFetchStatusLoaded     = "loaded"      // PR data was successfully loaded
+	PRFetchStatusError      = "error"       // PR fetch encountered an error
+	PRFetchStatusNoPR       = "no_pr"       // No PR exists for this branch
 )

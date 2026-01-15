@@ -722,26 +722,30 @@ func (s *Service) FetchPRMap(ctx context.Context) (map[string]*models.PRInfo, er
 	return prMap, nil
 }
 
-// FetchPRForWorktree fetches PR info for a specific worktree by running gh/glab in that directory.
-// This correctly detects PRs even when the local branch name differs from the remote branch.
-func (s *Service) FetchPRForWorktree(ctx context.Context, worktreePath string) *models.PRInfo {
+// FetchPRForWorktreeWithError fetches PR info and returns detailed error information.
+func (s *Service) FetchPRForWorktreeWithError(ctx context.Context, worktreePath string) (*models.PRInfo, error) {
 	host := s.DetectHost(ctx)
 
 	switch host {
 	case gitHostGithub:
-		// Run gh pr view in the worktree directory to get PR for current branch
+		// Run gh pr view with silent=false to capture actual errors
 		prRaw := s.RunGit(ctx, []string{
 			"gh", "pr", "view",
 			"--json", "number,state,title,body,url,headRefName,baseRefName,author",
-		}, worktreePath, []int{0}, false, true)
+		}, worktreePath, []int{0, 1}, false, false)
 
 		if prRaw == "" {
-			return nil
+			// Check if it's because gh CLI is missing
+			if _, err := exec.LookPath("gh"); err != nil {
+				return nil, fmt.Errorf("gh CLI not found in PATH")
+			}
+			// Exit code 1 typically means "no PR found", which is not an error
+			return nil, nil
 		}
 
 		var pr map[string]any
 		if err := json.Unmarshal([]byte(prRaw), &pr); err != nil {
-			return nil
+			return nil, fmt.Errorf("failed to parse PR data: %w", err)
 		}
 
 		number, _ := pr["number"].(float64)
@@ -778,22 +782,27 @@ func (s *Service) FetchPRForWorktree(ctx context.Context, worktreePath string) *
 			Author:      author,
 			AuthorName:  authorName,
 			AuthorIsBot: authorIsBot,
-		}
+		}, nil
 
 	case gitHostGitLab:
-		// Run glab mr view in the worktree directory
+		// Run glab mr view with silent=false to capture actual errors
 		prRaw := s.RunGit(ctx, []string{
 			"glab", "mr", "view",
 			"--output", "json",
-		}, worktreePath, []int{0}, false, true)
+		}, worktreePath, []int{0, 1}, false, false)
 
 		if prRaw == "" {
-			return nil
+			// Check if it's because glab CLI is missing
+			if _, err := exec.LookPath("glab"); err != nil {
+				return nil, fmt.Errorf("glab CLI not found in PATH")
+			}
+			// Exit code 1 typically means "no MR found", which is not an error
+			return nil, nil
 		}
 
 		var pr map[string]any
 		if err := json.Unmarshal([]byte(prRaw), &pr); err != nil {
-			return nil
+			return nil, fmt.Errorf("failed to parse MR data: %w", err)
 		}
 
 		iid, _ := pr["iid"].(float64)
@@ -835,10 +844,18 @@ func (s *Service) FetchPRForWorktree(ctx context.Context, worktreePath string) *
 			Author:      author,
 			AuthorName:  authorName,
 			AuthorIsBot: authorIsBot,
-		}
+		}, nil
 	}
 
-	return nil
+	return nil, nil
+}
+
+// FetchPRForWorktree fetches PR info for a specific worktree by running gh/glab in that directory.
+// This correctly detects PRs even when the local branch name differs from the remote branch.
+// Maintains backward compatibility by swallowing errors.
+func (s *Service) FetchPRForWorktree(ctx context.Context, worktreePath string) *models.PRInfo {
+	pr, _ := s.FetchPRForWorktreeWithError(ctx, worktreePath)
+	return pr
 }
 
 // FetchAllOpenPRs fetches all open PRs/MRs and returns them as a slice.

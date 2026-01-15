@@ -3592,6 +3592,152 @@ func TestHandleOpenIssuesLoadedError(t *testing.T) {
 	}
 }
 
+// TestPRAssignmentsPreservedOnWorktreeRefresh verifies that PR assignments
+// are preserved when worktrees are refreshed (e.g., due to git file watcher).
+// This is a regression test for a bug where PR data was lost on auto-refresh.
+func TestPRAssignmentsPreservedOnWorktreeRefresh(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.WorktreeDir = t.TempDir()
+	m := NewModel(cfg, "")
+	m.worktreeTable.SetWidth(100)
+	m.worktreesLoaded = true
+
+	// Create initial worktrees
+	wt1 := &models.WorktreeInfo{
+		Path:   filepath.Join(cfg.WorktreeDir, "wt1"),
+		Branch: "feature-1",
+	}
+	wt2 := &models.WorktreeInfo{
+		Path:   filepath.Join(cfg.WorktreeDir, "wt2"),
+		Branch: "feature-2",
+	}
+	m.worktrees = []*models.WorktreeInfo{wt1, wt2}
+	m.filteredWts = m.worktrees
+
+	// Assign PR data to worktrees
+	prMsg := prDataLoadedMsg{
+		prMap: map[string]*models.PRInfo{
+			"feature-1": {Number: 123, State: "OPEN", Title: "PR 123", URL: "https://example.com/123"},
+		},
+		worktreePRs: map[string]*models.PRInfo{
+			wt2.Path: {Number: 456, State: "MERGED", Title: "PR 456", URL: "https://example.com/456"},
+		},
+		worktreeErrors: map[string]string{},
+	}
+	m.handlePRDataLoaded(prMsg)
+
+	// Verify PR assignments
+	if m.worktrees[0].PR == nil || m.worktrees[0].PR.Number != 123 {
+		t.Fatal("expected wt1 to have PR #123 assigned")
+	}
+	if m.worktrees[1].PR == nil || m.worktrees[1].PR.Number != 456 {
+		t.Fatal("expected wt2 to have PR #456 assigned")
+	}
+	if m.worktrees[0].PRFetchStatus != "loaded" {
+		t.Fatalf("expected wt1 PRFetchStatus='loaded', got %q", m.worktrees[0].PRFetchStatus)
+	}
+
+	// Simulate worktree refresh (e.g., from git file watcher)
+	// This creates NEW WorktreeInfo objects
+	refreshedWt1 := &models.WorktreeInfo{
+		Path:   filepath.Join(cfg.WorktreeDir, "wt1"),
+		Branch: "feature-1",
+	}
+	refreshedWt2 := &models.WorktreeInfo{
+		Path:   filepath.Join(cfg.WorktreeDir, "wt2"),
+		Branch: "feature-2",
+	}
+	refreshMsg := worktreesLoadedMsg{
+		worktrees: []*models.WorktreeInfo{refreshedWt1, refreshedWt2},
+		err:       nil,
+	}
+	m.handleWorktreesLoaded(refreshMsg)
+
+	// CRITICAL: Verify PR assignments are PRESERVED after refresh
+	if m.worktrees[0].PR == nil || m.worktrees[0].PR.Number != 123 {
+		t.Fatal("PR assignment was lost on worktree refresh! wt1 should still have PR #123")
+	}
+	if m.worktrees[1].PR == nil || m.worktrees[1].PR.Number != 456 {
+		t.Fatal("PR assignment was lost on worktree refresh! wt2 should still have PR #456")
+	}
+	if m.worktrees[0].PRFetchStatus != "loaded" {
+		t.Fatalf("PRFetchStatus was lost on refresh! expected 'loaded', got %q", m.worktrees[0].PRFetchStatus)
+	}
+
+	// Verify table row data includes PR info
+	rows := m.worktreeTable.Rows()
+	if len(rows) != 2 {
+		t.Fatalf("expected 2 rows, got %d", len(rows))
+	}
+	// With prDataLoaded=true, rows should have 5 columns including PR
+	if len(rows[0]) != 5 {
+		t.Fatalf("expected 5 columns in row (including PR), got %d", len(rows[0]))
+	}
+	// PR column should not be "-"
+	prColumn := rows[0][4] // 5th column is PR
+	if prColumn == "-" {
+		t.Fatal("PR column shows '-' instead of PR data after refresh")
+	}
+	if !strings.Contains(prColumn, "123") {
+		t.Fatalf("PR column should contain '123', got %q", prColumn)
+	}
+}
+
+// TestPRFetchErrorsPreservedOnWorktreeRefresh verifies that PR fetch errors
+// are preserved when worktrees are refreshed, not just successful PR assignments.
+func TestPRFetchErrorsPreservedOnWorktreeRefresh(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.WorktreeDir = t.TempDir()
+	m := NewModel(cfg, "")
+	m.worktreeTable.SetWidth(100)
+	m.worktreesLoaded = true
+
+	// Create initial worktrees
+	wt1 := &models.WorktreeInfo{
+		Path:   filepath.Join(cfg.WorktreeDir, "wt1"),
+		Branch: "feature-1",
+	}
+	m.worktrees = []*models.WorktreeInfo{wt1}
+	m.filteredWts = m.worktrees
+
+	// Simulate PR fetch with error
+	prMsg := prDataLoadedMsg{
+		prMap:       map[string]*models.PRInfo{},
+		worktreePRs: map[string]*models.PRInfo{},
+		worktreeErrors: map[string]string{
+			wt1.Path: "gh CLI not found in PATH",
+		},
+	}
+	m.handlePRDataLoaded(prMsg)
+
+	// Verify error was recorded
+	if m.worktrees[0].PRFetchError != "gh CLI not found in PATH" {
+		t.Fatalf("expected PRFetchError to be set, got %q", m.worktrees[0].PRFetchError)
+	}
+	if m.worktrees[0].PRFetchStatus != "error" {
+		t.Fatalf("expected PRFetchStatus='error', got %q", m.worktrees[0].PRFetchStatus)
+	}
+
+	// Simulate worktree refresh
+	refreshedWt1 := &models.WorktreeInfo{
+		Path:   filepath.Join(cfg.WorktreeDir, "wt1"),
+		Branch: "feature-1",
+	}
+	refreshMsg := worktreesLoadedMsg{
+		worktrees: []*models.WorktreeInfo{refreshedWt1},
+		err:       nil,
+	}
+	m.handleWorktreesLoaded(refreshMsg)
+
+	// CRITICAL: Verify error state is PRESERVED after refresh
+	if m.worktrees[0].PRFetchError != "gh CLI not found in PATH" {
+		t.Fatalf("PRFetchError was lost on refresh! expected error message, got %q", m.worktrees[0].PRFetchError)
+	}
+	if m.worktrees[0].PRFetchStatus != "error" {
+		t.Fatalf("PRFetchStatus was lost on refresh! expected 'error', got %q", m.worktrees[0].PRFetchStatus)
+	}
+}
+
 // TestPRDataResetSyncsRowsAndColumns verifies that when prDataLoaded is reset
 // to false (e.g., pressing 'p' to refetch), rows and columns are properly
 // synchronized to prevent index out of range panics.
