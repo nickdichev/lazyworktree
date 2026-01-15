@@ -451,8 +451,8 @@ func normalizeArgsList(val any) []string {
 	return res
 }
 
-// LoadConfig loads the application configuration from a file.
-func LoadConfig(configPath string) (*AppConfig, error) {
+// loadYAMLFile loads YAML config file and returns parsed data.
+func loadYAMLFile(configPath string) map[string]any {
 	configBase := filepath.Join(getConfigDir(), "lazyworktree")
 	configBase = filepath.Clean(configBase)
 
@@ -461,11 +461,11 @@ func LoadConfig(configPath string) (*AppConfig, error) {
 	if configPath != "" {
 		expanded, err := expandPath(configPath)
 		if err != nil {
-			return DefaultConfig(), err
+			return nil
 		}
 		absPath, err := filepath.Abs(expanded)
 		if err != nil {
-			return DefaultConfig(), err
+			return nil
 		}
 		paths = []string{absPath}
 	} else {
@@ -474,8 +474,6 @@ func LoadConfig(configPath string) (*AppConfig, error) {
 			filepath.Join(configBase, "config.yml"),
 		}
 	}
-
-	var cfg *AppConfig
 
 	for _, path := range paths {
 		if _, err := os.Stat(path); os.IsNotExist(err) {
@@ -490,18 +488,186 @@ func LoadConfig(configPath string) (*AppConfig, error) {
 
 		var yamlData map[string]any
 		if err := yaml.Unmarshal(data, &yamlData); err != nil {
-			return DefaultConfig(), nil
+			return nil
 		}
 
-		cfg = parseConfig(yamlData)
-		cfg.ConfigPath = path
-		break
+		return yamlData
 	}
 
-	if cfg == nil {
-		cfg = DefaultConfig()
+	return nil
+}
+
+// ApplyCLIOverrides applies CLI config overrides to the configuration.
+func (cfg *AppConfig) ApplyCLIOverrides(overrides []string) error {
+	if len(overrides) == 0 {
+		return nil
 	}
 
+	// Parse CLI overrides
+	overrideData, err := parseCLIConfigOverrides(overrides)
+	if err != nil {
+		return err
+	}
+
+	// Apply overrides directly to cfg by re-creating from merged data
+	// Create a map representation of current config, merge overrides, re-parse
+	// For now, just parse the overrides and apply each field directly
+	overrideCfg := parseConfig(overrideData)
+
+	// Apply each non-zero/non-empty field from overrideCfg to cfg
+	if overrideCfg.WorktreeDir != "" {
+		cfg.WorktreeDir = overrideCfg.WorktreeDir
+	}
+	if overrideCfg.SortMode != "" {
+		cfg.SortMode = overrideCfg.SortMode
+	}
+	if overrideCfg.Theme != "" {
+		cfg.Theme = overrideCfg.Theme
+	}
+	if overrideCfg.GitPager != "" {
+		cfg.GitPager = overrideCfg.GitPager
+	}
+	if overrideCfg.Pager != "" {
+		cfg.Pager = overrideCfg.Pager
+	}
+	if overrideCfg.Editor != "" {
+		cfg.Editor = overrideCfg.Editor
+	}
+	if overrideCfg.DebugLog != "" {
+		cfg.DebugLog = overrideCfg.DebugLog
+	}
+	if overrideCfg.TrustMode != "" {
+		cfg.TrustMode = overrideCfg.TrustMode
+	}
+	if overrideCfg.MergeMethod != "" {
+		cfg.MergeMethod = overrideCfg.MergeMethod
+	}
+	if overrideCfg.BranchNameScript != "" {
+		cfg.BranchNameScript = overrideCfg.BranchNameScript
+	}
+	if overrideCfg.IssueBranchNameTemplate != "" {
+		cfg.IssueBranchNameTemplate = overrideCfg.IssueBranchNameTemplate
+	}
+	if overrideCfg.PRBranchNameTemplate != "" {
+		cfg.PRBranchNameTemplate = overrideCfg.PRBranchNameTemplate
+	}
+	if overrideCfg.SessionPrefix != "" {
+		cfg.SessionPrefix = overrideCfg.SessionPrefix
+	}
+
+	// Arrays - check if they exist in override data
+	if _, ok := overrideData["init_commands"]; ok {
+		cfg.InitCommands = overrideCfg.InitCommands
+	}
+	if _, ok := overrideData["terminate_commands"]; ok {
+		cfg.TerminateCommands = overrideCfg.TerminateCommands
+	}
+	if _, ok := overrideData["git_pager_args"]; ok {
+		cfg.GitPagerArgs = overrideCfg.GitPagerArgs
+		cfg.GitPagerArgsSet = true
+	}
+
+	// For booleans and integers, check if they were explicitly set in overrideData
+	if _, ok := overrideData["auto_fetch_prs"]; ok {
+		cfg.AutoFetchPRs = overrideCfg.AutoFetchPRs
+	}
+	if _, ok := overrideData["search_auto_select"]; ok {
+		cfg.SearchAutoSelect = overrideCfg.SearchAutoSelect
+	}
+	if _, ok := overrideData["auto_refresh"]; ok {
+		cfg.AutoRefresh = overrideCfg.AutoRefresh
+	}
+	if _, ok := overrideData["git_pager_interactive"]; ok {
+		cfg.GitPagerInteractive = overrideCfg.GitPagerInteractive
+	}
+	if _, ok := overrideData["fuzzy_finder_input"]; ok {
+		cfg.FuzzyFinderInput = overrideCfg.FuzzyFinderInput
+	}
+	if _, ok := overrideData["show_icons"]; ok {
+		cfg.ShowIcons = overrideCfg.ShowIcons
+	}
+	if _, ok := overrideData["palette_mru"]; ok {
+		cfg.PaletteMRU = overrideCfg.PaletteMRU
+	}
+
+	if _, ok := overrideData["max_untracked_diffs"]; ok {
+		cfg.MaxUntrackedDiffs = overrideCfg.MaxUntrackedDiffs
+	}
+	if _, ok := overrideData["max_diff_chars"]; ok {
+		cfg.MaxDiffChars = overrideCfg.MaxDiffChars
+	}
+	if _, ok := overrideData["refresh_interval_seconds"]; ok {
+		cfg.RefreshIntervalSeconds = overrideCfg.RefreshIntervalSeconds
+	}
+	if _, ok := overrideData["palette_mru_limit"]; ok {
+		cfg.PaletteMRULimit = overrideCfg.PaletteMRULimit
+	}
+
+	return nil
+}
+
+// mergeMaps merges src map into dst map, with src values taking precedence.
+func mergeMaps(dst, src map[string]any) {
+	for k, v := range src {
+		dst[k] = v
+	}
+}
+
+// LoadConfig loads the application configuration from a file.
+func LoadConfig(configPath string) (*AppConfig, error) {
+	// Collect all config data maps, then merge and parse once
+	mergedData := make(map[string]any)
+
+	// 1. Load YAML config
+	var actualConfigPath string
+	yamlData := loadYAMLFile(configPath)
+	if yamlData != nil {
+		mergeMaps(mergedData, yamlData)
+
+		// Determine actual config path
+		if configPath != "" {
+			expanded, _ := expandPath(configPath)
+			absPath, _ := filepath.Abs(expanded)
+			actualConfigPath = absPath
+		} else {
+			// Set to default location if it exists
+			configBase := filepath.Join(getConfigDir(), "lazyworktree")
+			for _, name := range []string{"config.yaml", "config.yml"} {
+				path := filepath.Join(configBase, name)
+				if _, err := os.Stat(path); err == nil {
+					actualConfigPath = path
+					break
+				}
+			}
+		}
+	}
+
+	// 2. Load and merge git global config (overrides YAML)
+	gitGlobalData, err := loadGitConfig(true, "")
+	if err == nil && len(gitGlobalData) > 0 {
+		mergeMaps(mergedData, gitGlobalData)
+	}
+
+	// 3. Determine repo path from merged data so far
+	var worktreeDir string
+	if wd, ok := mergedData["worktree_dir"].(string); ok {
+		worktreeDir = wd
+	}
+
+	// 4. Load and merge git local config (overrides git global)
+	repoPath := determineRepoPath(worktreeDir)
+	if repoPath != "" {
+		gitLocalData, err := loadGitConfig(false, repoPath)
+		if err == nil && len(gitLocalData) > 0 {
+			mergeMaps(mergedData, gitLocalData)
+		}
+	}
+
+	// 5. Parse the merged data into AppConfig
+	cfg := parseConfig(mergedData)
+	cfg.ConfigPath = actualConfigPath
+
+	// 6. Theme detection (if theme not set from any config source)
 	if cfg.Theme == "" {
 		detected, err := theme.DetectBackground(500 * time.Millisecond)
 		if err == nil {

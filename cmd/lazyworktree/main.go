@@ -24,6 +24,18 @@ var (
 	builtBy = "unknown"
 )
 
+// configOverrides is a custom flag type for repeatable --config flags.
+type configOverrides []string
+
+func (c *configOverrides) String() string {
+	return strings.Join(*c, ",")
+}
+
+func (c *configOverrides) Set(value string) error {
+	*c = append(*c, value)
+	return nil
+}
+
 func main() {
 	var worktreeDir string
 	var debugLog string
@@ -34,6 +46,7 @@ func main() {
 	var showSyntaxThemes bool
 	var completionShell string
 	var configFile string
+	var configOverrideList configOverrides
 
 	flag.StringVar(&worktreeDir, "worktree-dir", "", "Override the default worktree root directory")
 	flag.StringVar(&debugLog, "debug-log", "", "Path to debug log file")
@@ -43,7 +56,8 @@ func main() {
 	flag.BoolVar(&showVersion, "version", false, "Print version information")
 	flag.BoolVar(&showSyntaxThemes, "show-syntax-themes", false, "List available delta syntax themes")
 	flag.StringVar(&completionShell, "completion", "", "Generate shell completion script (bash, zsh, fish)")
-	flag.StringVar(&configFile, "config", "", "Path to configuration file")
+	flag.StringVar(&configFile, "config-file", "", "Path to configuration file")
+	flag.Var(&configOverrideList, "config", "Override config values (repeatable): --config=lw.key=value")
 	flag.Parse()
 
 	if showVersion {
@@ -124,6 +138,14 @@ func main() {
 			cfg.DebugLog = expanded
 		} else {
 			cfg.DebugLog = debugLog
+		}
+	}
+
+	// Apply CLI config overrides (highest precedence)
+	if len(configOverrideList) > 0 {
+		if err := cfg.ApplyCLIOverrides(configOverrideList); err != nil {
+			fmt.Fprintf(os.Stderr, "Error applying config overrides: %v\n", err)
+			os.Exit(1)
 		}
 	}
 

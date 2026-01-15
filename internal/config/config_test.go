@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -1879,4 +1880,177 @@ func TestMaxNameLengthConfig(t *testing.T) {
 			assert.Equal(t, tt.expected, cfg.MaxNameLength, "MaxNameLength mismatch")
 		})
 	}
+}
+// Integration tests for git config precedence
+
+func TestLoadConfigWithGitGlobalConfig(t *testing.T) {
+	// Setup mock
+	defer func() { gitConfigMock = nil }()
+
+	gitConfigMock = func(args []string, repoPath string) (string, error) {
+		if slices.Contains(args, "--global") {
+			return "lw.worktree_dir /git/global/path\nlw.auto_fetch_prs true\nlw.theme nord\n", nil
+		}
+		return "", nil
+	}
+
+	cfg, err := LoadConfig("")
+	require.NoError(t, err)
+
+	// Values from git global config should be applied
+	assert.Equal(t, "/git/global/path", cfg.WorktreeDir)
+	assert.True(t, cfg.AutoFetchPRs)
+	assert.Equal(t, "nord", cfg.Theme)
+}
+
+func TestLoadConfigGitLocalOverridesGitGlobal(t *testing.T) {
+	// Setup mock
+	defer func() { gitConfigMock = nil }()
+
+	gitConfigMock = func(args []string, repoPath string) (string, error) {
+		if slices.Contains(args, "--global") {
+			return "lw.theme nord\nlw.auto_fetch_prs true\nlw.worktree_dir /global/path\n", nil
+		}
+		if slices.Contains(args, "--local") {
+			// Local overrides theme and auto_fetch_prs
+			return "lw.theme dracula\nlw.auto_fetch_prs false\n", nil
+		}
+		return "", nil
+	}
+
+	cfg, err := LoadConfig("")
+	require.NoError(t, err)
+
+	// Local git config overrides global
+	assert.Equal(t, "dracula", cfg.Theme)
+	assert.False(t, cfg.AutoFetchPRs)
+	// WorktreeDir from global (not overridden by local)
+	assert.Equal(t, "/global/path", cfg.WorktreeDir)
+}
+
+func TestLoadConfigGitConfigMultiValue(t *testing.T) {
+	// Setup mock
+	defer func() { gitConfigMock = nil }()
+
+	gitConfigMock = func(args []string, repoPath string) (string, error) {
+		if slices.Contains(args, "--global") {
+			return "lw.init_commands link_topsymlinks\nlw.init_commands npm install\nlw.init_commands make setup\n", nil
+		}
+		return "", nil
+	}
+
+	cfg, err := LoadConfig("")
+	require.NoError(t, err)
+
+	// Multi-value config should be parsed as array
+	assert.Equal(t, []string{"link_topsymlinks", "npm install", "make setup"}, cfg.InitCommands)
+}
+
+func TestApplyCLIOverrides(t *testing.T) {
+	cfg := DefaultConfig()
+
+	// Apply CLI overrides
+	overrides := []string{
+		"lw.theme=gruvbox-dark",
+		"lw.auto_fetch_prs=true",
+		"lw.max_diff_chars=500000",
+	}
+
+	err := cfg.ApplyCLIOverrides(overrides)
+	require.NoError(t, err)
+
+	assert.Equal(t, "gruvbox-dark", cfg.Theme)
+	assert.True(t, cfg.AutoFetchPRs)
+	assert.Equal(t, 500000, cfg.MaxDiffChars)
+}
+
+func TestApplyCLIOverridesMultiValue(t *testing.T) {
+	cfg := DefaultConfig()
+
+	// Apply CLI overrides with repeated keys
+	overrides := []string{
+		"lw.init_commands=echo first",
+		"lw.init_commands=echo second",
+		"lw.theme=nord",
+	}
+
+	err := cfg.ApplyCLIOverrides(overrides)
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"echo first", "echo second"}, cfg.InitCommands)
+	assert.Equal(t, "nord", cfg.Theme)
+}
+
+func TestApplyCLIOverridesInvalidFormat(t *testing.T) {
+	cfg := DefaultConfig()
+
+	// Invalid format (missing equals)
+	overrides := []string{"lw.theme"}
+	err := cfg.ApplyCLIOverrides(overrides)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid config override format")
+
+	// Invalid format (missing lw prefix)
+	overrides = []string{"theme=nord"}
+	err = cfg.ApplyCLIOverrides(overrides)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "config override key must start with 'lw.'")
+}
+
+func TestConfigPrecedenceFullStack(t *testing.T) {
+	// Test full precedence: CLI override > git local > git global > YAML > defaults
+	defer func() { gitConfigMock = nil }()
+
+	// Create temp YAML config
+	tempDir := t.TempDir()
+	yamlPath := filepath.Join(tempDir, "config.yaml")
+	yamlContent := "theme: dracula\nworktree_dir: /yaml/path\nauto_fetch_prs: false\nmax_diff_chars: 100000\n"
+	err := os.WriteFile(yamlPath, []byte(yamlContent), 0o600)
+	require.NoError(t, err)
+
+	// Mock git config
+	gitConfigMock = func(args []string, repoPath string) (string, error) {
+		if slices.Contains(args, "--global") {
+			return "lw.theme nord\nlw.auto_fetch_prs true\nlw.max_untracked_diffs 20\n", nil
+		}
+		if slices.Contains(args, "--local") {
+			return "lw.theme gruvbox-dark\nlw.max_diff_chars 200000\n", nil
+		}
+		return "", nil
+	}
+
+	// Load config with YAML
+	cfg, err := LoadConfig(yamlPath)
+	require.NoError(t, err)
+
+	// Verify precedence:
+	// - theme: gruvbox-dark (git local wins over git global and YAML)
+	assert.Equal(t, "gruvbox-dark", cfg.Theme)
+
+	// - worktree_dir: /yaml/path (from YAML, not overridden by git)
+	assert.Equal(t, "/yaml/path", cfg.WorktreeDir)
+
+	// - auto_fetch_prs: true (git global wins over YAML)
+	assert.True(t, cfg.AutoFetchPRs)
+
+	// - max_diff_chars: 200000 (git local wins over YAML)
+	assert.Equal(t, 200000, cfg.MaxDiffChars)
+
+	// - max_untracked_diffs: 20 (from git global)
+	assert.Equal(t, 20, cfg.MaxUntrackedDiffs)
+
+	// Now apply CLI overrides (highest precedence)
+	cliOverrides := []string{
+		"lw.theme=tokyo-night",
+		"lw.auto_fetch_prs=false",
+	}
+	err = cfg.ApplyCLIOverrides(cliOverrides)
+	require.NoError(t, err)
+
+	// CLI overrides win
+	assert.Equal(t, "tokyo-night", cfg.Theme)
+	assert.False(t, cfg.AutoFetchPRs)
+	// Other values unchanged
+	assert.Equal(t, "/yaml/path", cfg.WorktreeDir)
+	assert.Equal(t, 200000, cfg.MaxDiffChars)
 }
