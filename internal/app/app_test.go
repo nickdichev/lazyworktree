@@ -3494,3 +3494,109 @@ func TestFilterPaletteItemsSkipsMRU(t *testing.T) {
 		t.Error("filtered item should not be marked as MRU")
 	}
 }
+
+func TestWorkspaceNameTruncation(t *testing.T) {
+	tests := []struct {
+		name          string
+		input         string
+		isMain        bool
+		maxNameLength int
+		expected      string
+	}{
+		{
+			name:          "short name unchanged",
+			input:         "my-worktree",
+			isMain:        false,
+			maxNameLength: 95,
+			expected:      " my-worktree",
+		},
+		{
+			name:          "main worktree unchanged",
+			input:         "",
+			isMain:        true,
+			maxNameLength: 95,
+			expected:      " main",
+		},
+		{
+			name:          "exactly 95 chars unchanged",
+			input:         strings.Repeat("a", 94),
+			isMain:        false,
+			maxNameLength: 95,
+			expected:      " " + strings.Repeat("a", 94),
+		},
+		{
+			name:          "96 chars truncated to 95 plus ellipsis",
+			input:         strings.Repeat("a", 95),
+			isMain:        false,
+			maxNameLength: 95,
+			expected:      " " + strings.Repeat("a", 94) + "...",
+		},
+		{
+			name:          "over 100 chars truncated to 95 plus ellipsis",
+			input:         strings.Repeat("a", 120),
+			isMain:        false,
+			maxNameLength: 95,
+			expected:      " " + strings.Repeat("a", 94) + "...",
+		},
+		{
+			name:          "unicode characters handled correctly",
+			input:         strings.Repeat("😀", 100),
+			isMain:        false,
+			maxNameLength: 95,
+			expected:      " " + strings.Repeat("😀", 94) + "...",
+		},
+		{
+			name:          "mixed ascii and unicode",
+			input:         "abc" + strings.Repeat("😀", 100),
+			isMain:        false,
+			maxNameLength: 95,
+			expected:      " abc" + strings.Repeat("😀", 91) + "...",
+		},
+		{
+			name:          "truncation disabled with 0",
+			input:         strings.Repeat("a", 200),
+			isMain:        false,
+			maxNameLength: 0,
+			expected:      " " + strings.Repeat("a", 200),
+		},
+		{
+			name:          "custom limit of 50",
+			input:         strings.Repeat("a", 100),
+			isMain:        false,
+			maxNameLength: 50,
+			expected:      " " + strings.Repeat("a", 49) + "...",
+		},
+		{
+			name:          "custom limit 50 with unicode",
+			input:         strings.Repeat("😀", 100),
+			isMain:        false,
+			maxNameLength: 50,
+			expected:      " " + strings.Repeat("😀", 49) + "...",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Simulate the logic from updateTable() function
+			var name string
+			if tt.isMain {
+				name = " " + mainWorktreeName
+			} else {
+				name = " " + tt.input
+			}
+
+			// Apply truncation logic (matching the implementation in updateTable)
+			if tt.maxNameLength > 0 {
+				nameRunes := []rune(name)
+				if len(nameRunes) > tt.maxNameLength {
+					name = string(nameRunes[:tt.maxNameLength]) + "..."
+				}
+			}
+
+			if name != tt.expected {
+				t.Errorf("expected %q, got %q (expected length: %d, got length: %d)",
+					tt.expected, name, len([]rune(tt.expected)), len([]rune(name)))
+			}
+		})
+	}
+}

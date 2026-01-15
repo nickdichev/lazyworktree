@@ -61,6 +61,7 @@ type AppConfig struct {
 	SearchAutoSelect        bool // Start with filter focused and select first match on Enter.
 	MaxUntrackedDiffs       int
 	MaxDiffChars            int
+	MaxNameLength           int // Maximum length for worktree names in table display (0 disables truncation)
 	GitPagerArgs            []string
 	GitPagerArgsSet         bool `yaml:"-"`
 	GitPager                string
@@ -103,6 +104,7 @@ func DefaultConfig() *AppConfig {
 		SearchAutoSelect:        false,
 		MaxUntrackedDiffs:       10,
 		MaxDiffChars:            200000,
+		MaxNameLength:           95,
 		GitPagerArgs:            DefaultDeltaArgsForTheme(theme.DraculaName),
 		GitPager:                "delta",
 		GitPagerInteractive:     false,
@@ -200,6 +202,7 @@ func parseConfig(data map[string]any) *AppConfig {
 	cfg.ShowIcons = coerceBool(data["show_icons"], cfg.ShowIcons)
 	cfg.MaxUntrackedDiffs = coerceInt(data["max_untracked_diffs"], 10)
 	cfg.MaxDiffChars = coerceInt(data["max_diff_chars"], 200000)
+	cfg.MaxNameLength = coerceInt(data["max_name_length"], 95)
 	// Diff formatter/pager configuration (new keys: git_pager, git_pager_args)
 	if _, ok := data["git_pager_args"]; ok {
 		cfg.GitPagerArgs = normalizeArgsList(data["git_pager_args"])
@@ -286,6 +289,9 @@ func parseConfig(data map[string]any) *AppConfig {
 	}
 	if cfg.MaxDiffChars < 0 {
 		cfg.MaxDiffChars = 0
+	}
+	if cfg.MaxNameLength < 0 {
+		cfg.MaxNameLength = 0
 	}
 
 	if _, ok := data["custom_commands"]; ok {

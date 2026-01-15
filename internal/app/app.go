@@ -1339,6 +1339,14 @@ func (m *Model) updateTable() {
 			name = " " + name
 		}
 
+		// Truncate to configured max length with ellipsis if needed
+		if m.config.MaxNameLength > 0 {
+			nameRunes := []rune(name)
+			if len(nameRunes) > m.config.MaxNameLength {
+				name = string(nameRunes[:m.config.MaxNameLength]) + "..."
+			}
+		}
+
 		status := "✓ "
 		if wt.Dirty {
 			status = "✎ "

@@ -1834,3 +1834,49 @@ func TestLoadConfigWithNonexistentPathFallsBack(t *testing.T) {
 	// Theme will be auto-detected or set to default
 	assert.NotEmpty(t, cfg.Theme)
 }
+
+func TestMaxNameLengthConfig(t *testing.T) {
+	tests := []struct {
+		name     string
+		data     map[string]interface{}
+		expected int
+	}{
+		{
+			name:     "default value",
+			data:     map[string]interface{}{},
+			expected: 95,
+		},
+		{
+			name:     "custom value",
+			data:     map[string]interface{}{"max_name_length": 50},
+			expected: 50,
+		},
+		{
+			name:     "disabled with 0",
+			data:     map[string]interface{}{"max_name_length": 0},
+			expected: 0,
+		},
+		{
+			name:     "negative treated as 0",
+			data:     map[string]interface{}{"max_name_length": -10},
+			expected: 0,
+		},
+		{
+			name:     "string coerced to int",
+			data:     map[string]interface{}{"max_name_length": "75"},
+			expected: 75,
+		},
+		{
+			name:     "large value",
+			data:     map[string]interface{}{"max_name_length": 200},
+			expected: 200,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := parseConfig(tt.data)
+			assert.Equal(t, tt.expected, cfg.MaxNameLength, "MaxNameLength mismatch")
+		})
+	}
+}

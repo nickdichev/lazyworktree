@@ -520,6 +520,7 @@ palette_mru: true         # Enable MRU (Most Recently Used) sorting for command 
 palette_mru_limit: 5      # Number of recent commands to show (default: 5)
 max_untracked_diffs: 10
 max_diff_chars: 200000
+max_name_length: 95       # Maximum length for worktree names in table display (0 disables truncation)
 theme: ""       # Leave empty to auto-detect based on terminal background color
                 # (defaults to "dracula" for dark, "dracula-light" for light).
                 # Options: "dracula", "dracula-light", "narna", "clean-light",
@@ -577,6 +578,7 @@ Notes:
 - Set `fuzzy_finder_input` to `true` to enable fuzzy finder suggestions in input dialogs. When enabled, typing in text input fields displays fuzzy-filtered suggestions from available options. Use arrow keys to navigate suggestions and Enter to select.
 - The command palette includes MRU (Most Recently Used) sorting by default (`palette_mru: true`). A "Recently Used" section appears at the top of the palette showing your most frequently used commands. The number of commands shown is controlled by `palette_mru_limit` (default: 5). Usage history is stored per-repository in `.command-palette-history.json`. Set `palette_mru: false` to disable this feature.
 - Use `max_untracked_diffs: 0` to conceal untracked diffs; `max_diff_chars: 0` disables truncation.
+- Use `max_name_length` to control the maximum length for worktree names displayed in the table (default: 95 characters). Names longer than this limit will be truncated with "..." appended. Set to 0 to disable truncation entirely.
 - Execute `lazyworktree --show-syntax-themes` to display the default delta `--syntax-theme` values for each UI theme.
 - Use `lazyworktree --theme <name>` to select a UI theme directly; the supported names correspond to those listed above.
 - `git_pager` specifies the diff formatter/pager command (default: `delta`). Set to an empty string to disable diff formatting and use plain git diff output. You may also use alternatives such as `diff-so-fancy` or interactive tools like `diffnav` (requires `git_pager_interactive: true`). VS Code users can set `git_pager: code` to open diffs via `git difftool` with proper side-by-side comparison (one VS Code window per changed file).
