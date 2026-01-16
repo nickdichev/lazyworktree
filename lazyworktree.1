@@ -580,7 +580,9 @@ Can also be set with \fB--debug-log\fR.
 .B theme
 UI colour theme. If left empty or unspecified, the theme is auto-detected from the terminal background.
 .br
-Options: \fBdracula\fR (default for dark), \fBdracula-light\fR (default for light), \fBnarna\fR, \fBclean-light\fR, \fBcatppuccin-latte\fR, \fBrose-pine-dawn\fR, \fBone-light\fR, \fBeverforest-light\fR, \fBeverforest-dark\fR, \fBsolarized-dark\fR, \fBsolarized-light\fR, \fBgruvbox-dark\fR, \fBgruvbox-light\fR, \fBnord\fR, \fBmonokai\fR, \fBcatppuccin-mocha\fR, \fBmodern\fR, \fBtokyo-night\fR, \fBone-dark\fR, \fBrose-pine\fR, \fBayu-mirage\fR.
+Available built-in themes: \fBdracula\fR (default for dark), \fBdracula-light\fR (default for light), \fBnarna\fR, \fBclean-light\fR, \fBcatppuccin-latte\fR, \fBrose-pine-dawn\fR, \fBone-light\fR, \fBeverforest-light\fR, \fBeverforest-dark\fR, \fBsolarized-dark\fR, \fBsolarized-light\fR, \fBgruvbox-dark\fR, \fBgruvbox-light\fR, \fBnord\fR, \fBmonokai\fR, \fBcatppuccin-mocha\fR, \fBmodern\fR, \fBtokyo-night\fR, \fBone-dark\fR, \fBrose-pine\fR, \fBayu-mirage\fR.
+.br
+Custom themes can be defined in the configuration file (see \fBcustom_themes\fR below) and will appear alongside built-in themes in the theme selection screen.
 .br
 Can also be set with \fB--theme\fR.
 .
@@ -814,6 +816,53 @@ custom_create_menus:
     post_interactive: false
 .fi
 .RE
+.
+.TP
+.B custom_themes
+Define custom themes that can inherit from built-in themes or other custom themes. Custom themes allow you to personalise the colour scheme without modifying code.
+.br
+Two ways to define a custom theme:
+.RS
+.IP 1. 4
+Inherit from a built-in theme and override specific colours:
+.RS
+.nf
+custom_themes:
+  my-dark:
+    base: dracula
+    accent: "#FF6B9D"
+    text_fg: "#E8E8E8"
+.fi
+.RE
+.IP 2. 4
+Define a complete theme without a base (all 14 colour fields required):
+.RS
+.nf
+custom_themes:
+  completely-custom:
+    background: "#1A1A1A"
+    accent: "#00FF00"
+    accent_fg: "#000000"
+    accent_dim: "#2A2A2A"
+    border: "#3A3A3A"
+    border_dim: "#2A2A2A"
+    muted_fg: "#888888"
+    text_fg: "#FFFFFF"
+    success_fg: "#00FF00"
+    warn_fg: "#FFFF00"
+    error_fg: "#FF0000"
+    cyan: "#00FFFF"
+    pink: "#FF00FF"
+    yellow: "#FFFF00"
+.fi
+.RE
+.RE
+.PP
+Custom themes can also inherit from other custom themes. Available colour fields (snake_case in YAML): \fBbackground\fR, \fBaccent\fR, \fBaccent_fg\fR, \fBaccent_dim\fR, \fBborder\fR, \fBborder_dim\fR, \fBmuted_fg\fR, \fBtext_fg\fR, \fBsuccess_fg\fR, \fBwarn_fg\fR, \fBerror_fg\fR, \fBcyan\fR, \fBpink\fR, \fByellow\fR.
+.br
+Colour values must be in hex format (\fB#RRGGBB\fR or \fB#RGB\fR). When using a \fBbase\fR theme, only specify colours you want to override. When not using a base, all 14 colour fields are required.
+.br
+Custom themes appear in the theme selection screen alongside built-in themes.
 .
 .SS Example Configuration
 A practical configuration demonstrating common settings:

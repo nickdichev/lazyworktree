@@ -27,7 +27,7 @@ fuzzy_finder_input: false
 # Options: "dracula", "dracula-light", "narna", "clean-light", "solarized-dark",
 #          "solarized-light", "gruvbox-dark", "gruvbox-light", "nord", "monokai",
 #          "catppuccin-mocha", "modern", "tokyo-night", "one-dark", "rose-pine",
-#          "ayu-mirage", "everforest-dark"
+#          "ayu-mirage", "everforest-dark", or any custom theme defined below
 theme: dracula
 
 # Toggle Nerd Font v3 icons in file trees, PR views, and CI checks
@@ -328,3 +328,75 @@ custom_create_menus:
   - label: "From clipboard"
     description: "Use clipboard as branch name"
     command: "pbpaste"
+
+# ============================================================================
+# CUSTOM THEMES
+# ============================================================================
+
+# Define custom themes that can inherit from built-in themes or other custom themes.
+# Custom themes allow you to personalise the colour scheme without modifying code.
+#
+# Two ways to define a custom theme:
+#
+# 1. Inherit from a built-in theme and override specific colours:
+#    custom_themes:
+#      my-dark:
+#        base: dracula
+#        accent: "#FF6B9D"
+#        text_fg: "#E8E8E8"
+#
+# 2. Define a complete theme without a base (all 14 colour fields required):
+#    custom_themes:
+#      completely-custom:
+#        background: "#1A1A1A"
+#        accent: "#00FF00"
+#        accent_fg: "#000000"
+#        accent_dim: "#2A2A2A"
+#        border: "#3A3A3A"
+#        border_dim: "#2A2A2A"
+#        muted_fg: "#888888"
+#        text_fg: "#FFFFFF"
+#        success_fg: "#00FF00"
+#        warn_fg: "#FFFF00"
+#        error_fg: "#FF0000"
+#        cyan: "#00FFFF"
+#        pink: "#FF00FF"
+#        yellow: "#FFFF00"
+#
+# Custom themes can also inherit from other custom themes:
+#    custom_themes:
+#      base-custom:
+#        base: dracula
+#        accent: "#FF0000"
+#      derived:
+#        base: base-custom
+#        accent: "#00FF00"
+#
+# Available colour fields (snake_case in YAML):
+#   - background: Main background colour
+#   - accent: Primary accent colour (used for highlights, selected items)
+#   - accent_fg: Foreground colour for text on accent background
+#   - accent_dim: Dimmed accent colour (used for selected rows/panels)
+#   - border: Border colour
+#   - border_dim: Dimmed border colour
+#   - muted_fg: Muted text colour (for less important text)
+#   - text_fg: Primary text colour
+#   - success_fg: Success/positive indicator colour
+#   - warn_fg: Warning indicator colour
+#   - error_fg: Error indicator colour
+#   - cyan: Cyan accent colour
+#   - pink: Pink accent colour
+#   - yellow: Yellow accent colour
+#
+# Colour values must be in hex format: #RRGGBB or #RGB
+# When using a base theme, only specify colours you want to override.
+# When not using a base, all 14 colour fields are required.
+#
+# custom_themes:
+#   my-dark:
+#     base: dracula
+#     accent: "#FF6B9D"
+#   my-light:
+#     base: dracula-light
+#     background: "#FAFAFA"
+#     accent: "#0066CC"

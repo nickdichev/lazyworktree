@@ -52,6 +52,25 @@ type CustomCreateMenu struct {
 	PostInteractive bool   // Run post-command interactively (default: false)
 }
 
+// CustomTheme represents a user-defined theme that can inherit from built-in or other custom themes.
+type CustomTheme struct {
+	Base       string // Optional base theme name (built-in or custom)
+	Background string
+	Accent     string
+	AccentFg   string
+	AccentDim  string
+	Border     string
+	BorderDim  string
+	MutedFg    string
+	TextFg     string
+	SuccessFg  string
+	WarnFg     string
+	ErrorFg    string
+	Cyan       string
+	Pink       string
+	Yellow     string
+}
+
 // AppConfig defines the global lazyworktree configuration options.
 type AppConfig struct {
 	WorktreeDir             string
@@ -85,7 +104,8 @@ type AppConfig struct {
 	PaletteMRU              bool   // Enable MRU sorting for command palette (default: false)
 	PaletteMRULimit         int    // Number of MRU items to show (default: 5)
 	CustomCreateMenus       []*CustomCreateMenu
-	ConfigPath              string `yaml:"-"` // Path to the configuration file
+	CustomThemes            map[string]*CustomTheme // User-defined custom themes
+	ConfigPath              string                  `yaml:"-"` // Path to the configuration file
 }
 
 // RepoConfig represents repository-scoped commands from .wt
@@ -118,6 +138,7 @@ func DefaultConfig() *AppConfig {
 		PaletteMRU:              true,
 		PaletteMRULimit:         5,
 		ShowIcons:               true,
+		CustomThemes:            make(map[string]*CustomTheme),
 		CustomCommands: map[string]*CustomCommand{
 			"t": {
 				Description: "Tmux",
@@ -306,6 +327,10 @@ func parseConfig(data map[string]any) *AppConfig {
 		cfg.CustomCreateMenus = parseCustomCreateMenus(data)
 	}
 
+	if _, ok := data["custom_themes"]; ok {
+		cfg.CustomThemes = parseCustomThemes(data)
+	}
+
 	return cfg
 }
 
@@ -403,6 +428,208 @@ func parseCustomCreateMenus(data map[string]any) []*CustomCreateMenu {
 		}
 	}
 	return menus
+}
+
+func parseCustomThemes(data map[string]any) map[string]*CustomTheme {
+	raw, ok := data["custom_themes"].(map[string]any)
+	if !ok {
+		return make(map[string]*CustomTheme)
+	}
+
+	themes := make(map[string]*CustomTheme)
+	builtInThemes := theme.AvailableThemes()
+	builtInMap := make(map[string]bool)
+	for _, name := range builtInThemes {
+		builtInMap[strings.ToLower(name)] = true
+	}
+
+	for name, val := range raw {
+		name = strings.ToLower(strings.TrimSpace(name))
+		if name == "" {
+			continue
+		}
+
+		// Check for conflicts with built-in themes
+		if builtInMap[name] {
+			continue
+		}
+
+		themeData, ok := val.(map[string]any)
+		if !ok {
+			continue
+		}
+
+		customTheme := &CustomTheme{
+			Base:       strings.TrimSpace(getString(themeData, "base")),
+			Background: strings.TrimSpace(getString(themeData, "background")),
+			Accent:     strings.TrimSpace(getString(themeData, "accent")),
+			AccentFg:   strings.TrimSpace(getString(themeData, "accent_fg")),
+			AccentDim:  strings.TrimSpace(getString(themeData, "accent_dim")),
+			Border:     strings.TrimSpace(getString(themeData, "border")),
+			BorderDim:  strings.TrimSpace(getString(themeData, "border_dim")),
+			MutedFg:    strings.TrimSpace(getString(themeData, "muted_fg")),
+			TextFg:     strings.TrimSpace(getString(themeData, "text_fg")),
+			SuccessFg:  strings.TrimSpace(getString(themeData, "success_fg")),
+			WarnFg:     strings.TrimSpace(getString(themeData, "warn_fg")),
+			ErrorFg:    strings.TrimSpace(getString(themeData, "error_fg")),
+			Cyan:       strings.TrimSpace(getString(themeData, "cyan")),
+			Pink:       strings.TrimSpace(getString(themeData, "pink")),
+			Yellow:     strings.TrimSpace(getString(themeData, "yellow")),
+		}
+
+		// Validate: if no base, all fields must be present
+		if customTheme.Base == "" {
+			if err := validateCompleteTheme(customTheme); err != nil {
+				continue
+			}
+		}
+
+		// Validate all color values
+		if !validateThemeColors(customTheme) {
+			continue
+		}
+
+		themes[name] = customTheme
+	}
+
+	// Validate inheritance chains (no circular dependencies, base themes exist)
+	validatedThemes := make(map[string]*CustomTheme)
+	for name, customTheme := range themes {
+		if validateThemeInheritance(name, customTheme, themes, builtInMap, make(map[string]bool)) {
+			validatedThemes[name] = customTheme
+		}
+	}
+
+	return validatedThemes
+}
+
+// validateCompleteTheme validates that all required fields are present when base is not specified.
+func validateCompleteTheme(custom *CustomTheme) error {
+	var missing []string
+
+	if custom.Background == "" {
+		missing = append(missing, "background")
+	}
+	if custom.Accent == "" {
+		missing = append(missing, "accent")
+	}
+	if custom.AccentFg == "" {
+		missing = append(missing, "accent_fg")
+	}
+	if custom.AccentDim == "" {
+		missing = append(missing, "accent_dim")
+	}
+	if custom.Border == "" {
+		missing = append(missing, "border")
+	}
+	if custom.BorderDim == "" {
+		missing = append(missing, "border_dim")
+	}
+	if custom.MutedFg == "" {
+		missing = append(missing, "muted_fg")
+	}
+	if custom.TextFg == "" {
+		missing = append(missing, "text_fg")
+	}
+	if custom.SuccessFg == "" {
+		missing = append(missing, "success_fg")
+	}
+	if custom.WarnFg == "" {
+		missing = append(missing, "warn_fg")
+	}
+	if custom.ErrorFg == "" {
+		missing = append(missing, "error_fg")
+	}
+	if custom.Cyan == "" {
+		missing = append(missing, "cyan")
+	}
+	if custom.Pink == "" {
+		missing = append(missing, "pink")
+	}
+	if custom.Yellow == "" {
+		missing = append(missing, "yellow")
+	}
+
+	if len(missing) > 0 {
+		return fmt.Errorf("missing required fields: %s", strings.Join(missing, ", "))
+	}
+
+	return nil
+}
+
+// validateThemeColors validates all color hex values in a custom theme.
+func validateThemeColors(custom *CustomTheme) bool {
+	colors := []string{
+		custom.Background,
+		custom.Accent,
+		custom.AccentFg,
+		custom.AccentDim,
+		custom.Border,
+		custom.BorderDim,
+		custom.MutedFg,
+		custom.TextFg,
+		custom.SuccessFg,
+		custom.WarnFg,
+		custom.ErrorFg,
+		custom.Cyan,
+		custom.Pink,
+		custom.Yellow,
+	}
+
+	for _, color := range colors {
+		if color != "" && !validateColorHex(color) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// validateColorHex validates hex color format (#RRGGBB or #RGB).
+func validateColorHex(color string) bool {
+	if color == "" {
+		return false
+	}
+
+	if color[0] != '#' {
+		return false
+	}
+
+	hex := color[1:]
+	if len(hex) != 3 && len(hex) != 6 {
+		return false
+	}
+
+	matched, _ := regexp.MatchString("^[0-9A-Fa-f]+$", hex)
+	return matched
+}
+
+// validateThemeInheritance validates inheritance chains, checking for circular dependencies and ensuring base themes exist.
+func validateThemeInheritance(name string, custom *CustomTheme, themes map[string]*CustomTheme, builtInMap, visited map[string]bool) bool {
+	if custom.Base == "" {
+		return true
+	}
+
+	baseName := strings.ToLower(custom.Base)
+
+	// Check for circular dependency
+	if visited[baseName] {
+		return false
+	}
+
+	// Check if base exists
+	if builtInMap[baseName] {
+		return true
+	}
+
+	baseTheme, exists := themes[baseName]
+	if !exists {
+		return false
+	}
+
+	// Recursively validate base theme
+	visited[name] = true
+	return validateThemeInheritance(baseName, baseTheme, themes, builtInMap, visited)
 }
 
 func normalizeCommandList(val any) []string {
@@ -907,4 +1134,40 @@ func getString(data map[string]any, key string) string {
 		return strings.TrimSpace(fmt.Sprint(v))
 	}
 	return ""
+}
+
+// ToThemeData converts CustomTheme to theme.CustomThemeData to avoid circular dependencies.
+func (ct *CustomTheme) ToThemeData() *theme.CustomThemeData {
+	if ct == nil {
+		return nil
+	}
+	return &theme.CustomThemeData{
+		Base:       ct.Base,
+		Background: ct.Background,
+		Accent:     ct.Accent,
+		AccentFg:   ct.AccentFg,
+		AccentDim:  ct.AccentDim,
+		Border:     ct.Border,
+		BorderDim:  ct.BorderDim,
+		MutedFg:    ct.MutedFg,
+		TextFg:     ct.TextFg,
+		SuccessFg:  ct.SuccessFg,
+		WarnFg:     ct.WarnFg,
+		ErrorFg:    ct.ErrorFg,
+		Cyan:       ct.Cyan,
+		Pink:       ct.Pink,
+		Yellow:     ct.Yellow,
+	}
+}
+
+// CustomThemesToThemeDataMap converts a map of CustomTheme to theme.CustomThemeData.
+func CustomThemesToThemeDataMap(customThemes map[string]*CustomTheme) map[string]*theme.CustomThemeData {
+	if customThemes == nil {
+		return nil
+	}
+	result := make(map[string]*theme.CustomThemeData)
+	for name, ct := range customThemes {
+		result[name] = ct.ToThemeData()
+	}
+	return result
 }

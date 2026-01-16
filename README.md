@@ -440,6 +440,78 @@ To select a theme, configure it in your configuration file:
 theme: dracula  # or any listed above
 ```
 
+### Custom Themes
+
+You can define custom themes in your configuration file that inherit from built-in themes or define completely new colour schemes.
+
+**Inheriting from a built-in theme:**
+
+```yaml
+custom_themes:
+  my-dark:
+    base: dracula
+    accent: "#FF6B9D"
+    text_fg: "#E8E8E8"
+
+  my-light:
+    base: dracula-light
+    background: "#FAFAFA"
+    accent: "#0066CC"
+```
+
+**Defining a complete theme (all 14 colour fields required):**
+
+```yaml
+custom_themes:
+  completely-custom:
+    background: "#1A1A1A"
+    accent: "#00FF00"
+    accent_fg: "#000000"
+    accent_dim: "#2A2A2A"
+    border: "#3A3A3A"
+    border_dim: "#2A2A2A"
+    muted_fg: "#888888"
+    text_fg: "#FFFFFF"
+    success_fg: "#00FF00"
+    warn_fg: "#FFFF00"
+    error_fg: "#FF0000"
+    cyan: "#00FFFF"
+    pink: "#FF00FF"
+    yellow: "#FFFF00"
+```
+
+**Custom themes can inherit from other custom themes:**
+
+```yaml
+custom_themes:
+  base-custom:
+    base: dracula
+    accent: "#FF0000"
+  derived:
+    base: base-custom
+    accent: "#00FF00"
+```
+
+**Available colour fields:**
+- `background` - Main background colour
+- `accent` - Primary accent colour (highlights, selected items)
+- `accent_fg` - Foreground colour for text on accent background
+- `accent_dim` - Dimmed accent colour (selected rows/panels)
+- `border` - Border colour
+- `border_dim` - Dimmed border colour
+- `muted_fg` - Muted text colour
+- `text_fg` - Primary text colour
+- `success_fg` - Success indicator colour
+- `warn_fg` - Warning indicator colour
+- `error_fg` - Error indicator colour
+- `cyan` - Cyan accent colour
+- `pink` - Pink accent colour
+- `yellow` - Yellow accent colour
+
+Colour values must be in hex format (`#RRGGBB` or `#RGB`). When using a `base` theme, only specify colours you want to override. When not using a base, all 14 colour fields are required.
+
+Custom themes appear in the theme selection screen alongside built-in themes.
+
 ## CI Status Display
 
 When viewing a worktree with an associated PR/MR, lazyworktree automatically retrieves and displays CI check statuses in the information pane.

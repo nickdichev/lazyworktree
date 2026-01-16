@@ -1,7 +1,31 @@
 // Package theme provides theme definitions and management for the TUI.
 package theme
 
-import "github.com/charmbracelet/lipgloss"
+import (
+	"strings"
+
+	"github.com/charmbracelet/lipgloss"
+)
+
+// CustomThemeData represents custom theme data without importing config package.
+// This avoids circular dependencies.
+type CustomThemeData struct {
+	Base       string
+	Background string
+	Accent     string
+	AccentFg   string
+	AccentDim  string
+	Border     string
+	BorderDim  string
+	MutedFg    string
+	TextFg     string
+	SuccessFg  string
+	WarnFg     string
+	ErrorFg    string
+	Cyan       string
+	Pink       string
+	Yellow     string
+}
 
 // Theme defines all colors used in the application UI.
 type Theme struct {
@@ -548,5 +572,173 @@ func AvailableThemes() []string {
 		OneDarkName,
 		RosePineName,
 		AyuMirageName,
+	}
+}
+
+// AvailableThemesWithCustoms returns a list of available theme names including custom themes.
+func AvailableThemesWithCustoms(customThemes map[string]*CustomThemeData) []string {
+	themes := AvailableThemes()
+	for name := range customThemes {
+		themes = append(themes, name)
+	}
+	return themes
+}
+
+// GetThemeWithCustoms returns a theme by name, checking built-in themes first, then custom themes.
+// It handles inheritance recursively and merges base themes with overrides.
+func GetThemeWithCustoms(name string, customThemes map[string]*CustomThemeData) *Theme {
+	if name == "" {
+		return Dracula()
+	}
+
+	nameLower := strings.ToLower(name)
+
+	// First check built-in themes
+	if isBuiltInTheme(nameLower) {
+		return GetTheme(nameLower)
+	}
+
+	// Check custom themes
+	if customThemes != nil {
+		if custom, ok := customThemes[name]; ok {
+			return resolveCustomTheme(custom, customThemes, make(map[string]bool))
+		}
+		// Also try case-insensitive lookup
+		for customName, custom := range customThemes {
+			if strings.EqualFold(customName, nameLower) {
+				return resolveCustomTheme(custom, customThemes, make(map[string]bool))
+			}
+		}
+	}
+
+	// Fallback to Dracula
+	return Dracula()
+}
+
+// resolveCustomTheme recursively resolves a custom theme, handling inheritance.
+func resolveCustomTheme(custom *CustomThemeData, customThemes map[string]*CustomThemeData, visited map[string]bool) *Theme {
+	// If no base, create theme from scratch
+	if custom.Base == "" {
+		return themeFromCustom(custom)
+	}
+
+	baseName := strings.ToLower(strings.TrimSpace(custom.Base))
+
+	// Check for circular dependency
+	if visited[baseName] {
+		return Dracula() // Fallback on circular dependency
+	}
+
+	// Try to get base theme from built-in themes first
+	baseTheme := GetTheme(baseName)
+	if baseTheme == nil || !isBuiltInTheme(baseName) {
+		// Check if it's a custom theme
+		if baseCustom, ok := customThemes[baseName]; ok {
+			visited[baseName] = true
+			baseTheme = resolveCustomTheme(baseCustom, customThemes, visited)
+		} else {
+			// Base doesn't exist, fallback
+			return Dracula()
+		}
+	}
+
+	// Merge base with custom overrides
+	return MergeTheme(baseTheme, custom)
+}
+
+// isBuiltInTheme checks if a theme name is a built-in theme.
+func isBuiltInTheme(name string) bool {
+	builtInThemes := AvailableThemes()
+	for _, builtIn := range builtInThemes {
+		if strings.EqualFold(builtIn, name) {
+			return true
+		}
+	}
+	return false
+}
+
+// MergeTheme merges a base theme with custom theme overrides.
+func MergeTheme(base *Theme, custom *CustomThemeData) *Theme {
+	merged := &Theme{
+		Background: base.Background,
+		Accent:     base.Accent,
+		AccentFg:   base.AccentFg,
+		AccentDim:  base.AccentDim,
+		Border:     base.Border,
+		BorderDim:  base.BorderDim,
+		MutedFg:    base.MutedFg,
+		TextFg:     base.TextFg,
+		SuccessFg:  base.SuccessFg,
+		WarnFg:     base.WarnFg,
+		ErrorFg:    base.ErrorFg,
+		Cyan:       base.Cyan,
+		Pink:       base.Pink,
+		Yellow:     base.Yellow,
+	}
+
+	// Apply overrides from custom theme
+	if custom.Background != "" {
+		merged.Background = lipgloss.Color(custom.Background)
+	}
+	if custom.Accent != "" {
+		merged.Accent = lipgloss.Color(custom.Accent)
+	}
+	if custom.AccentFg != "" {
+		merged.AccentFg = lipgloss.Color(custom.AccentFg)
+	}
+	if custom.AccentDim != "" {
+		merged.AccentDim = lipgloss.Color(custom.AccentDim)
+	}
+	if custom.Border != "" {
+		merged.Border = lipgloss.Color(custom.Border)
+	}
+	if custom.BorderDim != "" {
+		merged.BorderDim = lipgloss.Color(custom.BorderDim)
+	}
+	if custom.MutedFg != "" {
+		merged.MutedFg = lipgloss.Color(custom.MutedFg)
+	}
+	if custom.TextFg != "" {
+		merged.TextFg = lipgloss.Color(custom.TextFg)
+	}
+	if custom.SuccessFg != "" {
+		merged.SuccessFg = lipgloss.Color(custom.SuccessFg)
+	}
+	if custom.WarnFg != "" {
+		merged.WarnFg = lipgloss.Color(custom.WarnFg)
+	}
+	if custom.ErrorFg != "" {
+		merged.ErrorFg = lipgloss.Color(custom.ErrorFg)
+	}
+	if custom.Cyan != "" {
+		merged.Cyan = lipgloss.Color(custom.Cyan)
+	}
+	if custom.Pink != "" {
+		merged.Pink = lipgloss.Color(custom.Pink)
+	}
+	if custom.Yellow != "" {
+		merged.Yellow = lipgloss.Color(custom.Yellow)
+	}
+
+	return merged
+}
+
+// themeFromCustom creates a Theme from a CustomThemeData without a base.
+func themeFromCustom(custom *CustomThemeData) *Theme {
+	return &Theme{
+		Background: lipgloss.Color(custom.Background),
+		Accent:     lipgloss.Color(custom.Accent),
+		AccentFg:   lipgloss.Color(custom.AccentFg),
+		AccentDim:  lipgloss.Color(custom.AccentDim),
+		Border:     lipgloss.Color(custom.Border),
+		BorderDim:  lipgloss.Color(custom.BorderDim),
+		MutedFg:    lipgloss.Color(custom.MutedFg),
+		TextFg:     lipgloss.Color(custom.TextFg),
+		SuccessFg:  lipgloss.Color(custom.SuccessFg),
+		WarnFg:     lipgloss.Color(custom.WarnFg),
+		ErrorFg:    lipgloss.Color(custom.ErrorFg),
+		Cyan:       lipgloss.Color(custom.Cyan),
+		Pink:       lipgloss.Color(custom.Pink),
+		Yellow:     lipgloss.Color(custom.Yellow),
 	}
 }

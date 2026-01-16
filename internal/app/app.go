@@ -441,7 +441,7 @@ func NewModel(cfg *config.AppConfig, initialFilter string) *Model {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// Load theme
-	thm := theme.GetTheme(cfg.Theme)
+	thm := theme.GetThemeWithCustoms(cfg.Theme, config.CustomThemesToThemeDataMap(cfg.CustomThemes))
 
 	debugNotified := map[string]bool{}
 	var debugMu sync.Mutex // Protects debugNotified map
@@ -3627,7 +3627,7 @@ func (m *Model) showCommandPalette() tea.Cmd {
 
 func (m *Model) showThemeSelection() tea.Cmd {
 	m.originalTheme = m.config.Theme
-	themes := theme.AvailableThemes()
+	themes := theme.AvailableThemesWithCustoms(config.CustomThemesToThemeDataMap(m.config.CustomThemes))
 	sort.Strings(themes)
 	items := make([]selectionItem, 0, len(themes))
 	for _, t := range themes {
@@ -6462,7 +6462,7 @@ func (m *Model) renderFooter(layout layoutDims) string {
 
 // UpdateTheme updates the application theme and refreshes component styles.
 func (m *Model) UpdateTheme(themeName string) {
-	thm := theme.GetTheme(themeName)
+	thm := theme.GetThemeWithCustoms(themeName, config.CustomThemesToThemeDataMap(m.config.CustomThemes))
 	m.theme = thm
 
 	// Update table styles
