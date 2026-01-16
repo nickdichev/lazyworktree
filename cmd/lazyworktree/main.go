@@ -76,22 +76,7 @@ func main() {
 	flag.Parse()
 
 	if showVersion {
-		if commit == "none" || builtBy == "unknown" {
-			if info, ok := debug.ReadBuildInfo(); ok {
-				if commit == "none" {
-					for _, setting := range info.Settings {
-						if setting.Key == "vcs.revision" {
-							commit = setting.Value
-						}
-					}
-				}
-				if builtBy == "unknown" {
-					builtBy = info.GoVersion
-				}
-			}
-		}
-
-		fmt.Printf("lazyworktree version %s\ncommit: %s\nbuilt at: %s\nbuilt by: %s\n", version, commit, date, builtBy)
+		printVersion()
 		return
 	}
 	if showSyntaxThemes {
@@ -161,39 +146,19 @@ func main() {
 		}
 	}
 
-	if themeName != "" {
-		normalized := config.NormalizeThemeName(themeName)
-		if normalized == "" {
-			fmt.Fprintf(os.Stderr, "Unknown theme %q\n", themeName)
-			_ = log.Close()
-			os.Exit(1)
-		}
-		cfg.Theme = normalized
-		if !cfg.GitPagerArgsSet && filepath.Base(cfg.GitPager) == "delta" {
-			cfg.GitPagerArgs = config.DefaultDeltaArgsForTheme(normalized)
-		}
+	if err := applyThemeConfig(cfg, themeName); err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		_ = log.Close()
+		os.Exit(1)
 	}
 	if searchAutoSelect {
 		cfg.SearchAutoSelect = true
 	}
 
-	switch {
-	case worktreeDir != "":
-		expanded, err := utils.ExpandPath(worktreeDir)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error expanding worktree-dir: %v\n", err)
-			_ = log.Close()
-			os.Exit(1)
-		}
-		cfg.WorktreeDir = expanded
-	case cfg.WorktreeDir != "":
-		expanded, err := utils.ExpandPath(cfg.WorktreeDir)
-		if err == nil {
-			cfg.WorktreeDir = expanded
-		}
-	default:
-		home, _ := os.UserHomeDir()
-		cfg.WorktreeDir = filepath.Join(home, ".local", "share", "worktrees")
+	if err := applyWorktreeDirConfig(cfg, worktreeDir); err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		_ = log.Close()
+		os.Exit(1)
 	}
 
 	if debugLog != "" {
@@ -302,5 +267,49 @@ func printCompletion(shell string) error {
 		return err
 	}
 	fmt.Println(script)
+	return nil
+}
+
+// printVersion prints version information.
+func printVersion() {
+	v := version
+	c := commit
+	d := date
+	b := builtBy
+
+	if c == "none" || b == "unknown" {
+		if info, ok := debug.ReadBuildInfo(); ok {
+			if c == "none" {
+				for _, setting := range info.Settings {
+					if setting.Key == "vcs.revision" {
+						c = setting.Value
+					}
+				}
+			}
+			if b == "unknown" {
+				b = info.GoVersion
+			}
+		}
+	}
+
+	fmt.Printf("lazyworktree version %s\ncommit: %s\nbuilt at: %s\nbuilt by: %s\n", v, c, d, b)
+}
+
+// applyThemeConfig applies theme configuration from command line flag.
+func applyThemeConfig(cfg *config.AppConfig, themeName string) error {
+	if themeName == "" {
+		return nil
+	}
+
+	normalized := config.NormalizeThemeName(themeName)
+	if normalized == "" {
+		return fmt.Errorf("unknown theme %q", themeName)
+	}
+
+	cfg.Theme = normalized
+	if !cfg.GitPagerArgsSet && filepath.Base(cfg.GitPager) == "delta" {
+		cfg.GitPagerArgs = config.DefaultDeltaArgsForTheme(normalized)
+	}
+
 	return nil
 }

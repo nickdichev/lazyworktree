@@ -848,3 +848,194 @@ func TestBuildCommitItems(t *testing.T) {
 		t.Fatalf("unexpected description: %q", items[0].description)
 	}
 }
+
+func TestShowBaseBranchForCustomCreateMenu(t *testing.T) {
+	repo := initTestRepo(t)
+	withCwd(t, repo.dir)
+
+	cfg := &config.AppConfig{WorktreeDir: t.TempDir()}
+	m := NewModel(cfg, "")
+	m.windowWidth = 120
+	m.windowHeight = 40
+
+	menu := &config.CustomCreateMenu{
+		Label:       "Test Menu",
+		Description: "Test Description",
+		Command:     "echo test-branch",
+		Interactive: false,
+	}
+
+	cmd := m.showBaseBranchForCustomCreateMenu(menu)
+	if cmd == nil {
+		t.Fatal("expected command to be returned")
+	}
+	if m.listScreen == nil {
+		t.Fatal("expected list screen to be set")
+	}
+
+	// Simulate selecting a branch
+	if len(m.listScreen.items) > 0 {
+		m.listSubmit(m.listScreen.items[0])
+		// After branch selection, pendingCustomBaseRef and pendingCustomMenu should be set
+		if m.pendingCustomBaseRef == "" {
+			t.Error("expected pendingCustomBaseRef to be set")
+		}
+		if m.pendingCustomMenu == nil {
+			t.Error("expected pendingCustomMenu to be set")
+		}
+	}
+}
+
+func TestExecuteCustomCreateCommand(t *testing.T) {
+	repo := initTestRepo(t)
+	withCwd(t, repo.dir)
+
+	cfg := &config.AppConfig{WorktreeDir: t.TempDir()}
+	m := NewModel(cfg, "")
+	m.worktrees = []*models.WorktreeInfo{
+		{Path: repo.dir, Branch: repo.branch, IsMain: true},
+	}
+
+	menu := &config.CustomCreateMenu{
+		Label:       "Test Menu",
+		Description: "Test Description",
+		Command:     "echo test-branch-name",
+		Interactive: false,
+	}
+
+	cmd := m.executeCustomCreateCommand(menu)
+	if cmd == nil {
+		t.Fatal("expected command to be returned")
+	}
+	if m.currentScreen != screenLoading {
+		t.Errorf("expected screenLoading, got %v", m.currentScreen)
+	}
+	if m.loadingScreen == nil {
+		t.Error("expected loading screen to be set")
+	}
+
+	// Execute the command
+	msg := cmd()
+	result, ok := msg.(customCreateResultMsg)
+	if !ok {
+		t.Fatalf("expected customCreateResultMsg, got %T", msg)
+	}
+	if result.err != nil {
+		t.Fatalf("unexpected error: %v", result.err)
+	}
+	if result.branchName != "test-branch-name" {
+		t.Errorf("expected branch name 'test-branch-name', got %q", result.branchName)
+	}
+}
+
+func TestExecuteCustomCreateCommandError(t *testing.T) {
+	repo := initTestRepo(t)
+	withCwd(t, repo.dir)
+
+	cfg := &config.AppConfig{WorktreeDir: t.TempDir()}
+	m := NewModel(cfg, "")
+	m.worktrees = []*models.WorktreeInfo{
+		{Path: repo.dir, Branch: repo.branch, IsMain: true},
+	}
+
+	menu := &config.CustomCreateMenu{
+		Label:       "Test Menu",
+		Description: "Test Description",
+		Command:     "false", // Command that fails
+		Interactive: false,
+	}
+
+	cmd := m.executeCustomCreateCommand(menu)
+	msg := cmd()
+	result, ok := msg.(customCreateResultMsg)
+	if !ok {
+		t.Fatalf("expected customCreateResultMsg, got %T", msg)
+	}
+	if result.err == nil {
+		t.Error("expected error from failing command")
+	}
+}
+
+func TestExecuteCustomCreateCommandNoOutput(t *testing.T) {
+	repo := initTestRepo(t)
+	withCwd(t, repo.dir)
+
+	cfg := &config.AppConfig{WorktreeDir: t.TempDir()}
+	m := NewModel(cfg, "")
+	m.worktrees = []*models.WorktreeInfo{
+		{Path: repo.dir, Branch: repo.branch, IsMain: true},
+	}
+
+	menu := &config.CustomCreateMenu{
+		Label:       "Test Menu",
+		Description: "Test Description",
+		Command:     "true", // Command that succeeds but produces no output
+		Interactive: false,
+	}
+
+	cmd := m.executeCustomCreateCommand(menu)
+	msg := cmd()
+	result, ok := msg.(customCreateResultMsg)
+	if !ok {
+		t.Fatalf("expected customCreateResultMsg, got %T", msg)
+	}
+	if result.err == nil {
+		t.Error("expected error for command with no output")
+	}
+}
+
+func TestExecuteCustomPostCommand(t *testing.T) {
+	repo := initTestRepo(t)
+	withCwd(t, repo.dir)
+
+	cfg := &config.AppConfig{WorktreeDir: t.TempDir()}
+	m := NewModel(cfg, "")
+
+	targetPath := t.TempDir()
+	env := map[string]string{
+		"WORKTREE_PATH": targetPath,
+		"TEST_VAR":      "test-value",
+	}
+
+	cmd := m.executeCustomPostCommand("echo success", targetPath, env)
+	if cmd == nil {
+		t.Fatal("expected command to be returned")
+	}
+	if m.currentScreen != screenLoading {
+		t.Errorf("expected screenLoading, got %v", m.currentScreen)
+	}
+	if m.loadingScreen == nil {
+		t.Error("expected loading screen to be set")
+	}
+
+	// Execute the command
+	msg := cmd()
+	result, ok := msg.(customPostCommandResultMsg)
+	if !ok {
+		t.Fatalf("expected customPostCommandResultMsg, got %T", msg)
+	}
+	if result.err != nil {
+		t.Fatalf("unexpected error: %v", result.err)
+	}
+}
+
+func TestExecuteCustomPostCommandError(t *testing.T) {
+	repo := initTestRepo(t)
+	withCwd(t, repo.dir)
+
+	cfg := &config.AppConfig{WorktreeDir: t.TempDir()}
+	m := NewModel(cfg, "")
+
+	targetPath := t.TempDir()
+	env := map[string]string{}
+
+	cmd := m.executeCustomPostCommand("false", targetPath, env)
+	msg := cmd()
+	result, ok := msg.(customPostCommandResultMsg)
+	if !ok {
+		t.Fatalf("expected customPostCommandResultMsg, got %T", msg)
+	}
+	if result.err == nil {
+		t.Error("expected error from failing command")
+	}
+}

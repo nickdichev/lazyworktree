@@ -783,3 +783,183 @@ func TestLoadingScreenBorderColors(t *testing.T) {
 		t.Error("expected last color to be accent")
 	}
 }
+
+func TestChecklistScreenInit(t *testing.T) {
+	thm := theme.Dracula()
+	items := []ChecklistItem{
+		{Label: "Item 1", Checked: false},
+		{Label: "Item 2", Checked: true},
+	}
+	screen := NewChecklistScreen(items, "Title", "placeholder", "no results", 40, 20, thm)
+	cmd := screen.Init()
+	if cmd == nil {
+		t.Error("expected Init to return textinput.Blink command")
+	}
+}
+
+func TestConfirmScreenInit(t *testing.T) {
+	thm := theme.Dracula()
+	screen := NewConfirmScreen("Message", thm)
+	cmd := screen.Init()
+	if cmd != nil {
+		t.Error("expected Init to return nil command")
+	}
+}
+
+func TestInfoScreenInit(t *testing.T) {
+	thm := theme.Dracula()
+	screen := NewInfoScreen("Message", thm)
+	cmd := screen.Init()
+	if cmd != nil {
+		t.Error("expected Init to return nil command")
+	}
+}
+
+func TestInputScreenInit(t *testing.T) {
+	thm := theme.Dracula()
+	screen := NewInputScreen("Prompt", "placeholder", "default", thm)
+	cmd := screen.Init()
+	if cmd == nil {
+		t.Error("expected Init to return textinput.Blink command")
+	}
+}
+
+func TestInputScreenUpdate(t *testing.T) {
+	thm := theme.Dracula()
+	screen := NewInputScreen("Prompt", "placeholder", "default", thm)
+	screen.Init()
+
+	// Test Enter key submits value
+	screen.input.SetValue("test value")
+	_, cmd := screen.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if cmd == nil {
+		t.Error("expected command on Enter")
+	}
+	select {
+	case result := <-screen.result:
+		if result != "test value" {
+			t.Errorf("expected result 'test value', got %q", result)
+		}
+	default:
+		t.Error("expected result to be sent")
+	}
+
+	// Test Esc cancels
+	screen2 := NewInputScreen("Prompt", "placeholder", "default", thm)
+	screen2.Init()
+	_, cmd2 := screen2.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	if cmd2 == nil {
+		t.Error("expected command on Esc")
+	}
+	select {
+	case result := <-screen2.result:
+		if result != "" {
+			t.Errorf("expected empty result on cancel, got %q", result)
+		}
+	default:
+		t.Error("expected result to be sent")
+	}
+}
+
+func TestHelpScreenInit(t *testing.T) {
+	thm := theme.Dracula()
+	screen := NewHelpScreen(40, 20, nil, thm)
+	cmd := screen.Init()
+	if cmd != nil {
+		t.Error("expected Init to return nil command")
+	}
+}
+
+func TestHelpScreenUpdate(t *testing.T) {
+	thm := theme.Dracula()
+	screen := NewHelpScreen(40, 20, nil, thm)
+	screen.Init()
+
+	// Test / key starts search
+	_, cmd := screen.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("/")})
+	if !screen.searching {
+		t.Error("expected searching to be true after / key")
+	}
+	if cmd == nil {
+		t.Error("expected command to be returned")
+	}
+
+	// Test Enter in search mode
+	screen.searchInput.SetValue("test query")
+	_, _ = screen.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if screen.searching {
+		t.Error("expected searching to be false after Enter")
+	}
+	if screen.searchQuery != "test query" {
+		t.Errorf("expected searchQuery to be 'test query', got %q", screen.searchQuery)
+	}
+}
+
+func TestCommandPaletteScreenInit(t *testing.T) {
+	thm := theme.Dracula()
+	commands := []paletteItem{
+		{label: "Command 1"},
+		{label: "Command 2"},
+	}
+	screen := NewCommandPaletteScreen(commands, 40, 20, thm)
+	cmd := screen.Init()
+	if cmd == nil {
+		t.Error("expected Init to return textinput.Blink command")
+	}
+}
+
+func TestPRSelectionScreenInit(t *testing.T) {
+	thm := theme.Dracula()
+	prs := []*models.PRInfo{
+		{Number: 1, Title: "PR 1", Branch: "branch1"},
+		{Number: 2, Title: "PR 2", Branch: "branch2"},
+	}
+	screen := NewPRSelectionScreen(prs, 40, 20, thm, false)
+	cmd := screen.Init()
+	if cmd == nil {
+		t.Error("expected Init to return textinput.Blink command")
+	}
+}
+
+func TestPRSelectionScreenApplyFilter(t *testing.T) {
+	thm := theme.Dracula()
+	prs := []*models.PRInfo{
+		{Number: 1, Title: "Feature PR", Branch: "feature"},
+		{Number: 2, Title: "Bug Fix", Branch: "bugfix"},
+	}
+	screen := NewPRSelectionScreen(prs, 40, 20, thm, false)
+	screen.filterInput.SetValue("feature")
+	screen.applyFilter()
+	if len(screen.filtered) != 1 {
+		t.Errorf("expected 1 filtered PR, got %d", len(screen.filtered))
+	}
+	if screen.filtered[0].Number != 1 {
+		t.Errorf("expected filtered PR to be #1, got #%d", screen.filtered[0].Number)
+	}
+}
+
+func TestListSelectionScreenInit(t *testing.T) {
+	thm := theme.Dracula()
+	items := []selectionItem{
+		{id: "1", label: "Item 1"},
+		{id: "2", label: "Item 2"},
+	}
+	screen := NewListSelectionScreen(items, "Title", "placeholder", "no results", 40, 20, "", thm)
+	cmd := screen.Init()
+	if cmd == nil {
+		t.Error("expected Init to return textinput.Blink command")
+	}
+}
+
+func TestIssueSelectionScreenInit(t *testing.T) {
+	thm := theme.Dracula()
+	issues := []*models.IssueInfo{
+		{Number: 1, Title: "Issue 1"},
+		{Number: 2, Title: "Issue 2"},
+	}
+	screen := NewIssueSelectionScreen(issues, 40, 20, thm, false)
+	cmd := screen.Init()
+	if cmd == nil {
+		t.Error("expected Init to return textinput.Blink command")
+	}
+}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/chmouel/lazyworktree/internal/models"
 	"github.com/chmouel/lazyworktree/internal/utils"
@@ -982,6 +983,199 @@ func TestFormatCreateFromCurrentLabel(t *testing.T) {
 			// Verify result is at most 78 chars
 			if len(result) > 78 {
 				t.Errorf("formatCreateFromCurrentLabel(%q) result length = %d, want <= 78", tt.branch, len(result))
+			}
+		})
+	}
+}
+
+func TestFilterInputSuggestions(t *testing.T) {
+	tests := []struct {
+		name        string
+		suggestions []string
+		query       string
+		expected    []string
+	}{
+		{
+			name:        "empty query returns all suggestions",
+			suggestions: []string{"apple", "banana", "cherry"},
+			query:       "",
+			expected:    []string{"apple", "banana", "cherry"},
+		},
+		{
+			name:        "query with whitespace is trimmed",
+			suggestions: []string{"apple", "banana", "cherry"},
+			query:       "  app  ",
+			expected:    []string{"apple"},
+		},
+		{
+			name:        "exact match",
+			suggestions: []string{"apple", "banana", "cherry"},
+			query:       "apple",
+			expected:    []string{"apple"},
+		},
+		{
+			name:        "prefix match",
+			suggestions: []string{"apple", "application", "banana"},
+			query:       "app",
+			expected:    []string{"apple", "application"},
+		},
+		{
+			name:        "case insensitive match",
+			suggestions: []string{"Apple", "BANANA", "cherry"},
+			query:       "app",
+			expected:    []string{"Apple"},
+		},
+		{
+			name:        "fuzzy match",
+			suggestions: []string{"apple", "banana", "cherry", "apricot"},
+			query:       "apl",
+			expected:    []string{"apple"}, // fuzzyScoreLower may only match "apple" for "apl"
+		},
+		{
+			name:        "no matches returns empty",
+			suggestions: []string{"apple", "banana", "cherry"},
+			query:       "xyz",
+			expected:    []string{},
+		},
+		{
+			name:        "empty suggestions",
+			suggestions: []string{},
+			query:       "app",
+			expected:    []string{},
+		},
+		{
+			name:        "suggestions sorted by score",
+			suggestions: []string{"application", "apple", "apricot"},
+			query:       "ap",
+			expected:    []string{"apple", "application", "apricot"}, // All should match, verify all are present
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := filterInputSuggestions(tt.suggestions, tt.query)
+			if len(result) != len(tt.expected) {
+				t.Errorf("filterInputSuggestions() length = %d, want %d, got %v", len(result), len(tt.expected), result)
+				return
+			}
+			// Verify all expected items are present (order may vary for same scores)
+			for _, expected := range tt.expected {
+				found := false
+				for _, r := range result {
+					if r == expected {
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Errorf("filterInputSuggestions() missing expected item %q, got %v", expected, result)
+				}
+			}
+		})
+	}
+}
+
+func TestFormatRelativeTime(t *testing.T) {
+	now := time.Now()
+
+	tests := []struct {
+		name     string
+		time     time.Time
+		expected string
+	}{
+		{
+			name:     "just now",
+			time:     now.Add(-30 * time.Second),
+			expected: "just now",
+		},
+		{
+			name:     "1 minute ago",
+			time:     now.Add(-1 * time.Minute),
+			expected: "1 minute ago",
+		},
+		{
+			name:     "multiple minutes ago",
+			time:     now.Add(-5 * time.Minute),
+			expected: "5 minutes ago",
+		},
+		{
+			name:     "59 minutes ago",
+			time:     now.Add(-59 * time.Minute),
+			expected: "59 minutes ago",
+		},
+		{
+			name:     "1 hour ago",
+			time:     now.Add(-1 * time.Hour),
+			expected: "1 hour ago",
+		},
+		{
+			name:     "multiple hours ago",
+			time:     now.Add(-5 * time.Hour),
+			expected: "5 hours ago",
+		},
+		{
+			name:     "23 hours ago",
+			time:     now.Add(-23 * time.Hour),
+			expected: "23 hours ago",
+		},
+		{
+			name:     "yesterday",
+			time:     now.Add(-1 * 24 * time.Hour),
+			expected: "yesterday",
+		},
+		{
+			name:     "multiple days ago",
+			time:     now.Add(-3 * 24 * time.Hour),
+			expected: "3 days ago",
+		},
+		{
+			name:     "6 days ago",
+			time:     now.Add(-6 * 24 * time.Hour),
+			expected: "6 days ago",
+		},
+		{
+			name:     "1 week ago",
+			time:     now.Add(-7 * 24 * time.Hour),
+			expected: "1 week ago",
+		},
+		{
+			name:     "multiple weeks ago",
+			time:     now.Add(-14 * 24 * time.Hour),
+			expected: "2 weeks ago",
+		},
+		{
+			name:     "4 weeks ago",
+			time:     now.Add(-28 * 24 * time.Hour),
+			expected: "4 weeks ago",
+		},
+		{
+			name:     "more than 30 days ago",
+			time:     now.Add(-60 * 24 * time.Hour),
+			expected: "", // Will be formatted as date
+		},
+		{
+			name:     "far in the past",
+			time:     now.Add(-365 * 24 * time.Hour),
+			expected: "", // Will be formatted as date
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := formatRelativeTime(tt.time)
+			if tt.expected != "" {
+				if result != tt.expected {
+					t.Errorf("formatRelativeTime() = %q, want %q", result, tt.expected)
+				}
+			} else {
+				// For dates, verify it's formatted as "Jan 2, 2006"
+				if result == "" {
+					t.Error("formatRelativeTime() returned empty string for date format")
+				}
+				// Verify it contains a year (basic check)
+				if !strings.Contains(result, "200") && !strings.Contains(result, "202") && !strings.Contains(result, "199") {
+					t.Errorf("formatRelativeTime() = %q, expected date format", result)
+				}
 			}
 		})
 	}

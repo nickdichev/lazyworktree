@@ -2,11 +2,14 @@ package cli
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
 
+	"github.com/chmouel/lazyworktree/internal/config"
 	"github.com/chmouel/lazyworktree/internal/models"
+	"github.com/chmouel/lazyworktree/internal/security"
 )
 
 type fakeGitService struct {
@@ -147,4 +150,312 @@ func TestBuildCommandEnv(t *testing.T) {
 	if !reflect.DeepEqual(want, env) {
 		t.Fatalf("unexpected env: want=%#v got=%#v", want, env)
 	}
+}
+
+func TestCheckTrust(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	wtFile := filepath.Join(tmpDir, ".wt")
+
+	tests := []struct {
+		name        string
+		trustMode   string
+		trustStatus security.TrustStatus
+		wantErr     bool
+	}{
+		{
+			name:        "trust mode always",
+			trustMode:   "always",
+			trustStatus: security.TrustStatusUntrusted,
+			wantErr:     false,
+		},
+		{
+			name:        "trust mode never",
+			trustMode:   "never",
+			trustStatus: security.TrustStatusUntrusted,
+			wantErr:     true,
+		},
+		{
+			name:        "tofu mode trusted",
+			trustMode:   "tofu",
+			trustStatus: security.TrustStatusTrusted,
+			wantErr:     false,
+		},
+		{
+			name:        "tofu mode untrusted",
+			trustMode:   "tofu",
+			trustStatus: security.TrustStatusUntrusted,
+			wantErr:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &config.AppConfig{
+				TrustMode: tt.trustMode,
+			}
+
+			// Set up trust status if needed
+			if tt.trustMode == "tofu" {
+				if tt.trustStatus == security.TrustStatusTrusted {
+					tm := security.NewTrustManager()
+					_ = tm.TrustFile(wtFile)
+				} else {
+					// For untrusted, create a file that exists but isn't trusted
+					untrustedFile := filepath.Join(tmpDir, "untrusted.wt")
+					if err := os.WriteFile(untrustedFile, []byte("test"), 0o600); err != nil {
+						t.Fatalf("failed to create untrusted file: %v", err)
+					}
+					wtFile = untrustedFile
+				}
+			}
+
+			err := checkTrust(ctx, cfg, wtFile)
+			if tt.wantErr && err == nil {
+				t.Fatal("expected error but got none")
+			}
+			if !tt.wantErr && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestRunInitCommands(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	mainPath := tmpDir
+	wtPath := filepath.Join(tmpDir, "worktree")
+
+	cfg := &config.AppConfig{
+		InitCommands: []string{"echo init1", "echo init2"},
+	}
+
+	svc := &fakeGitService{
+		mainWorktreePath: mainPath,
+		resolveRepoName:  "test-repo",
+		executedCommands: nil, // Success
+	}
+
+	err := runInitCommands(ctx, svc, cfg, "branch", wtPath, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Test with no commands
+	cfg2 := &config.AppConfig{
+		InitCommands: []string{},
+	}
+	err = runInitCommands(ctx, svc, cfg2, "branch", wtPath, false)
+	if err != nil {
+		t.Fatalf("unexpected error with no commands: %v", err)
+	}
+}
+
+func TestRunTerminateCommands(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	mainPath := tmpDir
+	wtPath := filepath.Join(tmpDir, "worktree")
+
+	cfg := &config.AppConfig{
+		TerminateCommands: []string{"echo terminate1"},
+	}
+
+	svc := &fakeGitService{
+		mainWorktreePath: mainPath,
+		resolveRepoName:  "test-repo",
+		executedCommands: nil, // Success
+	}
+
+	err := runTerminateCommands(ctx, svc, cfg, "branch", wtPath, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Test with no commands
+	cfg2 := &config.AppConfig{
+		TerminateCommands: []string{},
+	}
+	err = runTerminateCommands(ctx, svc, cfg2, "branch", wtPath, false)
+	if err != nil {
+		t.Fatalf("unexpected error with no commands: %v", err)
+	}
+}
+
+func TestGetCurrentWorktreeWithChanges(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	wtPath := filepath.Join(tmpDir, "worktree")
+
+	worktrees := []*models.WorktreeInfo{
+		{Path: wtPath, Branch: "main"},
+	}
+
+	svc := &fakeGitService{
+		worktrees: worktrees,
+		runGitOutput: map[string]string{
+			filepath.Join("git", "status", "--porcelain"): "M file.txt\n",
+		},
+	}
+
+	// Mock os.Getwd
+	oldGetwd := osGetwd
+	osGetwd = func() (string, error) {
+		return wtPath, nil
+	}
+	defer func() { osGetwd = oldGetwd }()
+
+	wt, hasChanges, err := getCurrentWorktreeWithChanges(ctx, svc)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if wt == nil {
+		t.Fatal("expected worktree to be found")
+	}
+	if !hasChanges {
+		t.Error("expected changes to be detected")
+	}
+
+	// Test with no changes
+	svc2 := &fakeGitService{
+		worktrees: worktrees,
+		runGitOutput: map[string]string{
+			filepath.Join("git", "status", "--porcelain"): "",
+		},
+	}
+
+	wt2, hasChanges2, err := getCurrentWorktreeWithChanges(ctx, svc2)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if wt2 == nil {
+		t.Fatal("expected worktree to be found")
+	}
+	if hasChanges2 {
+		t.Error("expected no changes to be detected")
+	}
+}
+
+func TestCreateFromBranch(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	cfg := &config.AppConfig{
+		WorktreeDir:  tmpDir,
+		InitCommands: []string{},
+	}
+
+	t.Run("branch does not exist", func(t *testing.T) {
+		svc := &fakeGitService{
+			resolveRepoName: "test-repo",
+			runGitOutput: map[string]string{
+				filepath.Join("git", "rev-parse", "--verify", "nonexistent"): "",
+			},
+		}
+
+		err := CreateFromBranch(ctx, svc, cfg, "nonexistent", false, false)
+		if err == nil {
+			t.Fatal("expected error for nonexistent branch")
+		}
+	})
+
+	t.Run("path already exists", func(t *testing.T) {
+		repoName := "test-repo"
+		branchName := "existing"
+		targetPath := filepath.Join(tmpDir, repoName, branchName)
+
+		// Create the path
+		if err := os.MkdirAll(targetPath, 0o750); err != nil {
+			t.Fatalf("failed to create path: %v", err)
+		}
+
+		svc := &fakeGitService{
+			resolveRepoName: repoName,
+			runGitOutput: map[string]string{
+				filepath.Join("git", "rev-parse", "--verify", branchName): "abc123\n",
+			},
+		}
+
+		err := CreateFromBranch(ctx, svc, cfg, branchName, false, false)
+		if err == nil {
+			t.Fatal("expected error for existing path")
+		}
+	})
+
+	t.Run("successful creation", func(t *testing.T) {
+		repoName := "test-repo"
+		branchName := "new-branch"
+		mainPath := filepath.Join(tmpDir, "main")
+		if err := os.MkdirAll(mainPath, 0o750); err != nil {
+			t.Fatalf("failed to create main path: %v", err)
+		}
+
+		svc := &fakeGitService{
+			resolveRepoName:     repoName,
+			mainWorktreePath:    mainPath,
+			runCommandCheckedOK: true,
+			runGitOutput: map[string]string{
+				filepath.Join("git", "rev-parse", "--verify", branchName):              "abc123\n",
+				filepath.Join("git", "show-ref", "--verify", "refs/heads/"+branchName): "abc123\n",
+			},
+		}
+
+		err := CreateFromBranch(ctx, svc, cfg, branchName, false, true)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+}
+
+func TestDeleteWorktree(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	cfg := &config.AppConfig{
+		WorktreeDir:       tmpDir,
+		TerminateCommands: []string{},
+	}
+
+	t.Run("worktree not found", func(t *testing.T) {
+		svc := &fakeGitService{
+			resolveRepoName: "test-repo",
+			worktrees:       []*models.WorktreeInfo{},
+			worktreesErr:    nil,
+		}
+
+		err := DeleteWorktree(ctx, svc, cfg, "nonexistent", true, false)
+		if err == nil {
+			t.Fatal("expected error for nonexistent worktree")
+		}
+	})
+
+	t.Run("successful deletion", func(t *testing.T) {
+		wtPath := filepath.Join(tmpDir, "test-repo", "worktree")
+		worktrees := []*models.WorktreeInfo{
+			{Path: wtPath, Branch: "worktree"},
+		}
+
+		svc := &fakeGitService{
+			resolveRepoName:     "test-repo",
+			worktrees:           worktrees,
+			runCommandCheckedOK: true,
+		}
+
+		err := DeleteWorktree(ctx, svc, cfg, "worktree", true, true)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
 }

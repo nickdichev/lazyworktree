@@ -1383,3 +1383,228 @@ func TestGetMergedBranches(t *testing.T) {
 	assert.Contains(t, merged, "feature-branch")
 	assert.NotContains(t, merged, "unmerged-branch")
 }
+
+func TestFetchGitLabOpenIssues(t *testing.T) {
+	stub := "#!/bin/sh\n" +
+		"if [ \"$1\" = \"api\" ] && [ \"$2\" = \"issues?state=opened&per_page=100\" ]; then\n" +
+		"  echo '[{\"iid\":1,\"state\":\"opened\",\"title\":\"Issue One\",\"description\":\"Description one\",\"web_url\":\"https://example.com/issues/1\",\"author\":{\"username\":\"user1\",\"name\":\"User One\",\"bot\":false}},{\"iid\":2,\"state\":\"closed\",\"title\":\"Issue Two\",\"description\":\"Description two\",\"web_url\":\"https://example.com/issues/2\",\"author\":{\"username\":\"user2\",\"name\":\"User Two\",\"bot\":true}}]'\n" +
+		"  exit 0\n" +
+		"fi\n" +
+		"exit 0\n"
+	dir := writeStub(t, "glab", stub)
+	withStubbedPath(t, dir)
+
+	service := NewService(func(string, string) {}, func(string, string, string) {})
+	issues, err := service.fetchGitLabOpenIssues(context.Background())
+	require.NoError(t, err)
+	require.Len(t, issues, 1) // Only opened issues should be returned
+
+	issue := issues[0]
+	assert.Equal(t, 1, issue.Number)
+	assert.Equal(t, "open", issue.State)
+	assert.Equal(t, "Issue One", issue.Title)
+	assert.Equal(t, "Description one", issue.Body)
+	assert.Equal(t, "https://example.com/issues/1", issue.URL)
+	assert.Equal(t, "user1", issue.Author)
+	assert.Equal(t, "User One", issue.AuthorName)
+	assert.False(t, issue.AuthorIsBot)
+}
+
+func TestFetchGitLabOpenIssuesEmptyResponse(t *testing.T) {
+	stub := "#!/bin/sh\n" +
+		"if [ \"$1\" = \"api\" ] && [ \"$2\" = \"issues?state=opened&per_page=100\" ]; then\n" +
+		"  echo '[]'\n" + // Return empty JSON array, not empty string
+		"  exit 0\n" +
+		"fi\n" +
+		"exit 0\n"
+	dir := writeStub(t, "glab", stub)
+	withStubbedPath(t, dir)
+
+	service := NewService(func(string, string) {}, func(string, string, string) {})
+	issues, err := service.fetchGitLabOpenIssues(context.Background())
+	require.NoError(t, err)
+	assert.Empty(t, issues)
+}
+
+func TestFetchGitLabOpenIssuesInvalidJSON(t *testing.T) {
+	stub := "#!/bin/sh\n" +
+		"if [ \"$1\" = \"api\" ] && [ \"$2\" = \"issues?state=opened&per_page=100\" ]; then\n" +
+		"  echo 'invalid json'\n" +
+		"  exit 0\n" +
+		"fi\n" +
+		"exit 0\n"
+	dir := writeStub(t, "glab", stub)
+	withStubbedPath(t, dir)
+
+	notified := false
+	notifyOnce := func(key, msg, severity string) {
+		if key == "issue_json_decode_glab" && severity == "error" {
+			notified = true
+		}
+	}
+
+	service := NewService(func(string, string) {}, notifyOnce)
+	issues, err := service.fetchGitLabOpenIssues(context.Background())
+	require.Error(t, err)
+	assert.Nil(t, issues)
+	assert.True(t, notified, "expected notification for JSON decode error")
+}
+
+func TestFetchAllOpenIssuesGitHub(t *testing.T) {
+	stub := "#!/bin/sh\n" +
+		"if [ \"$1\" = \"issue\" ] && [ \"$2\" = \"list\" ]; then\n" +
+		"  echo '[{\"number\":1,\"state\":\"open\",\"title\":\"Issue One\",\"body\":\"Description\",\"url\":\"https://github.com/repo/issues/1\",\"author\":{\"login\":\"user1\",\"name\":\"User One\",\"is_bot\":false}},{\"number\":2,\"state\":\"closed\",\"title\":\"Issue Two\",\"body\":\"Description\",\"url\":\"https://github.com/repo/issues/2\",\"author\":{\"login\":\"user2\",\"name\":\"User Two\",\"is_bot\":true}}]'\n" +
+		"  exit 0\n" +
+		"fi\n" +
+		"exit 0\n"
+	dir := writeStub(t, "gh", stub)
+	withStubbedPath(t, dir)
+
+	service := NewService(func(string, string) {}, func(string, string, string) {})
+	service.gitHost = gitHostGithub // Force GitHub host
+
+	issues, err := service.FetchAllOpenIssues(context.Background())
+	require.NoError(t, err)
+	require.Len(t, issues, 1) // Only open issues should be returned
+
+	issue := issues[0]
+	assert.Equal(t, 1, issue.Number)
+	assert.Equal(t, "open", issue.State)
+	assert.Equal(t, "Issue One", issue.Title)
+	assert.Equal(t, "Description", issue.Body)
+	assert.Equal(t, "https://github.com/repo/issues/1", issue.URL)
+	assert.Equal(t, "user1", issue.Author)
+	assert.Equal(t, "User One", issue.AuthorName)
+	assert.False(t, issue.AuthorIsBot)
+}
+
+func TestFetchAllOpenIssuesGitLab(t *testing.T) {
+	stub := "#!/bin/sh\n" +
+		"if [ \"$1\" = \"api\" ] && [ \"$2\" = \"issues?state=opened&per_page=100\" ]; then\n" +
+		"  echo '[{\"iid\":1,\"state\":\"opened\",\"title\":\"Issue One\",\"description\":\"Description\",\"web_url\":\"https://gitlab.com/repo/issues/1\",\"author\":{\"username\":\"user1\",\"name\":\"User One\",\"bot\":false}}]'\n" +
+		"  exit 0\n" +
+		"fi\n" +
+		"exit 0\n"
+	dir := writeStub(t, "glab", stub)
+	withStubbedPath(t, dir)
+
+	service := NewService(func(string, string) {}, func(string, string, string) {})
+	service.gitHost = gitHostGitLab // Force GitLab host
+
+	issues, err := service.FetchAllOpenIssues(context.Background())
+	require.NoError(t, err)
+	require.Len(t, issues, 1)
+
+	issue := issues[0]
+	assert.Equal(t, 1, issue.Number)
+	assert.Equal(t, "open", issue.State)
+	assert.Equal(t, "Issue One", issue.Title)
+}
+
+func TestFetchAllOpenIssuesEmptyResponse(t *testing.T) {
+	// Test with empty string response (which should return empty slice before JSON parsing)
+	stub := "#!/bin/sh\n" +
+		"if [ \"$1\" = \"issue\" ] && [ \"$2\" = \"list\" ]; then\n" +
+		"  exit 0\n" + // Return nothing (empty output)
+		"fi\n" +
+		"exit 0\n"
+	dir := writeStub(t, "gh", stub)
+	withStubbedPath(t, dir)
+
+	service := NewService(func(string, string) {}, func(string, string, string) {})
+	service.gitHost = gitHostGithub
+
+	issues, err := service.FetchAllOpenIssues(context.Background())
+	require.NoError(t, err)
+	assert.Empty(t, issues)
+}
+
+func TestFetchAllOpenIssuesEmptyArray(t *testing.T) {
+	// Test with empty JSON array
+	stub := "#!/bin/sh\n" +
+		"if [ \"$1\" = \"issue\" ] && [ \"$2\" = \"list\" ]; then\n" +
+		"  echo '[]'\n" +
+		"  exit 0\n" +
+		"fi\n" +
+		"exit 0\n"
+	dir := writeStub(t, "gh", stub)
+	withStubbedPath(t, dir)
+
+	service := NewService(func(string, string) {}, func(string, string, string) {})
+	service.gitHost = gitHostGithub
+
+	issues, err := service.FetchAllOpenIssues(context.Background())
+	require.NoError(t, err)
+	assert.Empty(t, issues)
+}
+
+func TestFetchAllOpenIssuesInvalidJSON(t *testing.T) {
+	stub := "#!/bin/sh\n" +
+		"if [ \"$1\" = \"issue\" ] && [ \"$2\" = \"list\" ]; then\n" +
+		"  echo 'invalid json'\n" +
+		"  exit 0\n" +
+		"fi\n" +
+		"exit 0\n"
+	dir := writeStub(t, "gh", stub)
+	withStubbedPath(t, dir)
+
+	notified := false
+	notifyOnce := func(key, msg, severity string) {
+		if key == "issue_json_decode" && severity == "error" {
+			notified = true
+		}
+	}
+
+	service := NewService(func(string, string) {}, notifyOnce)
+	service.gitHost = gitHostGithub
+
+	issues, err := service.FetchAllOpenIssues(context.Background())
+	require.Error(t, err)
+	assert.Nil(t, issues)
+	assert.True(t, notified, "expected notification for JSON decode error")
+}
+
+func TestApplyGitPagerEdgeCases(t *testing.T) {
+	notify := func(_ string, _ string) {}
+	notifyOnce := func(_ string, _ string, _ string) {}
+
+	t.Run("empty diff returns empty", func(t *testing.T) {
+		service := NewService(notify, notifyOnce)
+		service.SetGitPager("cat") // Use cat as a simple pager
+		result := service.ApplyGitPager(context.Background(), "")
+		assert.Empty(t, result)
+	})
+
+	t.Run("pager disabled returns original diff", func(t *testing.T) {
+		service := NewService(notify, notifyOnce)
+		service.SetGitPager("")
+		diff := "test diff"
+		result := service.ApplyGitPager(context.Background(), diff)
+		assert.Equal(t, diff, result)
+	})
+
+	t.Run("pager command fails returns original diff", func(t *testing.T) {
+		service := NewService(notify, notifyOnce)
+		service.SetGitPager("nonexistent-command-that-fails")
+		diff := "test diff"
+		result := service.ApplyGitPager(context.Background(), diff)
+		assert.Equal(t, diff, result) // Should return original on error
+	})
+
+	t.Run("delta pager with args", func(t *testing.T) {
+		// Create a simple echo stub for delta
+		stub := "#!/bin/sh\n" +
+			"cat\n" + // Just pass through input
+			"exit 0\n"
+		dir := writeStub(t, "delta", stub)
+		withStubbedPath(t, dir)
+
+		service := NewService(notify, notifyOnce)
+		service.SetGitPager("delta")
+		service.SetGitPagerArgs([]string{"--syntax-theme", "Dracula"})
+		diff := "test diff content"
+		result := service.ApplyGitPager(context.Background(), diff)
+		// Should process the diff (may add formatting)
+		assert.NotNil(t, result)
+	})
+}

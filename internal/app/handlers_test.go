@@ -3935,3 +3935,279 @@ func TestPRDataResetSyncsRowsAndColumns(t *testing.T) {
 		t.Fatalf("expected 4 values in row after reset, got %d", len(rows[0]))
 	}
 }
+
+func TestClearSearchQuery(t *testing.T) {
+	cfg := &config.AppConfig{WorktreeDir: t.TempDir()}
+	m := NewModel(cfg, "")
+	m.searchTarget = searchTargetWorktrees
+	m.setSearchQuery(searchTargetWorktrees, "test query")
+	m.filterInput.SetValue("test")
+
+	m.clearSearchQuery()
+
+	if m.worktreeSearchQuery != "" {
+		t.Errorf("expected worktreeSearchQuery to be empty, got %q", m.worktreeSearchQuery)
+	}
+	if m.filterInput.Value() != "" {
+		t.Errorf("expected filterInput to be empty, got %q", m.filterInput.Value())
+	}
+}
+
+func TestRestoreFocusAfterSearch(t *testing.T) {
+	cfg := &config.AppConfig{WorktreeDir: t.TempDir()}
+	m := NewModel(cfg, "")
+
+	t.Run("restore focus to worktrees", func(t *testing.T) {
+		m.searchTarget = searchTargetWorktrees
+		m.restoreFocusAfterSearch()
+		if !m.worktreeTable.Focused() {
+			t.Error("expected worktreeTable to be focused")
+		}
+	})
+
+	t.Run("restore focus to log", func(t *testing.T) {
+		m.searchTarget = searchTargetLog
+		m.restoreFocusAfterSearch()
+		if !m.logTable.Focused() {
+			t.Error("expected logTable to be focused")
+		}
+	})
+}
+
+func TestRestoreFocusAfterFilter(t *testing.T) {
+	cfg := &config.AppConfig{WorktreeDir: t.TempDir()}
+	m := NewModel(cfg, "")
+
+	t.Run("restore focus to worktrees", func(t *testing.T) {
+		m.filterTarget = filterTargetWorktrees
+		m.restoreFocusAfterFilter()
+		if !m.worktreeTable.Focused() {
+			t.Error("expected worktreeTable to be focused")
+		}
+	})
+
+	t.Run("restore focus to log", func(t *testing.T) {
+		m.filterTarget = filterTargetLog
+		m.restoreFocusAfterFilter()
+		if !m.logTable.Focused() {
+			t.Error("expected logTable to be focused")
+		}
+	})
+}
+
+func TestHandleGotoTop(t *testing.T) {
+	cfg := &config.AppConfig{WorktreeDir: t.TempDir()}
+	m := NewModel(cfg, "")
+
+	t.Run("goto top on worktree pane", func(t *testing.T) {
+		m.focusedPane = 0
+		m.worktrees = []*models.WorktreeInfo{
+			{Path: filepath.Join(cfg.WorktreeDir, "wt1"), Branch: "branch1"},
+			{Path: filepath.Join(cfg.WorktreeDir, "wt2"), Branch: "branch2"},
+			{Path: filepath.Join(cfg.WorktreeDir, "wt3"), Branch: "branch3"},
+		}
+		m.worktreeTable.SetWidth(100)
+		m.updateTable()
+		m.updateTableColumns(m.worktreeTable.Width())
+		if len(m.worktreeTable.Rows()) == 0 {
+			t.Fatal("table has no rows after updateTable")
+		}
+		m.worktreeTable.SetCursor(2)
+		_, cmd := m.handleGotoTop()
+		if m.worktreeTable.Cursor() != 0 {
+			t.Errorf("expected cursor at top (0), got %d", m.worktreeTable.Cursor())
+		}
+		if cmd == nil {
+			t.Error("expected command to be returned")
+		}
+	})
+
+	t.Run("goto top on status pane", func(t *testing.T) {
+		m.focusedPane = 1
+		m.statusTreeFlat = []*StatusTreeNode{
+			{Path: "file1.txt", File: &StatusFile{Filename: "file1.txt"}},
+			{Path: "dir1", Children: []*StatusTreeNode{}},
+			{Path: "file2.txt", File: &StatusFile{Filename: "file2.txt"}},
+		}
+		m.statusTreeIndex = 2
+		_, cmd := m.handleGotoTop()
+		if m.statusTreeIndex != 0 {
+			t.Errorf("expected statusTreeIndex to be 0, got %d", m.statusTreeIndex)
+		}
+		if cmd != nil {
+			t.Error("expected nil command for status pane")
+		}
+	})
+
+	t.Run("goto top on log pane", func(t *testing.T) {
+		m.focusedPane = 2
+		m.logEntries = []commitLogEntry{
+			{sha: "abc123", message: "commit 1"},
+			{sha: "def456", message: "commit 2"},
+			{sha: "ghi789", message: "commit 3"},
+		}
+		m.setLogEntries(m.logEntries, false)
+		m.updateLogColumns(m.logTable.Width())
+		m.logTable.SetCursor(2)
+		_, cmd := m.handleGotoTop()
+		if m.logTable.Cursor() != 0 {
+			t.Errorf("expected cursor at top, got %d", m.logTable.Cursor())
+		}
+		// Command may or may not be nil - just verify the cursor moved
+		_ = cmd
+	})
+}
+
+func TestHandleGotoBottom(t *testing.T) {
+	cfg := &config.AppConfig{WorktreeDir: t.TempDir()}
+	m := NewModel(cfg, "")
+
+	t.Run("goto bottom on worktree pane", func(t *testing.T) {
+		m.focusedPane = 0
+		m.worktreeTable.SetCursor(0)
+		m.filteredWts = []*models.WorktreeInfo{
+			{Path: "wt1", Branch: "branch1"},
+			{Path: "wt2", Branch: "branch2"},
+			{Path: "wt3", Branch: "branch3"},
+		}
+		m.updateTable()
+		_, cmd := m.handleGotoBottom()
+		expectedBottom := len(m.filteredWts) - 1
+		if m.worktreeTable.Cursor() != expectedBottom {
+			t.Errorf("expected cursor at bottom (%d), got %d", expectedBottom, m.worktreeTable.Cursor())
+		}
+		if cmd == nil {
+			t.Error("expected command to be returned")
+		}
+	})
+
+	t.Run("goto bottom on status pane", func(t *testing.T) {
+		m.focusedPane = 1
+		m.statusTreeFlat = []*StatusTreeNode{
+			{Path: "file1.txt", File: &StatusFile{Filename: "file1.txt"}},
+			{Path: "dir1", Children: []*StatusTreeNode{}},
+			{Path: "file2.txt", File: &StatusFile{Filename: "file2.txt"}},
+		}
+		m.statusTreeIndex = 0
+		_, cmd := m.handleGotoBottom()
+		expectedBottom := len(m.statusTreeFlat) - 1
+		if m.statusTreeIndex != expectedBottom {
+			t.Errorf("expected statusTreeIndex to be %d, got %d", expectedBottom, m.statusTreeIndex)
+		}
+		// Command may or may not be nil - just verify the index changed
+		_ = cmd
+	})
+
+	t.Run("goto bottom on log pane", func(t *testing.T) {
+		m.focusedPane = 2
+		m.logTable.SetCursor(0)
+		m.logEntries = []commitLogEntry{
+			{sha: "abc123", message: "commit 1"},
+			{sha: "def456", message: "commit 2"},
+			{sha: "ghi789", message: "commit 3"},
+		}
+		m.setLogEntries(m.logEntries, false)
+		m.updateLogColumns(m.logTable.Width())
+		_, cmd := m.handleGotoBottom()
+		expectedBottom := len(m.logEntries) - 1
+		if m.logTable.Cursor() != expectedBottom {
+			t.Errorf("expected cursor at bottom (%d), got %d", expectedBottom, m.logTable.Cursor())
+		}
+		// Command may or may not be nil - just verify the cursor moved
+		_ = cmd
+	})
+}
+
+func TestHandleNextFolder(t *testing.T) {
+	cfg := &config.AppConfig{WorktreeDir: t.TempDir()}
+	m := NewModel(cfg, "")
+	m.focusedPane = 1
+
+	t.Run("empty status tree", func(t *testing.T) {
+		m.statusTreeFlat = []*StatusTreeNode{}
+		m.statusTreeIndex = 0
+		_, cmd := m.handleNextFolder()
+		if cmd != nil {
+			t.Error("expected nil command for empty tree")
+		}
+	})
+
+	t.Run("find next folder", func(t *testing.T) {
+		m.statusTreeFlat = []*StatusTreeNode{
+			{Path: "file1.txt", File: &StatusFile{Filename: "file1.txt"}},
+			{Path: "dir1", Children: []*StatusTreeNode{}},
+			{Path: "file2.txt", File: &StatusFile{Filename: "file2.txt"}},
+			{Path: "dir2", Children: []*StatusTreeNode{}},
+		}
+		m.statusTreeIndex = 0
+		_, cmd := m.handleNextFolder()
+		if m.statusTreeIndex != 1 {
+			t.Errorf("expected statusTreeIndex to be 1 (dir1), got %d", m.statusTreeIndex)
+		}
+		if cmd != nil {
+			t.Error("expected nil command")
+		}
+	})
+
+	t.Run("no next folder found", func(t *testing.T) {
+		m.statusTreeFlat = []*StatusTreeNode{
+			{Path: "file1.txt", File: &StatusFile{Filename: "file1.txt"}},
+			{Path: "dir1", Children: []*StatusTreeNode{}},
+		}
+		m.statusTreeIndex = 1 // Already at last folder
+		_, cmd := m.handleNextFolder()
+		if m.statusTreeIndex != 1 {
+			t.Errorf("expected statusTreeIndex to remain 1, got %d", m.statusTreeIndex)
+		}
+		if cmd != nil {
+			t.Error("expected nil command")
+		}
+	})
+}
+
+func TestHandlePrevFolder(t *testing.T) {
+	cfg := &config.AppConfig{WorktreeDir: t.TempDir()}
+	m := NewModel(cfg, "")
+	m.focusedPane = 1
+
+	t.Run("empty status tree", func(t *testing.T) {
+		m.statusTreeFlat = []*StatusTreeNode{}
+		m.statusTreeIndex = 0
+		_, cmd := m.handlePrevFolder()
+		if cmd != nil {
+			t.Error("expected nil command for empty tree")
+		}
+	})
+
+	t.Run("find previous folder", func(t *testing.T) {
+		m.statusTreeFlat = []*StatusTreeNode{
+			{Path: "dir1", Children: []*StatusTreeNode{}},
+			{Path: "file1.txt", File: &StatusFile{Filename: "file1.txt"}},
+			{Path: "dir2", Children: []*StatusTreeNode{}},
+			{Path: "file2.txt", File: &StatusFile{Filename: "file2.txt"}},
+		}
+		m.statusTreeIndex = 3
+		_, cmd := m.handlePrevFolder()
+		if m.statusTreeIndex != 2 {
+			t.Errorf("expected statusTreeIndex to be 2 (dir2), got %d", m.statusTreeIndex)
+		}
+		if cmd != nil {
+			t.Error("expected nil command")
+		}
+	})
+
+	t.Run("no previous folder found", func(t *testing.T) {
+		m.statusTreeFlat = []*StatusTreeNode{
+			{Path: "dir1", Children: []*StatusTreeNode{}},
+			{Path: "file1.txt", File: &StatusFile{Filename: "file1.txt"}},
+		}
+		m.statusTreeIndex = 0 // Already at first folder
+		_, cmd := m.handlePrevFolder()
+		if m.statusTreeIndex != 0 {
+			t.Errorf("expected statusTreeIndex to remain 0, got %d", m.statusTreeIndex)
+		}
+		if cmd != nil {
+			t.Error("expected nil command")
+		}
+	})
+}

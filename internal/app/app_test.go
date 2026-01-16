@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/bubbles/table"
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/chmouel/lazyworktree/internal/config"
 	"github.com/chmouel/lazyworktree/internal/models"
@@ -3672,5 +3673,221 @@ func TestFilterWorktreeEnvVars(t *testing.T) {
 				t.Errorf("filterWorktreeEnvVars() = %v, want %v", result, tt.expected)
 			}
 		})
+	}
+}
+
+func TestTruncateToHeightFromEnd(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		maxLines int
+		expected string
+	}{
+		{
+			name:     "fewer lines than max",
+			input:    "line1\nline2",
+			maxLines: 5,
+			expected: "line1\nline2",
+		},
+		{
+			name:     "exactly max lines",
+			input:    "line1\nline2\nline3",
+			maxLines: 3,
+			expected: "line1\nline2\nline3",
+		},
+		{
+			name:     "more lines than max",
+			input:    "line1\nline2\nline3\nline4\nline5",
+			maxLines: 3,
+			expected: "line3\nline4\nline5",
+		},
+		{
+			name:     "single line",
+			input:    "single line",
+			maxLines: 1,
+			expected: "single line",
+		},
+		{
+			name:     "empty string",
+			input:    "",
+			maxLines: 5,
+			expected: "",
+		},
+		{
+			name:     "maxLines zero",
+			input:    "line1\nline2",
+			maxLines: 0,
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := truncateToHeightFromEnd(tt.input, tt.maxLines)
+			if result != tt.expected {
+				t.Errorf("truncateToHeightFromEnd(%q, %d) = %q, want %q", tt.input, tt.maxLines, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestRenderZoomedLeftPane(t *testing.T) {
+	cfg := &config.AppConfig{WorktreeDir: t.TempDir()}
+	m := NewModel(cfg, "")
+	m.windowWidth = 100
+	m.windowHeight = 40
+	m.zoomedPane = 0
+
+	// Set up worktree table
+	m.worktrees = []*models.WorktreeInfo{
+		{Path: filepath.Join(cfg.WorktreeDir, "wt1"), Branch: "branch1"},
+	}
+	m.filteredWts = m.worktrees
+	m.worktreeTable.SetWidth(80)
+	m.updateTable()
+	m.updateTableColumns(m.worktreeTable.Width())
+
+	layout := layoutDims{
+		leftWidth:      80,
+		leftInnerWidth: 78,
+		bodyHeight:     30,
+	}
+
+	result := m.renderZoomedLeftPane(layout)
+	if result == "" {
+		t.Error("expected non-empty render result")
+	}
+	if !strings.Contains(result, "Worktrees") {
+		t.Error("expected render to contain 'Worktrees' title")
+	}
+}
+
+func TestRenderZoomedRightTopPane(t *testing.T) {
+	cfg := &config.AppConfig{WorktreeDir: t.TempDir()}
+	m := NewModel(cfg, "")
+	m.windowWidth = 100
+	m.windowHeight = 40
+	m.zoomedPane = 1
+
+	m.infoContent = "Test info"
+	m.statusContent = "Test status content"
+	m.statusViewport = viewport.New(50, 20)
+
+	layout := layoutDims{
+		rightWidth:          80,
+		rightInnerWidth:     78,
+		rightTopInnerHeight: 30,
+		bodyHeight:          30,
+	}
+
+	result := m.renderZoomedRightTopPane(layout)
+	if result == "" {
+		t.Error("expected non-empty render result")
+	}
+	if !strings.Contains(result, "Status") {
+		t.Error("expected render to contain 'Status' title")
+	}
+}
+
+func TestRenderZoomedRightBottomPane(t *testing.T) {
+	cfg := &config.AppConfig{WorktreeDir: t.TempDir()}
+	m := NewModel(cfg, "")
+	m.windowWidth = 100
+	m.windowHeight = 40
+	m.zoomedPane = 2
+
+	m.logEntries = []commitLogEntry{
+		{sha: "abc123", message: "commit 1"},
+		{sha: "def456", message: "commit 2"},
+	}
+	m.setLogEntries(m.logEntries, false)
+	m.logTable.SetWidth(80)
+	m.updateLogColumns(m.logTable.Width())
+
+	layout := layoutDims{
+		rightWidth:      80,
+		rightInnerWidth: 78,
+		bodyHeight:      30,
+	}
+
+	result := m.renderZoomedRightBottomPane(layout)
+	if result == "" {
+		t.Error("expected non-empty render result")
+	}
+	if !strings.Contains(result, "Log") {
+		t.Error("expected render to contain 'Log' title")
+	}
+}
+
+func TestShowCreateFromCurrent(t *testing.T) {
+	cfg := &config.AppConfig{WorktreeDir: t.TempDir()}
+	m := NewModel(cfg, "")
+
+	// Create a test git repo
+	tmpDir := t.TempDir()
+	origDir, _ := os.Getwd()
+	defer func() { _ = os.Chdir(origDir) }()
+	_ = os.Chdir(tmpDir)
+
+	// Initialize git repo
+	_ = exec.Command("git", "init", "-b", "main").Run()
+	_ = exec.Command("git", "config", "user.email", "test@test.com").Run()
+	_ = exec.Command("git", "config", "user.name", "Test").Run()
+	_ = exec.Command("git", "config", "commit.gpgsign", "false").Run()
+	_ = os.WriteFile("file.txt", []byte("test"), 0o600)
+	_ = exec.Command("git", "add", "file.txt").Run()
+	_ = exec.Command("git", "commit", "-m", "initial").Run()
+
+	// Set up model with worktree pointing to this repo
+	m.worktrees = []*models.WorktreeInfo{
+		{Path: tmpDir, Branch: "main", IsMain: true},
+	}
+	m.filteredWts = m.worktrees
+
+	// Test showCreateFromCurrent
+	cmd := m.showCreateFromCurrent()
+	if cmd == nil {
+		t.Fatal("expected command to be returned")
+	}
+
+	msg := cmd()
+	switch v := msg.(type) {
+	case createFromCurrentReadyMsg:
+		if v.currentWorktree == nil {
+			t.Error("expected currentWorktree to be set")
+		}
+		if v.currentBranch == "" {
+			t.Error("expected currentBranch to be set")
+		}
+		if v.defaultBranchName == "" {
+			t.Error("expected defaultBranchName to be set")
+		}
+	case errMsg:
+		t.Fatalf("unexpected error: %v", v.err)
+	default:
+		t.Fatalf("unexpected message type: %T", msg)
+	}
+}
+
+func TestShowCreateFromCurrentNoWorktree(t *testing.T) {
+	cfg := &config.AppConfig{WorktreeDir: t.TempDir()}
+	m := NewModel(cfg, "")
+
+	// No worktrees set up
+	m.worktrees = []*models.WorktreeInfo{}
+	m.filteredWts = m.worktrees
+
+	cmd := m.showCreateFromCurrent()
+	if cmd == nil {
+		t.Fatal("expected command to be returned")
+	}
+
+	msg := cmd()
+	errMsg, ok := msg.(errMsg)
+	if !ok {
+		t.Fatalf("expected errMsg, got %T", msg)
+	}
+	if errMsg.err == nil {
+		t.Error("expected error to be set")
 	}
 }
