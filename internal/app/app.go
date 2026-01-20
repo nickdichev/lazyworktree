@@ -2748,6 +2748,15 @@ func (m *Model) openTmuxSession(tmuxCfg *config.TmuxCommand, wt *models.Worktree
 		}
 	}
 
+	// Run direnv allow if .envrc exists to prevent shell hang waiting for approval
+	envrcPath := filepath.Join(wt.Path, ".envrc")
+	if _, statErr := os.Stat(envrcPath); statErr == nil {
+		// #nosec G204 -- direnv allow is a safe, well-known command
+		direnvCmd := exec.CommandContext(m.ctx, "direnv", "allow")
+		direnvCmd.Dir = wt.Path
+		_ = direnvCmd.Run() // best-effort, ignore errors if direnv not installed
+	}
+
 	scriptCfg := *tmuxCfg
 	scriptCfg.Attach = false
 	env["LW_TMUX_SESSION_FILE"] = sessionPath
@@ -2813,6 +2822,15 @@ func (m *Model) openZellijSession(zellijCfg *config.TmuxCommand, wt *models.Work
 		return func() tea.Msg {
 			return errMsg{err: closeErr}
 		}
+	}
+
+	// Run direnv allow if .envrc exists to prevent shell hang waiting for approval
+	envrcPath := filepath.Join(wt.Path, ".envrc")
+	if _, statErr := os.Stat(envrcPath); statErr == nil {
+		// #nosec G204 -- direnv allow is a safe, well-known command
+		direnvCmd := exec.CommandContext(m.ctx, "direnv", "allow")
+		direnvCmd.Dir = wt.Path
+		_ = direnvCmd.Run() // best-effort, ignore errors if direnv not installed
 	}
 
 	scriptCfg := *zellijCfg
