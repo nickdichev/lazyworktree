@@ -489,9 +489,7 @@ func NewModel(cfg *config.AppConfig, initialFilter string) *Model {
 		Foreground(thm.AccentFg). // Text color that contrasts with Accent background
 		Background(thm.Accent).   // Use Accent instead of AccentDim for better visibility
 		Bold(true)
-	// Add subtle background to unselected cells for better readability
-	s.Cell = s.Cell.
-		Foreground(thm.TextFg)
+	// Don't set Foreground on Cell - let Selected style's foreground take effect
 	t.SetStyles(s)
 
 	statusVp := viewport.New(40, 5)
@@ -4669,8 +4667,7 @@ func (m *Model) UpdateTheme(themeName string) {
 		Foreground(thm.AccentFg).
 		Background(thm.Accent).
 		Bold(true)
-	s.Cell = s.Cell.
-		Foreground(thm.TextFg)
+	// Don't set Foreground on Cell - let Selected style's foreground take effect
 
 	m.worktreeTable.SetStyles(s)
 	m.logTable.SetStyles(s)

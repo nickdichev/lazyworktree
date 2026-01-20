@@ -74,8 +74,8 @@ const (
 func Dracula() *Theme {
 	return &Theme{
 		Background: lipgloss.Color("#282A36"), // Background
-		Accent:     lipgloss.Color("#BD93F9"), // Purple (primary accent)
-		AccentFg:   lipgloss.Color("#282A36"), // Dark text on accent
+		Accent:     lipgloss.Color("#C68FE6"), // Purple (primary accent)
+		AccentFg:   lipgloss.Color("#44475A"), // Dark text on accent
 		AccentDim:  lipgloss.Color("#44475A"), // Current Line / Selection
 		Border:     lipgloss.Color("#44475A"), // Use selection color for subtle borders
 		BorderDim:  lipgloss.Color("#343746"), // Slightly darker for inactive
