@@ -2837,6 +2837,11 @@ func (m *Model) openZellijSession(zellijCfg *config.TmuxCommand, wt *models.Work
 	scriptCfg.Attach = false
 	env["LW_ZELLIJ_SESSION_FILE"] = sessionPath
 	script := buildZellijScript(sessionName, &scriptCfg, layoutPaths)
+
+	// DEBUG: Write script to temp file for inspection
+	debugFile := filepath.Join(os.TempDir(), "lazyworktree-zellij-debug.sh")
+	_ = os.WriteFile(debugFile, []byte(fmt.Sprintf("# Session: %s\n# WorktreePath: %s\n# InsideZellij: %v\n# Attach: %v\n\n%s", sessionName, wt.Path, insideZellij, zellijCfg.Attach, script)), 0o644)
+
 	// #nosec G204 -- command is built from user-configured zellij session settings.
 	c := m.commandRunner("bash", "-lc", script)
 	c.Dir = wt.Path
